@@ -141,7 +141,7 @@ export class Game {
       return
     }
 
-    const result = this.trees.chop(hit.treeId)
+    const result = this.trees.chop(hit.treeId, this.player.position)
     if (!result) return
 
     // Score increments exactly when chop() succeeds.

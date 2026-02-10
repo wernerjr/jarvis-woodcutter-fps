@@ -1,6 +1,10 @@
 import * as THREE from 'three'
 import { mulberry32 } from './util.js'
 
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3)
+}
+
 function makeTreeMesh(rng) {
   const group = new THREE.Group()
 
@@ -30,6 +34,10 @@ function makeTreeMesh(rng) {
     trunkR,
     leafR,
     cut: false,
+    falling: false,
+    fallT: 0,
+    fallDirX: 0,
+    fallDirZ: 1,
     respawnRemaining: 0,
   }
 
@@ -76,21 +84,42 @@ export class TreeManager {
   }
 
   update(dt) {
-    // update colliders + respawn (dt-based so pause freezes timers)
+    // update colliders + fall/respawn (dt-based so pause freezes timers)
     const t = performance.now()
     for (const { mesh, sphere } of this._trees.values()) {
       // keep collider centered if animating
       const trunkH = mesh.userData.trunkH
       sphere.center.set(mesh.position.x, mesh.position.y + trunkH * 0.8, mesh.position.z)
 
+      if (mesh.userData.falling) {
+        mesh.userData.fallT = Math.min(1, mesh.userData.fallT + dt / 0.55)
+        const p = easeOutCubic(mesh.userData.fallT)
+        const ang = p * (Math.PI / 2)
+
+        // Fall away from player: use dir in XZ to compute tilt on x/z.
+        const dx = mesh.userData.fallDirX
+        const dz = mesh.userData.fallDirZ
+        mesh.rotation.x = dz * ang
+        mesh.rotation.z = -dx * ang
+
+        if (mesh.userData.fallT >= 1) {
+          mesh.userData.falling = false
+          mesh.userData.cut = true
+          mesh.userData.respawnRemaining = this._respawnSec
+          mesh.visible = false
+        }
+        continue
+      }
+
       if (mesh.userData.cut) {
         mesh.userData.respawnRemaining = Math.max(0, (mesh.userData.respawnRemaining ?? 0) - dt)
         if (mesh.userData.respawnRemaining === 0) this._respawn(mesh)
-      } else {
-        // simple "sway" for alive trees
-        const sway = Math.sin((mesh.position.x + mesh.position.z + t * 0.0006)) * 0.01
-        mesh.rotation.z = sway
+        continue
       }
+
+      // simple "sway" for alive trees
+      const sway = Math.sin((mesh.position.x + mesh.position.z + t * 0.0006)) * 0.01
+      mesh.rotation.z = sway
     }
   }
 
@@ -98,8 +127,9 @@ export class TreeManager {
     const out = []
     for (const { mesh } of this._trees.values()) {
       if (!mesh.visible) continue
+      // Keep collision while falling; remove only after it's gone.
       if (mesh.userData.cut) continue
-      out.push({ x: mesh.position.x, z: mesh.position.z, r: Math.max(0.18, mesh.userData.trunkR) + 0.08 })
+      out.push({ x: mesh.position.x, z: mesh.position.z, r: Math.max(0.18, mesh.userData.trunkR) + 0.10 })
     }
     return out
   }
@@ -124,22 +154,31 @@ export class TreeManager {
     return { treeId, distance: hit.distance }
   }
 
-  chop(treeId) {
+  chop(treeId, playerPos) {
     const item = this._trees.get(String(treeId))
     if (!item) return false
     const { mesh } = item
 
-    if (mesh.userData.cut) return false
+    if (mesh.userData.cut || mesh.userData.falling) return false
 
-    mesh.userData.cut = true
-    mesh.userData.respawnRemaining = this._respawnSec
+    // Start falling animation. Tree is considered "cut" for score purposes now.
+    mesh.userData.falling = true
+    mesh.userData.fallT = 0
 
-    // cut animation: shrink + tilt
-    mesh.rotation.x = -0.08
-    mesh.scale.set(1, 0.2, 1)
-    mesh.position.y = 0.05
+    // Fall direction: away from player (normalized XZ).
+    let dx = mesh.position.x - (playerPos?.x ?? 0)
+    let dz = mesh.position.z - (playerPos?.z ?? 0)
+    const len = Math.hypot(dx, dz) || 1
+    dx /= len
+    dz /= len
+    mesh.userData.fallDirX = dx
+    mesh.userData.fallDirZ = dz
 
-    // hide leaves first for clarity
+    // Make sure it's visible and full size.
+    mesh.visible = true
+    mesh.scale.set(1, 1, 1)
+
+    // Hide leaves early so the fall reads better.
     for (const child of mesh.children) {
       if (child.geometry?.type?.includes('Cone')) child.visible = false
     }
@@ -155,8 +194,11 @@ export class TreeManager {
 
   _respawn(mesh) {
     mesh.userData.cut = false
+    mesh.userData.falling = false
+    mesh.userData.fallT = 0
     mesh.userData.respawnRemaining = 0
 
+    mesh.visible = true
     mesh.scale.set(1, 1, 1)
     mesh.rotation.x = 0
     mesh.rotation.z = 0

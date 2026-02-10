@@ -39,8 +39,10 @@ export class Player {
 
     // Simple "axe" in view (Jarvis the lumberjack robot)
     this._swingT = 0
-    this._axe = this._makeAxe()
-    this.camera.add(this._axe)
+    const { pivot, model } = this._makeAxe()
+    this._axePivot = pivot
+    this._axeModel = model
+    this.camera.add(this._axePivot)
 
     this._onKeyDown = (e) => this._keys.add(e.code)
     this._onKeyUp = (e) => this._keys.delete(e.code)
@@ -161,40 +163,55 @@ export class Player {
     const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
     const swing = Math.sin(ease * Math.PI)
 
-    this._axe.rotation.z = -0.45 - swing * 0.90
-    this._axe.rotation.x = -0.25 + swing * 0.45
+    // Rotate around a plausible hand/grip pivot.
+    this._axePivot.rotation.z = -0.20 - swing * 0.95
+    this._axePivot.rotation.x = -0.35 + swing * 0.55
+    this._axePivot.rotation.y = 0.10 + swing * 0.10
 
     this._applyTransforms()
   }
 
   _makeAxe() {
-    const group = new THREE.Group()
+    // Pivot is placed near the robot "hand"; the model is offset so the grip sits at the pivot.
+    const pivot = new THREE.Group()
+    const model = new THREE.Group()
 
+    // handle
     const handleGeo = new THREE.CylinderGeometry(0.03, 0.04, 0.75, 8)
     const handleMat = new THREE.MeshStandardMaterial({ color: 0x3e2a18, roughness: 1 })
     const handle = new THREE.Mesh(handleGeo, handleMat)
-    handle.position.set(0.25, -0.18, -0.55)
-    handle.rotation.z = 0.15
+    handle.rotation.z = 0.12
 
+    // head + blade
     const headGeo = new THREE.BoxGeometry(0.18, 0.12, 0.08)
     const headMat = new THREE.MeshStandardMaterial({ color: 0x9aa4ad, roughness: 0.35, metalness: 0.8 })
     const head = new THREE.Mesh(headGeo, headMat)
-    head.position.set(0.25, 0.12, -0.55)
 
     const bladeGeo = new THREE.BoxGeometry(0.06, 0.14, 0.24)
     const bladeMat = new THREE.MeshStandardMaterial({ color: 0xcbd2d8, roughness: 0.25, metalness: 1.0 })
     const blade = new THREE.Mesh(bladeGeo, bladeMat)
-    blade.position.set(0.33, 0.12, -0.55)
 
-    group.add(handle)
-    group.add(head)
-    group.add(blade)
+    // Arrange along local Y then rotate model into camera-space.
+    handle.position.set(0, 0.33, 0)
+    head.position.set(0.08, 0.67, 0)
+    blade.position.set(0.14, 0.67, 0)
 
-    // base pose
-    group.position.set(0.15, -0.1, -0.05)
-    group.rotation.set(-0.25, 0.25, -0.45)
+    model.add(handle)
+    model.add(head)
+    model.add(blade)
 
-    return group
+    // Move model so the grip/base is at pivot origin.
+    model.position.set(0.0, -0.12, -0.02)
+
+    // Place pivot in view.
+    pivot.position.set(0.22, -0.22, -0.38)
+    pivot.rotation.set(-0.35, 0.10, -0.20)
+
+    // Rotate model so it reads like an axe held forward.
+    model.rotation.set(-0.35, 0.55, 0.10)
+
+    pivot.add(model)
+    return { pivot, model }
   }
 
   _resolveCollisions(nextPos, colliders) {
