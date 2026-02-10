@@ -55,6 +55,7 @@ export class UI {
   }
 
   showInventory() {
+    document.body.classList.add('inventory-open')
     this.els.inventoryEl.classList.remove('hidden')
     this.els.craftingEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
@@ -64,6 +65,7 @@ export class UI {
   }
 
   hideInventory() {
+    document.body.classList.remove('inventory-open')
     this.els.inventoryEl.classList.add('hidden')
   }
 
@@ -140,13 +142,19 @@ export class UI {
       const idx = Number(el.getAttribute('data-idx'))
       const s = slots[idx]
       el.classList.toggle('active', idx === activeIdx)
-      const ico = el.querySelector('.ico')
+      const ico = el.querySelector('.hotIco')
       if (!ico) return
+
+      if (idx === 0) {
+        ico.textContent = '✋'
+        return
+      }
+
       if (!s) {
-        ico.textContent = ' '
+        ico.textContent = ''
       } else {
-        const it = getItem(s.itemId)
-        ico.textContent = it?.icon ?? ' '
+        const it = getItem(s.id)
+        ico.textContent = it?.icon ?? ''
       }
     })
   }

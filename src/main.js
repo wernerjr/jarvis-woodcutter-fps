@@ -41,29 +41,74 @@ document.querySelector('#invGrid').addEventListener('contextmenu', (e) => {
   game.requestRemoveInventorySlot(idx)
 })
 
-// Drag: inventory -> hotbar
+// Drag: inventory <-> hotbar (only when inventory is open)
 const invGrid = document.querySelector('#invGrid')
 invGrid.addEventListener('dragstart', (e) => {
+  if (!document.body.classList.contains('inventory-open')) return
   const slot = e.target?.closest?.('.invSlot')
   if (!slot) return
   const idx = Number(slot.dataset.index)
   if (Number.isNaN(idx)) return
-  e.dataTransfer?.setData('text/plain', String(idx))
+  e.dataTransfer?.setData('application/json', JSON.stringify({ from: 'inv', idx }))
+})
+
+invGrid.addEventListener('dragover', (e) => {
+  if (!document.body.classList.contains('inventory-open')) return
+  e.preventDefault()
+})
+
+invGrid.addEventListener('drop', (e) => {
+  if (!document.body.classList.contains('inventory-open')) return
+  const data = e.dataTransfer?.getData('application/json')
+  if (!data) return
+  let payload
+  try {
+    payload = JSON.parse(data)
+  } catch {
+    return
+  }
+
+  const toSlot = e.target?.closest?.('.invSlot')
+  if (!toSlot) return
+  const toIdx = Number(toSlot.dataset.index)
+  if (Number.isNaN(toIdx)) return
+
+  game.moveItem(payload, { to: 'inv', idx: toIdx })
 })
 
 document.querySelectorAll('#hotbar .hotSlot').forEach((el) => {
+  el.addEventListener('dragstart', (e) => {
+    if (!document.body.classList.contains('inventory-open')) return
+    const hotIdx = Number(el.getAttribute('data-idx'))
+    if (Number.isNaN(hotIdx) || hotIdx === 0) return
+    e.dataTransfer?.setData('application/json', JSON.stringify({ from: 'hot', idx: hotIdx }))
+  })
+
   el.addEventListener('dragover', (e) => {
+    if (!document.body.classList.contains('inventory-open')) return
+    const hotIdx = Number(el.getAttribute('data-idx'))
+    if (Number.isNaN(hotIdx) || hotIdx === 0) return
     e.preventDefault()
     el.classList.add('drop')
   })
   el.addEventListener('dragleave', () => el.classList.remove('drop'))
   el.addEventListener('drop', (e) => {
+    if (!document.body.classList.contains('inventory-open')) return
     e.preventDefault()
     el.classList.remove('drop')
-    const invIdx = Number(e.dataTransfer?.getData('text/plain'))
     const hotIdx = Number(el.getAttribute('data-idx'))
-    if (Number.isNaN(invIdx) || Number.isNaN(hotIdx)) return
-    game.bindHotbar(hotIdx, invIdx)
+    if (Number.isNaN(hotIdx) || hotIdx === 0) return
+
+    const data = e.dataTransfer?.getData('application/json')
+    if (!data) return
+    let payload
+    try {
+      payload = JSON.parse(data)
+    } catch {
+      return
+    }
+
+    game.moveItem(payload, { to: 'hot', idx: hotIdx })
   })
 
   el.addEventListener('click', () => {

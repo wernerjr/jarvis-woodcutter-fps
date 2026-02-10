@@ -46,12 +46,17 @@ html,body{height:100%; margin:0; background:var(--bg); overflow:hidden; font-fam
 #toast.show{opacity:1; transform: translateY(0px)}
 #reticle{position:fixed; left:50%; top:50%; width:10px; height:10px; margin-left:-5px; margin-top:-5px; border:1px solid rgba(231,240,231,0.9); border-radius:50%; box-shadow:0 0 0 2px rgba(0,0,0,.25);}
 
-#hotbar{position:fixed; left:50%; bottom:14px; transform: translateX(-50%); display:flex; gap:10px; pointer-events:none;}
-.hotSlot{pointer-events:auto; border:1px solid var(--stroke); border-radius:12px; padding:8px 10px; background: rgba(10,18,10,0.55); color:var(--muted); font-size:12px; min-width:72px; display:flex; align-items:center; justify-content:center; gap:10px; text-align:center; text-shadow:0 2px 12px rgba(0,0,0,.6)}
-.hotSlot .ico{font-size:20px; line-height:1; color:var(--fg)}
+#hotbar{position:fixed; left:50%; bottom:14px; transform: translateX(-50%); display:flex; gap:10px; pointer-events:auto;}
+.hotSlot{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-height:58px; width:78px; padding:10px; text-align:center; background: rgba(10,18,10,0.55)}
+.hotSlot.fixed{opacity:0.95}
 .hotSlot.drop{border-color: rgba(159,245,168,0.55); background: rgba(159,245,168,0.10)}
-.hotSlot .k{display:inline-block; min-width:14px; padding:1px 6px; border:1px solid rgba(231,240,231,0.10); border-radius:10px; margin-right:6px; color:var(--fg); background: rgba(255,255,255,0.04)}
-.hotSlot.active{border-color: rgba(159,245,168,0.45); background: rgba(159,245,168,0.12); color: var(--fg); transform: translateY(-1px);}
+.hotSlot.active{border-color: rgba(159,245,168,0.55); background: rgba(159,245,168,0.12); transform: translateY(-1px);}
+.hotNum{font-size:11px; color:var(--muted); border:1px solid rgba(231,240,231,0.10); border-radius:999px; padding:1px 6px; width:max-content;}
+.hotIco{font-size:20px; line-height:1; color:var(--fg)}
+
+/* Drag safety: only allow dragging hotbar when inventory is open */
+body.inventory-open #hotbar{pointer-events:auto;}
+body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 
 /* Overlays */
 .overlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:24px; background: radial-gradient(1000px 600px at 50% 40%, rgba(10,18,10,0.72), rgba(0,0,0,0.80)); pointer-events:auto;}

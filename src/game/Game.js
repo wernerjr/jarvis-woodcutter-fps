@@ -76,8 +76,8 @@ export class Game {
     this._onMouseDown = (e) => this._onMouseDownAny(e)
     this._onMouseUp = (e) => this._onMouseUpAny(e)
 
-    // Hotbar bindings (inventory items). 'hand' is virtual.
-    this.hotbar = [{ itemId: ItemId.AXE }, { itemId: 'hand' }, { itemId: ItemId.TORCH }]
+    // Hotbar items (separate container). Slot 0 is fixed hand.
+    this.hotbar = Array.from({ length: 10 }, (_, i) => (i === 0 ? { id: 'hand', qty: 1 } : null))
     this.hotbarActive = 0
 
     this.tool = 'axe'
@@ -153,19 +153,17 @@ export class Game {
   }
 
   _onKeyDownAny(e) {
-    // Hotbar slots
-    if (e.code === 'Digit1') {
-      this.selectHotbar(0)
-      return
-    }
-    if (e.code === 'Digit2') {
-      this.selectHotbar(1)
-      return
-    }
-    if (e.code === 'Digit3') {
-      this.selectHotbar(2)
-      return
-    }
+    // Hotbar slots (1-0 => idx 0-9)
+    if (e.code === 'Digit1') return void this.selectHotbar(0)
+    if (e.code === 'Digit2') return void this.selectHotbar(1)
+    if (e.code === 'Digit3') return void this.selectHotbar(2)
+    if (e.code === 'Digit4') return void this.selectHotbar(3)
+    if (e.code === 'Digit5') return void this.selectHotbar(4)
+    if (e.code === 'Digit6') return void this.selectHotbar(5)
+    if (e.code === 'Digit7') return void this.selectHotbar(6)
+    if (e.code === 'Digit8') return void this.selectHotbar(7)
+    if (e.code === 'Digit9') return void this.selectHotbar(8)
+    if (e.code === 'Digit0') return void this.selectHotbar(9)
 
     // Jump
     if (e.code === 'Space') {
@@ -268,12 +266,12 @@ export class Game {
     }
 
     // Apply damage per-swing (TreeManager ignores falling/cut).
-    // Durability: consume 1 per valid hit that deals damage.
-    const meta = this.inventory.getFirstMeta(ItemId.AXE)
-    if (!meta || meta.dur <= 0) {
+    // Durability: consume 1 per valid hit that deals damage (equipped axe).
+    const axeSlot = this.hotbar[this.hotbarActive]
+    const meta = axeSlot?.meta
+    if (!axeSlot || axeSlot.id !== ItemId.AXE || !meta || meta.dur <= 0) {
       this.ui.toast('Seu machado quebrou.', 1100)
-      this.inventory.removeOne(ItemId.AXE)
-      this.setTool('hand')
+      this.hotbar[this.hotbarActive] = null
       this._cleanupHotbarBroken(ItemId.AXE)
       return
     }
@@ -282,11 +280,10 @@ export class Game {
     const dmgResult = this.trees.damage(hit.treeId, dmg, this.player.position)
     if (!dmgResult) return
 
-    this.inventory.setFirstMeta(ItemId.AXE, { dur: Math.max(0, meta.dur - 1) })
-    if (meta.dur - 1 <= 0) {
+    meta.dur = Math.max(0, meta.dur - 1)
+    if (meta.dur <= 0) {
       this.ui.toast('Machado quebrou!', 1200)
-      this.inventory.removeOne(ItemId.AXE)
-      this.setTool('hand')
+      this.hotbar[this.hotbarActive] = null
       this._cleanupHotbarBroken(ItemId.AXE)
     }
 
@@ -333,8 +330,8 @@ export class Game {
     this.ui.setScore(0)
     this.inventory.clear()
 
-    // Start with one axe so the game is playable; torch comes from crafting.
-    this.inventory.add(ItemId.AXE, 1, { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX })
+    // Start with one axe equipped in hotbar slot 2.
+    this.hotbar[1] = { id: ItemId.AXE, qty: 1, meta: { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX } }
 
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
@@ -380,8 +377,13 @@ export class Game {
     this.score = 0
     this.ui.setScore(0)
     this.inventory.clear()
-    this.inventory.add(ItemId.AXE, 1, { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX })
+
+    this.hotbar = Array.from({ length: 10 }, (_, i) => (i === 0 ? { id: 'hand', qty: 1 } : null))
+    this.hotbar[1] = { id: ItemId.AXE, qty: 1, meta: { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX } }
+    this.hotbarActive = 0
+
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
 
     this.trees.resetAll()
     this.fires.resetAll()
@@ -398,8 +400,13 @@ export class Game {
     this.score = 0
     this.ui.setScore(0)
     this.inventory.clear()
-    this.inventory.add(ItemId.AXE, 1, { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX })
+
+    this.hotbar = Array.from({ length: 10 }, (_, i) => (i === 0 ? { id: 'hand', qty: 1 } : null))
+    this.hotbar[1] = { id: ItemId.AXE, qty: 1, meta: { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX } }
+    this.hotbarActive = 0
+
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
 
     this.trees.resetAll()
     this.fires.resetAll()
@@ -550,7 +557,6 @@ export class Game {
   }
 
   setTool(tool) {
-    // Direct tool switch (used by break logic). Does not change hotbar bindings.
     this.tool = tool
     const modelTool = tool === 'campfire' ? 'hand' : tool
     this.player.setTool(modelTool)
@@ -561,51 +567,104 @@ export class Game {
     if (idx < 0 || idx >= this.hotbar.length) return
     this.hotbarActive = idx
 
-    const itemId = this.hotbar[idx]?.itemId
-    let tool = 'hand'
-    if (itemId === ItemId.AXE) tool = 'axe'
-    else if (itemId === ItemId.TORCH) tool = 'torch'
-    else if (itemId === ItemId.CAMPFIRE) tool = 'campfire'
+    if (idx === 0) {
+      this.setTool('hand')
+      return
+    }
 
-    // Validate inventory for bound items.
-    if (tool === 'axe' && this.inventory.count(ItemId.AXE) <= 0) tool = 'hand'
-    if (tool === 'torch' && this.inventory.count(ItemId.TORCH) <= 0) tool = 'hand'
-    if (tool === 'campfire' && this.inventory.count(ItemId.CAMPFIRE) <= 0) tool = 'hand'
+    const s = this.hotbar[idx]
+    if (!s) {
+      this.setTool('hand')
+      return
+    }
 
-    this.setTool(tool)
+    // Tool resolution
+    if (s.id === ItemId.AXE) this.setTool('axe')
+    else if (s.id === ItemId.TORCH) this.setTool('torch')
+    else if (s.id === ItemId.CAMPFIRE) this.setTool('campfire')
+    else this.setTool('hand')
 
     if (this.state === 'playing') {
-      const msg = tool === 'axe' ? 'Machado equipado.' : tool === 'torch' ? 'Tocha equipada.' : tool === 'campfire' ? 'Fogueira selecionada.' : 'Mão equipada.'
+      const msg = this.tool === 'axe' ? 'Machado equipado.' : this.tool === 'torch' ? 'Tocha equipada.' : this.tool === 'campfire' ? 'Fogueira selecionada.' : 'Mão equipada.'
       this.ui.toast(msg, 900)
     }
   }
 
-  bindHotbar(hotIdx, invIdx) {
-    const s = this.inventory.slots[invIdx]
-    if (!s) return
+  /**
+   * Move items between inventory and hotbar.
+   * @param {{from:'inv'|'hot', idx:number}} from
+   * @param {{to:'inv'|'hot', idx:number}} to
+   */
+  moveItem(from, to) {
+    if (!from || !to) return
 
-    const def = ITEMS[s.id]
-    if (def?.stackable) {
-      this.ui.toast('Arraste um item (ferramenta) não-stackável.', 1100)
-      return
+    const get = (loc) => {
+      if (loc === 'inv') return this.inventory.slots
+      return this.hotbar
     }
 
-    if (hotIdx < 0 || hotIdx >= this.hotbar.length) return
-    this.hotbar[hotIdx] = { itemId: s.id }
+    const srcArr = get(from.from)
+    const dstArr = get(to.to)
+    const sIdx = from.idx
+    const dIdx = to.idx
 
-    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+    if (from.from === 'hot' && sIdx === 0) return
+    if (to.to === 'hot' && dIdx === 0) return
+
+    const src = srcArr[sIdx]
+    if (!src) return
+
+    const dst = dstArr[dIdx]
+
+    // No-op if same.
+    if (srcArr === dstArr && sIdx === dIdx) return
+
+    const srcDef = this._getHotbarItemDef(src.id)
+    const dstDef = dst ? this._getHotbarItemDef(dst.id) : null
+
+    // Merge stackables if same id and destination has room.
+    if (dst && src.id === dst.id && srcDef?.stackable) {
+      const space = this.inventory.maxStack - dst.qty
+      if (space > 0) {
+        const take = Math.min(space, src.qty)
+        dst.qty += take
+        src.qty -= take
+        if (src.qty <= 0) srcArr[sIdx] = null
+        this._postMoveUpdate(sIdx, dIdx)
+        return
+      }
+    }
+
+    // Swap
+    srcArr[sIdx] = dst || null
+    dstArr[dIdx] = src
+
+    this._postMoveUpdate(sIdx, dIdx)
+  }
+
+  _postMoveUpdate() {
+    // Keep hand fixed.
+    this.hotbar[0] = { id: 'hand', qty: 1 }
+
+    // Re-render if inventory open.
+    if (this.state === 'inventory') {
+      this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+    }
+
+    // If active slot is now empty, fallback to hand.
+    if (this.hotbarActive !== 0 && !this.hotbar[this.hotbarActive]) {
+      this.selectHotbar(0)
+    } else {
+      this.selectHotbar(this.hotbarActive)
+    }
   }
 
   _cleanupHotbarBroken(itemId) {
-    for (let i = 0; i < this.hotbar.length; i++) {
-      if (this.hotbar[i]?.itemId === itemId) this.hotbar[i] = null
+    for (let i = 1; i < this.hotbar.length; i++) {
+      if (this.hotbar[i]?.id === itemId) this.hotbar[i] = null
     }
-    if (this.hotbar[this.hotbarActive] == null) {
-      // fallback to hand slot if exists
-      this.tool = 'hand'
-      this.player.setTool('hand')
-    }
-    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+    this._postMoveUpdate()
   }
 
   _handleFireAction() {
@@ -614,8 +673,8 @@ export class Game {
 
     // If campfire selected: place it.
     if (this.tool === 'campfire') {
-      if (this.inventory.count(ItemId.CAMPFIRE) <= 0) {
-        this.ui.toast('Você não tem uma fogueira.', 900)
+      if (!this.hotbar[this.hotbarActive] || this.hotbar[this.hotbarActive].id !== ItemId.CAMPFIRE) {
+        this.ui.toast('Selecione uma fogueira na hotbar.', 900)
         return
       }
 
@@ -625,10 +684,12 @@ export class Game {
       const pos = { x: p.x + dir.x * 1.4, y: 0, z: p.z + dir.z * 1.4 }
 
       this.fires.place(pos)
-      this.inventory.removeOne(ItemId.CAMPFIRE)
+      // consume from hotbar slot
+      this.hotbar[this.hotbarActive] = null
+      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
       this.ui.toast('Fogueira colocada.', 900)
 
-      if (this.inventory.count(ItemId.CAMPFIRE) <= 0) this._cleanupHotbarBroken(ItemId.CAMPFIRE)
+      this._cleanupHotbarBroken(ItemId.CAMPFIRE)
       return
     }
 
@@ -640,9 +701,10 @@ export class Game {
     }
 
     if (this.tool === 'torch') {
-      // Need torch that isn't broken.
-      const tmeta = this.inventory.getFirstMeta(ItemId.TORCH)
-      if (!tmeta || tmeta.dur <= 0) {
+      // Need equipped torch that isn't broken.
+      const tslot = this.hotbar[this.hotbarActive]
+      const tmeta = tslot?.meta
+      if (!tslot || tslot.id !== ItemId.TORCH || !tmeta || tmeta.dur <= 0) {
         this.ui.toast('Sua tocha apagou.', 900)
         return
       }
@@ -722,14 +784,19 @@ export class Game {
       this._torchTick += simDt
       if (this._torchTick >= 1.0) {
         this._torchTick = 0
-        const tmeta = this.inventory.getFirstMeta(ItemId.TORCH)
-        if (!tmeta || tmeta.dur <= 0) {
+        const tslot = this.hotbar[this.hotbarActive]
+        const tmeta = tslot?.meta
+        if (!tslot || tslot.id !== ItemId.TORCH || !tmeta || tmeta.dur <= 0) {
           this.ui.toast('Tocha apagou (quebrou).', 1300)
-          this.inventory.removeOne(ItemId.TORCH)
-          this.setTool('hand')
+          this.hotbar[this.hotbarActive] = null
           this._cleanupHotbarBroken(ItemId.TORCH)
         } else {
-          this.inventory.setFirstMeta(ItemId.TORCH, { dur: Math.max(0, tmeta.dur - 1) })
+          tmeta.dur = Math.max(0, tmeta.dur - 1)
+          if (tmeta.dur <= 0) {
+            this.ui.toast('Tocha apagou (quebrou).', 1300)
+            this.hotbar[this.hotbarActive] = null
+            this._cleanupHotbarBroken(ItemId.TORCH)
+          }
         }
       }
     }
