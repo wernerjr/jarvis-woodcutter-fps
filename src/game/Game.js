@@ -9,6 +9,7 @@ import { clamp } from './util.js'
 import { Inventory } from './Inventory.js'
 import { ITEMS, ItemId } from './items.js'
 import { TimeSystem } from './TimeSystem.js'
+import { Perf } from './Perf.js'
 
 export class Game {
   /**
@@ -39,6 +40,8 @@ export class Game {
 
     this.inventory = new Inventory({ slots: 20, maxStack: 100 })
     this.time = new TimeSystem({ startHours: 9.0 })
+    this.perf = new Perf()
+    this.perfEnabled = false
 
     this.score = 0
     this._running = false
@@ -271,7 +274,7 @@ export class Game {
     await this.sfx.enable()
     await this._lockPointer()
 
-    this.ui.toast('Corte árvores! (I inventário • 1/2 ferramenta • Espaço pular)')
+    this.ui.toast('Corte árvores! (I inventário • 1/2/3 ferramenta • Shift correr • Espaço pular)')
   }
 
   pause(reason = 'esc') {
@@ -371,6 +374,15 @@ export class Game {
     this.ui.toast('Clique direito de novo para confirmar remoção.', 1400)
   }
 
+  togglePerf() {
+    this.perfEnabled = !this.perfEnabled
+    this.perf.setEnabled(this.perfEnabled)
+    this.ui.setPerfVisible(this.perfEnabled)
+
+    const btn = document.querySelector('#btnPerfToggle')
+    if (btn) btn.textContent = `Performance: ${this.perfEnabled ? 'ON' : 'OFF'}`
+  }
+
   async closeInventory() {
     if (this.state !== 'inventory') return
     this.state = 'playing'
@@ -443,6 +455,10 @@ export class Game {
     if (!this._running) return
 
     const dt = clamp(this.clock.getDelta(), 0, 0.033)
+
+    // Perf overlay updates even in pause/menus (cheap).
+    this.perf.update(dt)
+    this.ui.setPerf({ fps: this.perf.fps, frameMs: this.perf.frameMs, memMB: this.perf.memMB })
 
     // Freeze simulation when not playing (pause/inventory/menus).
     const simDt = this.state === 'playing' ? dt : 0

@@ -1,5 +1,5 @@
 export class UI {
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -97,6 +97,25 @@ export class UI {
   }
 
   /** @param {{hhmm:string, norm:number, dayFactor:number, proximity:number}} t */
+  setPerfVisible(v) {
+    if (!this.els.perfEl) return
+    this.els.perfEl.classList.toggle('hidden', !v)
+  }
+
+  /** @param {{fps:number, frameMs:number, memMB:number|null}} p */
+  setPerf(p) {
+    if (!this.els.perfEl || this.els.perfEl.classList.contains('hidden')) return
+    this.els.perfFpsEl.textContent = String(p.fps ?? 0)
+    this.els.perfMsEl.textContent = String(Math.round((p.frameMs ?? 0) * 10) / 10)
+
+    if (p.memMB == null) {
+      this.els.perfMemRowEl.style.display = 'none'
+    } else {
+      this.els.perfMemRowEl.style.display = ''
+      this.els.perfMemEl.textContent = String(p.memMB)
+    }
+  }
+
   setTime(t) {
     if (!this.els.clockEl) return
 

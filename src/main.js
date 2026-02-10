@@ -17,6 +17,11 @@ const ui = new UI({
   timeMarkerEl: document.querySelector('#timeMarker'),
   icoSunEl: document.querySelector('#icoSun'),
   icoMoonEl: document.querySelector('#icoMoon'),
+  perfEl: document.querySelector('#perf'),
+  perfFpsEl: document.querySelector('#perfFps'),
+  perfMsEl: document.querySelector('#perfMs'),
+  perfMemRowEl: document.querySelector('#perfMemRow'),
+  perfMemEl: document.querySelector('#perfMem'),
 })
 
 const game = new Game({ canvas, ui })
@@ -42,6 +47,7 @@ $('#btnResume').addEventListener('click', () => game.resume())
 $('#btnRestart').addEventListener('click', () => game.restart())
 $('#btnPauseControls').addEventListener('click', () => game.openControls('pause'))
 $('#btnQuit').addEventListener('click', () => game.quitToMenu())
+$('#btnPerfToggle').addEventListener('click', () => game.togglePerf())
 
 $('#btnControlsBack').addEventListener('click', () => game.closeControls())
 $('#btnInvClose').addEventListener('click', () => game.closeInventory())

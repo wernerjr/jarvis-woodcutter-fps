@@ -12,6 +12,11 @@
     <div id="ui">
       <!-- HUD (in-game) -->
       <div id="hud" class="panel">
+        <div id="perf" class="perf hidden" aria-label="Performance">
+          <div><b>FPS</b>: <span id="perfFps">0</span></div>
+          <div><b>Frame</b>: <span id="perfMs">0</span> ms</div>
+          <div id="perfMemRow" class="muted"><b>Mem</b>: <span id="perfMem">-</span> MB</div>
+        </div>
         <div id="title">Jarvis — Robô Lenhador</div>
 
         <div id="timeHud" aria-label="Relógio">
@@ -58,6 +63,7 @@
             <button id="btnResume" class="primary">Resume</button>
             <button id="btnRestart">Restart</button>
             <button id="btnPauseControls">Controls</button>
+            <button id="btnPerfToggle">Performance: OFF</button>
             <button id="btnQuit">Quit to menu</button>
           </div>
           <p class="muted small">ESC para retomar / abrir pausa.</p>
