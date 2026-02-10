@@ -77,7 +77,7 @@ export class Game {
     this.score = 0
     this._running = false
 
-    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'relock'|'controls-menu'|'controls-pause'} */
+    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'controls-menu'|'controls-pause'} */
     this.state = 'menu'
 
     this._onResize = () => this._resize()
@@ -157,16 +157,10 @@ export class Game {
     const locked = document.pointerLockElement === this.canvas
     this.player.setLocked(locked)
 
-    // If lock is lost while playing (e.g. native ESC), enter controlled relock overlay.
+    // If lock is lost while playing (native ESC), pause and show pause menu.
     if (!locked && this.state === 'playing') {
-      this.state = 'relock'
-      this.ui.showRelock()
+      this.pause('pointerlock')
       return
-    }
-
-    // If we're trying to return to game, keep attempting briefly.
-    if (!locked && this.state === 'playing' && performance.now() < (this._pendingRelockUntil || 0)) {
-      setTimeout(() => this._attemptRelock(), 60)
     }
   }
 
@@ -247,16 +241,9 @@ export class Game {
       this.resume()
       return
     }
-    if (this.state === 'inventory') {
-      this.closeInventory()
-      return
-    }
-    if (this.state === 'crafting') {
-      this.closeCrafting()
-      return
-    }
-    if (this.state === 'relock') {
-      this.returnToGameMode()
+
+    // ESC does not close "modals" (inventory/crafting/controls). Use buttons.
+    if (this.state === 'inventory' || this.state === 'crafting' || this.state === 'controls-menu' || this.state === 'controls-pause') {
       return
     }
   }
@@ -410,7 +397,6 @@ export class Game {
     // Centralized UI exit -> gameplay, with best-effort pointer lock restore.
     this.state = 'playing'
 
-    this.ui.hideRelock?.()
     this.ui.hideInventory?.()
     this.ui.hideCrafting?.()
     this.ui.showHUD()

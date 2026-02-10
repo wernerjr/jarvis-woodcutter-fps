@@ -73,7 +73,7 @@ export class CampfireManager {
     mesh.add(light)
 
     this.scene.add(mesh)
-    this._fires.set(id, { mesh, light, lit: false })
+    this._fires.set(id, { mesh, light, lit: false, ttl: 0 })
     mesh.userData.id = id
 
     return id
@@ -87,7 +87,7 @@ export class CampfireManager {
 
   update(dt) {
     const t = performance.now() * 0.001
-    for (const f of this._fires.values()) {
+    for (const [id, f] of this._fires.entries()) {
       const ember = f.mesh.userData.ember
       const flame = f.mesh.userData.flame
 
@@ -101,18 +101,30 @@ export class CampfireManager {
         continue
       }
 
+      // Lifetime countdown (3 min while lit)
+      f.ttl = Math.max(0, (f.ttl ?? 0) - dt)
+
+      // Fade in last 30s
+      const fade = f.ttl <= 30 ? Math.max(0, f.ttl / 30) : 1
+
       // gentle flicker (reuse torch main scale to keep ~3x brightness)
       const flick = 0.9 + 0.1 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 12.7)
-      const I = this._torchMain * 3.0 * flick
+      const I = this._torchMain * 3.0 * flick * fade
 
       f.light.intensity = I
       f.light.distance = 16
 
-      if (ember?.material) ember.material.emissiveIntensity = 0.45 + 0.35 * flick
+      if (ember?.material) ember.material.emissiveIntensity = (0.45 + 0.35 * flick) * fade
       if (flame?.material) {
-        flame.material.opacity = 0.55 + 0.25 * flick
-        flame.material.emissiveIntensity = 1.1 + 1.3 * flick
-        flame.scale.set(1, 0.9 + 0.35 * flick, 1)
+        flame.material.opacity = (0.55 + 0.25 * flick) * fade
+        flame.material.emissiveIntensity = (1.1 + 1.3 * flick) * fade
+        flame.scale.set(1, (0.9 + 0.35 * flick) * (0.6 + 0.4 * fade), 1)
+      }
+
+      if (f.ttl <= 0) {
+        // Remove fire cleanly
+        f.mesh.removeFromParent()
+        this._fires.delete(id)
       }
     }
   }
@@ -142,6 +154,7 @@ export class CampfireManager {
     const f = this._fires.get(String(id))
     if (!f) return false
     f.lit = !!lit
+    if (f.lit) f.ttl = 180
     f.light.intensity = f.lit ? this._torchMain * 3.0 : 0.0
     const ember = f.mesh.userData.ember
     const flame = f.mesh.userData.flame
