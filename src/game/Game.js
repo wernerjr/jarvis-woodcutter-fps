@@ -28,6 +28,11 @@ export class Game {
 
     this.world = new World({ scene: this.scene })
     this.player = new Player({ camera: this.camera, domElement: canvas })
+
+    // Torch light (attached to camera)
+    this.torchLight = new THREE.PointLight(0xffa24a, 0.0, 12, 2)
+    this.torchLight.position.set(0.25, -0.15, -0.35)
+    this.camera.add(this.torchLight)
     this.trees = new TreeManager({ scene: this.scene })
     this.rocks = new RockManager({ scene: this.scene })
     this.sfx = new Sfx()
@@ -125,6 +130,10 @@ export class Game {
     }
     if (e.code === 'Digit2') {
       this.setTool('hand')
+      return
+    }
+    if (e.code === 'Digit3') {
+      this.setTool('torch')
       return
     }
 
@@ -390,13 +399,14 @@ export class Game {
   }
 
   setTool(tool) {
-    if (tool !== 'axe' && tool !== 'hand') return
+    if (tool !== 'axe' && tool !== 'hand' && tool !== 'torch') return
     this.tool = tool
     this.player.setTool(tool)
     this.ui.setHotbarActive(tool)
 
     if (this.state === 'playing') {
-      this.ui.toast(tool === 'axe' ? 'Machado equipado.' : 'Mão equipada.')
+      const msg = tool === 'axe' ? 'Machado equipado.' : tool === 'hand' ? 'Mão equipada.' : 'Tocha equipada.'
+      this.ui.toast(msg)
     }
   }
 
@@ -441,6 +451,13 @@ export class Game {
 
     this.player.update(simDt, colliders)
 
+    // Torch light intensity (mainly useful at night)
+    const night = 1 - this.time.getDayFactor()
+    const torchOn = this.tool === 'torch'
+    const flicker = 0.90 + 0.10 * Math.sin(performance.now() * 0.018) + 0.05 * Math.sin(performance.now() * 0.041)
+    const targetTorch = torchOn ? (0.6 + night * 1.2) * flicker : 0.0
+    this.torchLight.intensity += (targetTorch - this.torchLight.intensity) * (simDt > 0 ? 0.25 : 0.0)
+
     // Sprint FOV (subtle)
     const targetFov = this.player.isSprinting ? 80 : this._baseFov
     this.camera.fov += (targetFov - this.camera.fov) * (simDt > 0 ? 0.10 : 0.0)
@@ -453,7 +470,7 @@ export class Game {
         this.player.handAction()
         this._tryInteract()
         this._actionCooldown = 0.22
-      } else {
+      } else if (this.tool === 'axe') {
         if (!this.player.isSwinging()) {
           this.player.swing()
           this.sfx.swing()
@@ -462,6 +479,10 @@ export class Game {
           // wait until swing ends
           this._actionCooldown = 0.05
         }
+      } else {
+        // torch: neutral action (no chop / no pickup)
+        this.player.torchAction()
+        this._actionCooldown = 0.25
       }
     }
 

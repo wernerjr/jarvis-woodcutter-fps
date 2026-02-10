@@ -13,6 +13,8 @@ export class World {
     this._ground = null
     this._sky = null
     this._stars = null
+    this._sunMesh = null
+    this._moonMesh = null
   }
 
   init() {
@@ -32,6 +34,17 @@ export class World {
     const skyMat = new THREE.MeshBasicMaterial({ color: 0x1a2a44, side: THREE.BackSide })
     this._sky = new THREE.Mesh(skyGeo, skyMat)
     this.scene.add(this._sky)
+
+    // Sun/Moon visible discs
+    const sunGeo = new THREE.SphereGeometry(2.6, 16, 12)
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff0b3, transparent: true, opacity: 1.0 })
+    this._sunMesh = new THREE.Mesh(sunGeo, sunMat)
+    this.scene.add(this._sunMesh)
+
+    const moonGeo = new THREE.SphereGeometry(2.2, 16, 12)
+    const moonMat = new THREE.MeshBasicMaterial({ color: 0xd6e6ff, transparent: true, opacity: 1.0 })
+    this._moonMesh = new THREE.Mesh(moonGeo, moonMat)
+    this.scene.add(this._moonMesh)
 
     // Stars (points)
     const pts = new THREE.BufferGeometry()
@@ -98,6 +111,20 @@ export class World {
     this._sun.position.set(20 * x, 22 * Math.max(-0.2, alt), 14)
     this._moon.position.set(-20 * x, 18 * Math.max(-0.2, -alt), -14)
 
+    // Visible sun/moon placed on sky dome around camera.
+    const skyR = 125
+    const sunDir = new THREE.Vector3(0.9 * x, Math.max(-0.15, alt), 0.35).normalize()
+    const moonDir = new THREE.Vector3(-0.9 * x, Math.max(-0.15, -alt), -0.35).normalize()
+
+    if (this._sunMesh) {
+      this._sunMesh.position.copy(camera.position).addScaledVector(sunDir, skyR)
+      this._sunMesh.visible = alt > -0.05
+    }
+    if (this._moonMesh) {
+      this._moonMesh.position.copy(camera.position).addScaledVector(moonDir, skyR)
+      this._moonMesh.visible = alt < 0.05
+    }
+
     // Light tuning
     this._sun.intensity = 0.15 + day * 1.25
     this._sun.color.setHex(0xfff1d6)
@@ -123,6 +150,10 @@ export class World {
       this._stars.material.opacity = night * night * 0.9
       this._stars.position.copy(camera.position)
     }
+
+    // Fade sun/moon brightness a bit with day/night
+    if (this._sunMesh) this._sunMesh.material.opacity = 0.25 + day * 0.75
+    if (this._moonMesh) this._moonMesh.material.opacity = 0.35 + night * 0.65
 
     // Fog density slightly higher at night
     const fogColor = sky.clone().multiplyScalar(0.75)

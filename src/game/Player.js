@@ -49,6 +49,7 @@ export class Player {
     // Simple "axe" in view (Jarvis the lumberjack robot)
     this._swingT = 0
     this._handT = 0
+    this._torchT = 0
     const { pivot, model } = this._makeAxe()
     this._axePivot = pivot
     this._axeModel = model
@@ -57,6 +58,10 @@ export class Player {
     this._hand = this._makeHand()
     this.camera.add(this._hand)
     this._hand.visible = false
+
+    this._torch = this._makeTorch()
+    this.camera.add(this._torch)
+    this._torch.visible = false
 
     this._onKeyDown = (e) => this._keys.add(e.code)
     this._onKeyUp = (e) => this._keys.delete(e.code)
@@ -103,6 +108,10 @@ export class Player {
 
   handAction() {
     this._handT = 0.16
+  }
+
+  torchAction() {
+    this._torchT = 0.18
   }
 
   isSwinging() {
@@ -226,6 +235,15 @@ export class Player {
       this._hand.rotation.x = -0.05 - hSwing * 0.30
     }
 
+    // Torch action (small bob)
+    if (this._torchT > 0) this._torchT = Math.max(0, this._torchT - dt)
+    const tp = this._torchT > 0 ? 1 - this._torchT / 0.18 : 0
+    const tBob = tp > 0 ? Math.sin(tp * Math.PI) : 0
+    if (this._torch) {
+      this._torch.position.y = 0 + tBob * 0.02
+      this._torch.rotation.z = 0.05 - tBob * 0.15
+    }
+
     this._applyTransforms()
   }
 
@@ -273,9 +291,31 @@ export class Player {
   }
 
   setTool(toolId) {
-    // Show axe only when equipped.
+    // Show models based on tool.
     if (this._axePivot) this._axePivot.visible = toolId === 'axe'
     if (this._hand) this._hand.visible = toolId === 'hand'
+    if (this._torch) this._torch.visible = toolId === 'torch'
+  }
+
+  _makeTorch() {
+    const g = new THREE.Group()
+
+    const stickGeo = new THREE.CylinderGeometry(0.03, 0.04, 0.55, 8)
+    const stickMat = new THREE.MeshStandardMaterial({ color: 0x3e2a18, roughness: 1 })
+    const stick = new THREE.Mesh(stickGeo, stickMat)
+    stick.position.set(0.28, -0.22, -0.42)
+    stick.rotation.z = 0.12
+
+    const headGeo = new THREE.SphereGeometry(0.07, 10, 8)
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffc87a, roughness: 0.6, metalness: 0.0, emissive: 0xff7a18, emissiveIntensity: 0.8 })
+    const head = new THREE.Mesh(headGeo, headMat)
+    head.position.set(0.30, -0.45, -0.50)
+
+    g.add(stick)
+    g.add(head)
+    g.rotation.set(-0.15, 0.25, 0.05)
+
+    return g
   }
 
   _makeHand() {
