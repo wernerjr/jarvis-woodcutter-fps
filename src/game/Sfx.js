@@ -42,6 +42,11 @@ export class Sfx {
     this._beep({ freq: 420, bendTo: 240, dur: 0.07, type: 'triangle', gain: 0.10 })
   }
 
+  pickup() {
+    // short bright ping
+    this._beep({ freq: 880, bendTo: 1320, dur: 0.05, type: 'sine', gain: 0.12 })
+  }
+
   chop() {
     // metallic thunk + woody tick
     this._beep({ freq: 160, bendTo: 90, dur: 0.09, type: 'square', gain: 0.35 })

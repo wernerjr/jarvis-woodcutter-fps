@@ -171,11 +171,19 @@ export class Game {
   }
 
   async _onClickAny(e) {
-    // Swing is always allowed in-game (even if no target). Hit is applied on impact window.
+    // Primary action click.
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
 
     if (e.button !== 0) return
+
+    // Hand: click collects stones (explicit action).
+    if (this.tool === 'hand') {
+      this._tryInteract()
+      return
+    }
+
+    // Axe: swing (even if no target). Hit is applied on impact window.
     this.player.swing()
     this.sfx.swing()
   }
@@ -407,8 +415,10 @@ export class Game {
     const overflow = this.inventory.add(ItemId.STONE, 1)
     if (overflow) {
       this.ui.toast('Inventário cheio: pedra descartada.', 1200)
+      this.sfx.click()
     } else {
       this.ui.toast('Pegou: +1 pedra', 900)
+      this.sfx.pickup()
       if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     }
   }
