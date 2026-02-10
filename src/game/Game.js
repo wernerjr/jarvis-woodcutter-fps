@@ -5,6 +5,8 @@ import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
 import { Sfx } from './Sfx.js'
 import { clamp } from './util.js'
+import { Inventory } from './Inventory.js'
+import { ITEMS, ItemId } from './items.js'
 
 export class Game {
   /**
@@ -27,10 +29,12 @@ export class Game {
     this.trees = new TreeManager({ scene: this.scene })
     this.sfx = new Sfx()
 
+    this.inventory = new Inventory({ slots: 20, maxStack: 100 })
+
     this.score = 0
     this._running = false
 
-    /** @type {'menu'|'playing'|'paused'|'controls-menu'|'controls-pause'} */
+    /** @type {'menu'|'playing'|'paused'|'inventory'|'controls-menu'|'controls-pause'} */
     this.state = 'menu'
 
     this._onResize = () => this._resize()
@@ -94,6 +98,16 @@ export class Game {
   }
 
   _onKeyDownAny(e) {
+    // Inventory toggle (in-game only)
+    if (e.code === 'KeyI') {
+      if (this.state === 'playing') {
+        this.openInventory()
+      } else if (this.state === 'inventory') {
+        this.closeInventory()
+      }
+      return
+    }
+
     if (e.code !== 'Escape') return
 
     // In menus, ESC closes controls.
@@ -113,6 +127,10 @@ export class Game {
     }
     if (this.state === 'paused') {
       this.resume()
+      return
+    }
+    if (this.state === 'inventory') {
+      this.closeInventory()
       return
     }
   }
@@ -136,7 +154,7 @@ export class Game {
 
     const dist = hit.distance
     if (dist > 3.0) {
-      this._toast('Muito longe.')
+      this.ui.toast('Muito longe.')
       this.sfx.click()
       return
     }
@@ -148,13 +166,41 @@ export class Game {
     this.score += 1
     this.ui.setScore(this.score)
 
+    // Loot rule (fixed): 1 log, 2–5 sticks, 10–20 leaves.
+    const sticks = this._randInt(2, 5)
+    const leaves = this._randInt(10, 20)
+
+    const dropped = []
+    const overflowLog = this.inventory.add(ItemId.LOG, 1)
+    const overflowStick = this.inventory.add(ItemId.STICK, sticks)
+    const overflowLeaf = this.inventory.add(ItemId.LEAF, leaves)
+
+    if (overflowLog) dropped.push(`${overflowLog} ${ITEMS[ItemId.LOG].name}`)
+    if (overflowStick) dropped.push(`${overflowStick} ${ITEMS[ItemId.STICK].name}`)
+    if (overflowLeaf) dropped.push(`${overflowLeaf} ${ITEMS[ItemId.LEAF].name}`)
+
+    // Overflow behavior: discard excedente (inventário cheio) e notificar.
+    const msg = dropped.length
+      ? `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas (excedente descartado)`
+      : `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas`
+
     this.sfx.chop()
-    this.ui.toast('Árvore cortada! (+1)')
+    this.ui.toast(msg, 1400)
+
+    // If inventory is open, refresh it.
+    if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+  }
+
+  _randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min
   }
 
   async playFromMenu() {
     this.score = 0
     this.ui.setScore(0)
+    this.inventory.clear()
+    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+
     this.trees.resetAll()
     this.player.reset()
 
@@ -164,7 +210,7 @@ export class Game {
     await this.sfx.enable()
     await this._lockPointer()
 
-    this.ui.toast('Corte árvores!')
+    this.ui.toast('Corte árvores! (I = inventário)')
   }
 
   pause(reason = 'esc') {
@@ -191,6 +237,9 @@ export class Game {
     // Restart from pause: reset score + world and keep in playing state.
     this.score = 0
     this.ui.setScore(0)
+    this.inventory.clear()
+    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+
     this.trees.resetAll()
     this.player.reset()
 
@@ -204,6 +253,9 @@ export class Game {
     // Quit resets progress.
     this.score = 0
     this.ui.setScore(0)
+    this.inventory.clear()
+    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+
     this.trees.resetAll()
     this.player.reset()
 
@@ -230,6 +282,28 @@ export class Game {
     this.ui.showMenu()
   }
 
+  openInventory() {
+    if (this.state !== 'playing') return
+    this.state = 'inventory'
+
+    this.player.setLocked(false)
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+
+    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this.ui.showInventory()
+  }
+
+  async closeInventory() {
+    if (this.state !== 'inventory') return
+    this.state = 'playing'
+
+    this.ui.hideInventory()
+    this.ui.showHUD()
+
+    await this.sfx.enable()
+    await this._lockPointer()
+  }
+
   tryClose() {
     // Best-effort: browsers usually block window.close if not opened by script.
     window.close()
@@ -251,7 +325,7 @@ export class Game {
 
     const dt = clamp(this.clock.getDelta(), 0, 0.033)
 
-    // Freeze simulation when not playing.
+    // Freeze simulation when not playing (pause/inventory/menus).
     const simDt = this.state === 'playing' ? dt : 0
 
     const colliders = this.state === 'playing' ? this.trees.getTrunkColliders() : []

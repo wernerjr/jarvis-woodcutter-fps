@@ -11,6 +11,8 @@ const ui = new UI({
   menuEl: document.querySelector('#menu'),
   pauseEl: document.querySelector('#pause'),
   controlsEl: document.querySelector('#controls'),
+  inventoryEl: document.querySelector('#inventory'),
+  invGridEl: document.querySelector('#invGrid'),
 })
 
 const game = new Game({ canvas, ui })
@@ -28,6 +30,7 @@ $('#btnPauseControls').addEventListener('click', () => game.openControls('pause'
 $('#btnQuit').addEventListener('click', () => game.quitToMenu())
 
 $('#btnControlsBack').addEventListener('click', () => game.closeControls())
+$('#btnInvClose').addEventListener('click', () => game.closeInventory())
 
 // Start at main menu
 ui.showMenu()
