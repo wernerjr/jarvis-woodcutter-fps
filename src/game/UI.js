@@ -1,5 +1,5 @@
 export class UI {
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, relockEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -27,6 +27,7 @@ export class UI {
     document.body.classList.add('state-menu')
     this.els.menuEl.classList.remove('hidden')
     this.els.pauseEl.classList.add('hidden')
+    this.els.relockEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
     this.els.hudEl.classList.add('hidden')
   }
@@ -34,6 +35,7 @@ export class UI {
   showPause() {
     document.body.classList.remove('state-menu')
     this.els.pauseEl.classList.remove('hidden')
+    this.els.relockEl.classList.add('hidden')
     this.els.menuEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
     this.els.hudEl.classList.remove('hidden')
@@ -43,6 +45,7 @@ export class UI {
     document.body.classList.remove('state-menu')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
+    this.els.relockEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
     this.els.hudEl.classList.remove('hidden')
   }
@@ -50,8 +53,23 @@ export class UI {
   showControls() {
     this.els.controlsEl.classList.remove('hidden')
     this.els.inventoryEl.classList.add('hidden')
+    this.els.relockEl.classList.add('hidden')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
+  }
+
+  showRelock() {
+    this.els.relockEl.classList.remove('hidden')
+    this.els.pauseEl.classList.add('hidden')
+    this.els.inventoryEl.classList.add('hidden')
+    this.els.craftingEl.classList.add('hidden')
+    this.els.controlsEl.classList.add('hidden')
+    this.els.menuEl.classList.add('hidden')
+    this.els.hudEl.classList.remove('hidden')
+  }
+
+  hideRelock() {
+    this.els.relockEl.classList.add('hidden')
   }
 
   showInventory() {
@@ -61,6 +79,7 @@ export class UI {
     this.els.controlsEl.classList.add('hidden')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
+    this.els.relockEl.classList.add('hidden')
     this.els.hudEl.classList.remove('hidden')
   }
 
@@ -75,6 +94,7 @@ export class UI {
     this.els.controlsEl.classList.add('hidden')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
+    this.els.relockEl.classList.add('hidden')
     this.els.hudEl.classList.remove('hidden')
   }
 

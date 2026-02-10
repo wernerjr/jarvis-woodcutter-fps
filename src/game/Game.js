@@ -77,7 +77,7 @@ export class Game {
     this.score = 0
     this._running = false
 
-    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'controls-menu'|'controls-pause'} */
+    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'relock'|'controls-menu'|'controls-pause'} */
     this.state = 'menu'
 
     this._onResize = () => this._resize()
@@ -157,9 +157,16 @@ export class Game {
     const locked = document.pointerLockElement === this.canvas
     this.player.setLocked(locked)
 
-    // If we were playing and pointer lock is lost, pause.
+    // If lock is lost while playing (e.g. native ESC), enter controlled relock overlay.
     if (!locked && this.state === 'playing') {
-      this.pause('pointerlock')
+      this.state = 'relock'
+      this.ui.showRelock()
+      return
+    }
+
+    // If we're trying to return to game, keep attempting briefly.
+    if (!locked && this.state === 'playing' && performance.now() < (this._pendingRelockUntil || 0)) {
+      setTimeout(() => this._attemptRelock(), 60)
     }
   }
 
@@ -246,6 +253,10 @@ export class Game {
     }
     if (this.state === 'crafting') {
       this.closeCrafting()
+      return
+    }
+    if (this.state === 'relock') {
+      this.returnToGameMode()
       return
     }
   }
@@ -387,6 +398,7 @@ export class Game {
     if (this.state !== 'playing') return
     this.state = 'paused'
 
+    // Show cursor by opening UI (not by ESC directly)
     this.player.setLocked(false)
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
 
@@ -398,6 +410,7 @@ export class Game {
     // Centralized UI exit -> gameplay, with best-effort pointer lock restore.
     this.state = 'playing'
 
+    this.ui.hideRelock?.()
     this.ui.hideInventory?.()
     this.ui.hideCrafting?.()
     this.ui.showHUD()
@@ -468,6 +481,12 @@ export class Game {
     this.ui.showControls()
   }
 
+  async relock() {
+    // Called from relock overlay button.
+    if (this.state !== 'relock') return
+    await this.returnToGameMode()
+  }
+
   closeControls() {
     if (this.state === 'controls-pause') {
       this.state = 'paused'
@@ -483,6 +502,7 @@ export class Game {
     if (this.state !== 'playing') return
     this.state = 'inventory'
 
+    // Show cursor by opening UI
     this.player.setLocked(false)
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
 
@@ -494,6 +514,7 @@ export class Game {
     if (this.state !== 'playing') return
     this.state = 'crafting'
 
+    // Show cursor by opening UI
     this.player.setLocked(false)
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
 

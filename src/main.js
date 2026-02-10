@@ -10,6 +10,7 @@ const ui = new UI({
   hudEl: document.querySelector('#hud'),
   menuEl: document.querySelector('#menu'),
   pauseEl: document.querySelector('#pause'),
+  relockEl: document.querySelector('#relock'),
   controlsEl: document.querySelector('#controls'),
   inventoryEl: document.querySelector('#inventory'),
   invGridEl: document.querySelector('#invGrid'),
@@ -127,6 +128,7 @@ $('#btnRestart').addEventListener('click', () => game.restart())
 $('#btnPauseControls').addEventListener('click', () => game.openControls('pause'))
 $('#btnQuit').addEventListener('click', () => game.quitToMenu())
 $('#btnPerfToggle').addEventListener('click', () => game.togglePerf())
+$('#btnRelock').addEventListener('click', () => game.relock())
 
 $('#btnControlsBack').addEventListener('click', () => game.closeControls())
 $('#btnInvClose').addEventListener('click', () => game.closeInventory())
