@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jarvis — Robô Lenhador (FPS)</title>
+  </head>
+  <body>
+    <div id="ui">
+      <div id="title">Jarvis — Robô Lenhador</div>
+      <div id="hint">Clique para capturar o mouse (Pointer Lock)</div>
+      <div id="help">
+        <div><b>Controles</b>: WASD mover • Mouse olhar • Clique esquerdo cortar • ESC liberar mouse</div>
+      </div>
+      <div id="stats">Árvores cortadas: <span id="score">0</span></div>
+      <div id="reticle" aria-hidden="true"></div>
+      <div id="toast" role="status" aria-live="polite"></div>
+    </div>
+    <canvas id="game" tabindex="0"></canvas>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

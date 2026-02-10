@@ -1,0 +1,14 @@
+services:
+  jarvis-woodcutter:
+    build: .
+    container_name: jarvis-woodcutter
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - shared
+
+networks:
+  shared:
+    external: true
+    name: shared
