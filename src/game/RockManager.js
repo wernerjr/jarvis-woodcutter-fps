@@ -48,8 +48,7 @@ export class RockManager {
           mesh.visible = true
         }
       } else {
-        // tiny idle spin
-        mesh.rotation.y += dt * 0.4
+        // rocks are static (no idle spin)
       }
     }
   }

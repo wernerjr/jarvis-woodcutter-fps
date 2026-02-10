@@ -25,8 +25,11 @@ export class Player {
     this._vy = 0
     this._onGround = true
 
-    this.moveSpeed = 6.0
+    this.baseSpeed = 6.0
+    this.sprintMultiplier = 1.65
     this.lookSpeed = 0.002
+
+    this.isSprinting = false
 
     this._swingDuration = 0.42
 
@@ -45,6 +48,7 @@ export class Player {
 
     // Simple "axe" in view (Jarvis the lumberjack robot)
     this._swingT = 0
+    this._handT = 0
     const { pivot, model } = this._makeAxe()
     this._axePivot = pivot
     this._axeModel = model
@@ -97,6 +101,18 @@ export class Player {
     this._impactDone = false
   }
 
+  handAction() {
+    this._handT = 0.16
+  }
+
+  isSwinging() {
+    return this._swingT > 0
+  }
+
+  getSwingDuration() {
+    return this._swingDuration
+  }
+
   reset() {
     this.position.set(0, this.eyeHeight, 6)
     this.velocity.set(0, 0, 0)
@@ -137,7 +153,10 @@ export class Player {
     const yawMat = new THREE.Matrix4().makeRotationY(this.yaw.rotation.y)
     dir.applyMatrix4(yawMat)
 
-    const speed = this.moveSpeed
+    const sprint = this._keys.has('ShiftLeft') || this._keys.has('ShiftRight')
+    this.isSprinting = sprint && dir.lengthSq() > 0
+
+    const speed = this.baseSpeed * (this.isSprinting ? this.sprintMultiplier : 1.0)
     this.velocity.x = dir.x * speed
     this.velocity.z = dir.z * speed
 
@@ -197,6 +216,15 @@ export class Player {
     this._axePivot.rotation.z = -0.20 - swing * 0.95
     this._axePivot.rotation.x = -0.35 + swing * 0.55
     this._axePivot.rotation.y = 0.10 + swing * 0.10
+
+    // Hand action animation
+    if (this._handT > 0) this._handT = Math.max(0, this._handT - dt)
+    const hp = this._handT > 0 ? 1 - this._handT / 0.16 : 0
+    const hSwing = hp > 0 ? Math.sin(hp * Math.PI) : 0
+    if (this._hand) {
+      this._hand.position.z = -0.42 - hSwing * 0.06
+      this._hand.rotation.x = -0.05 - hSwing * 0.30
+    }
 
     this._applyTransforms()
   }

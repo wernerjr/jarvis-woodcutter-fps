@@ -43,8 +43,14 @@ export class Game {
 
     this._onResize = () => this._resize()
     this._onPointerLockChange = () => this._onPlockChange()
-    this._onClick = (e) => this._onClickAny(e)
+    this._onMouseDown = (e) => this._onMouseDownAny(e)
+    this._onMouseUp = (e) => this._onMouseUpAny(e)
     this.tool = 'axe'
+
+    this._actionHeld = false
+    this._actionCooldown = 0
+
+    this._baseFov = 75
 
     this._pendingDeleteIdx = null
     this._pendingDeleteUntil = 0
@@ -58,8 +64,9 @@ export class Game {
     document.addEventListener('pointerlockchange', this._onPointerLockChange)
     window.addEventListener('keydown', this._onKeyDown)
 
-    // Click canvas: swing (only when playing + locked)
-    this.canvas.addEventListener('click', this._onClick)
+    // Mouse button: hold-to-act
+    this.canvas.addEventListener('mousedown', this._onMouseDown)
+    window.addEventListener('mouseup', this._onMouseUp)
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
 
     this.world.init()
@@ -89,7 +96,8 @@ export class Game {
     window.removeEventListener('resize', this._onResize)
     document.removeEventListener('pointerlockchange', this._onPointerLockChange)
     window.removeEventListener('keydown', this._onKeyDown)
-    this.canvas.removeEventListener('click', this._onClick)
+    this.canvas.removeEventListener('mousedown', this._onMouseDown)
+    window.removeEventListener('mouseup', this._onMouseUp)
   }
 
   _resize() {
@@ -130,6 +138,7 @@ export class Game {
     }
 
     // Interact (hand)
+    // (E kept as alternative interact)
     if (e.code === 'KeyE') {
       if (this.state === 'playing') this._tryInteract()
       return
@@ -172,22 +181,17 @@ export class Game {
     }
   }
 
-  async _onClickAny(e) {
-    // Primary action click.
+  _onMouseDownAny(e) {
+    if (e.button !== 0) return
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
 
+    this._actionHeld = true
+  }
+
+  _onMouseUpAny(e) {
     if (e.button !== 0) return
-
-    // Hand: click collects stones (explicit action).
-    if (this.tool === 'hand') {
-      this._tryInteract()
-      return
-    }
-
-    // Axe: swing (even if no target). Hit is applied on impact window.
-    this.player.swing()
-    this.sfx.swing()
+    this._actionHeld = false
   }
 
   _tryChop() {
@@ -436,6 +440,30 @@ export class Game {
     const colliders = this.state === 'playing' ? this.trees.getTrunkColliders() : []
 
     this.player.update(simDt, colliders)
+
+    // Sprint FOV (subtle)
+    const targetFov = this.player.isSprinting ? 80 : this._baseFov
+    this.camera.fov += (targetFov - this.camera.fov) * (simDt > 0 ? 0.10 : 0.0)
+    this.camera.updateProjectionMatrix()
+
+    // Hold-to-act with cooldown.
+    this._actionCooldown = Math.max(0, this._actionCooldown - simDt)
+    if (simDt > 0 && this._actionHeld && this._actionCooldown === 0 && document.pointerLockElement === this.canvas) {
+      if (this.tool === 'hand') {
+        this.player.handAction()
+        this._tryInteract()
+        this._actionCooldown = 0.22
+      } else {
+        if (!this.player.isSwinging()) {
+          this.player.swing()
+          this.sfx.swing()
+          this._actionCooldown = this.player.getSwingDuration()
+        } else {
+          // wait until swing ends
+          this._actionCooldown = 0.05
+        }
+      }
+    }
 
     // Time freezes when not playing (we pass simDt).
     this.time.update(simDt)
