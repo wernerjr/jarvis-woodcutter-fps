@@ -251,13 +251,13 @@ export class Game {
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
 
-    // Right mouse: campfire placement hold
-    if (e.button === 2) {
+    // Left mouse: campfire placement hold
+    if (e.button === 0) {
       if (this.tool === 'campfire' && this.hotbarActive !== 0) {
         this._placingCampfire = true
         this._ghost.setVisible(true)
+        return
       }
-      return
     }
 
     if (e.button !== 0) return
@@ -267,12 +267,10 @@ export class Game {
   _onMouseUpAny(e) {
     if (this.state !== 'playing') return
 
-    if (e.button === 2) {
-      if (this._placingCampfire) {
-        this._placingCampfire = false
-        this._ghost.setVisible(false)
-        if (this._ghostValid) this._placeCampfireAtGhost()
-      }
+    if (e.button === 0 && this._placingCampfire) {
+      this._placingCampfire = false
+      this._ghost.setVisible(false)
+      if (this._ghostValid) this._placeCampfireAtGhost()
       return
     }
 
@@ -310,6 +308,7 @@ export class Game {
     if (!dmgResult) return
 
     meta.dur = Math.max(0, meta.dur - 1)
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
     if (meta.dur <= 0) {
       this.ui.toast('Machado quebrou!', 1200)
       this.hotbar[this.hotbarActive] = null
@@ -849,6 +848,7 @@ export class Game {
           this._cleanupHotbarBroken(ItemId.TORCH)
         } else {
           tmeta.dur = Math.max(0, tmeta.dur - 1)
+          this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
           if (tmeta.dur <= 0) {
             this.ui.toast('Tocha apagou (quebrou).', 1300)
             this.hotbar[this.hotbarActive] = null
