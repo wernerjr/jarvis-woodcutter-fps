@@ -59,7 +59,11 @@ export class Player {
     this.camera.add(this._hand)
     this._hand.visible = false
 
-    this._torch = this._makeTorch()
+    const { torch, flame } = this._makeTorch()
+    this._torch = torch
+    this._torchFlame = flame
+    this._torchFlicker = 1
+    this._torchHeat = 0
     this.camera.add(this._torch)
     this._torch.visible = false
 
@@ -112,6 +116,11 @@ export class Player {
 
   torchAction() {
     this._torchT = 0.18
+  }
+
+  setTorchFlicker(f, heat01) {
+    this._torchFlicker = f
+    this._torchHeat = heat01
   }
 
   isSwinging() {
@@ -235,13 +244,22 @@ export class Player {
       this._hand.rotation.x = -0.05 - hSwing * 0.30
     }
 
-    // Torch action (small bob)
+    // Torch action (small bob) + flame flicker
     if (this._torchT > 0) this._torchT = Math.max(0, this._torchT - dt)
     const tp = this._torchT > 0 ? 1 - this._torchT / 0.18 : 0
     const tBob = tp > 0 ? Math.sin(tp * Math.PI) : 0
     if (this._torch) {
       this._torch.position.y = 0 + tBob * 0.02
       this._torch.rotation.z = 0.05 - tBob * 0.15
+    }
+
+    if (this._torchFlame) {
+      const f = this._torchFlicker || 1
+      const heat = this._torchHeat || 0
+      const s = 0.85 + 0.35 * (f - 0.9) + heat * 0.25
+      this._torchFlame.scale.set(1, 1.1 + (s - 0.85), 1)
+      this._torchFlame.material.opacity = 0.55 + heat * 0.35
+      this._torchFlame.material.emissiveIntensity = 0.9 + heat * 1.8 + (f - 0.9) * 2.2
     }
 
     this._applyTransforms()
@@ -295,10 +313,11 @@ export class Player {
     if (this._axePivot) this._axePivot.visible = toolId === 'axe'
     if (this._hand) this._hand.visible = toolId === 'hand'
     if (this._torch) this._torch.visible = toolId === 'torch'
+    if (this._torchFlame) this._torchFlame.visible = toolId === 'torch'
   }
 
   _makeTorch() {
-    const g = new THREE.Group()
+    const torch = new THREE.Group()
 
     const stickGeo = new THREE.CylinderGeometry(0.03, 0.04, 0.55, 8)
     const stickMat = new THREE.MeshStandardMaterial({ color: 0x3e2a18, roughness: 1 })
@@ -307,15 +326,35 @@ export class Player {
     stick.rotation.z = 0.12
 
     const headGeo = new THREE.SphereGeometry(0.07, 10, 8)
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xffc87a, roughness: 0.6, metalness: 0.0, emissive: 0xff7a18, emissiveIntensity: 0.8 })
+    const headMat = new THREE.MeshStandardMaterial({
+      color: 0x2a1a10,
+      roughness: 1.0,
+      metalness: 0.0,
+      emissive: 0xff7a18,
+      emissiveIntensity: 0.6,
+    })
     const head = new THREE.Mesh(headGeo, headMat)
     head.position.set(0.30, -0.45, -0.50)
 
-    g.add(stick)
-    g.add(head)
-    g.rotation.set(-0.15, 0.25, 0.05)
+    // Flame (simple emissive cone) animated in update()
+    const flameGeo = new THREE.ConeGeometry(0.07, 0.18, 10)
+    const flameMat = new THREE.MeshStandardMaterial({
+      color: 0xffb24a,
+      emissive: 0xff6a00,
+      emissiveIntensity: 1.4,
+      transparent: true,
+      opacity: 0.95,
+    })
+    const flame = new THREE.Mesh(flameGeo, flameMat)
+    flame.position.set(0.30, -0.56, -0.50)
+    flame.rotation.x = Math.PI
 
-    return g
+    torch.add(stick)
+    torch.add(head)
+    torch.add(flame)
+    torch.rotation.set(-0.15, 0.25, 0.05)
+
+    return { torch, flame }
   }
 
   _makeHand() {

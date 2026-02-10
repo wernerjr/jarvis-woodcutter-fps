@@ -15,6 +15,48 @@ export class World {
     this._stars = null
     this._sunMesh = null
     this._moonMesh = null
+    this._clouds = null
+    this._cloudT = 0
+  }
+
+  _makeCloudTexture() {
+    const size = 512
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    const ctx = c.getContext('2d')
+
+    ctx.fillStyle = 'black'
+    ctx.fillRect(0, 0, size, size)
+
+    // soft blobs
+    for (let i = 0; i < 220; i++) {
+      const x = Math.random() * size
+      const y = Math.random() * size
+      const r = 18 + Math.random() * 64
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+      const a = 0.08 + Math.random() * 0.18
+      g.addColorStop(0, `rgba(255,255,255,${a})`)
+      g.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.fillStyle = g
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    // contrast curve
+    const img = ctx.getImageData(0, 0, size, size)
+    const d = img.data
+    for (let i = 0; i < d.length; i += 4) {
+      const v = d[i] / 255
+      const vv = Math.pow(v, 1.2)
+      d[i] = d[i + 1] = d[i + 2] = 255
+      d[i + 3] = Math.floor(vv * 255)
+    }
+    ctx.putImageData(img, 0, 0)
+
+    const tex = new THREE.CanvasTexture(c)
+    tex.anisotropy = 2
+    return tex
   }
 
   init() {
@@ -29,30 +71,78 @@ export class World {
 
     this.scene.add(this._amb)
 
-    // Simple sky dome
-    const skyGeo = new THREE.SphereGeometry(160, 24, 16)
-    const skyMat = new THREE.MeshBasicMaterial({ color: 0x1a2a44, side: THREE.BackSide })
-    // Prevent sky from depth-occluding sun/moon meshes.
-    skyMat.depthWrite = false
+    // Sky dome (shader gradient for contrast)
+    const skyGeo = new THREE.SphereGeometry(160, 32, 20)
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        topColor: { value: new THREE.Color(0x1a2a44) },
+        bottomColor: { value: new THREE.Color(0x0b160b) },
+        offset: { value: 10.0 },
+        exponent: { value: 0.65 },
+      },
+      vertexShader: `varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        uniform float offset;
+        uniform float exponent;
+        varying vec3 vWorldPosition;
+        void main() {
+          float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y;
+          float t = pow(max(h, 0.0), exponent);
+          gl_FragColor = vec4(mix(bottomColor, topColor, t), 1.0);
+        }`,
+    })
     this._sky = new THREE.Mesh(skyGeo, skyMat)
     this._sky.renderOrder = 0
     this.scene.add(this._sky)
 
-    // Sun/Moon visible discs
-    const sunGeo = new THREE.SphereGeometry(2.6, 16, 12)
-    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff0b3, transparent: true, opacity: 1.0 })
+    // Clouds layer (procedural canvas texture)
+    const cloudTex = this._makeCloudTexture()
+    cloudTex.wrapS = cloudTex.wrapT = THREE.RepeatWrapping
+    cloudTex.repeat.set(1.6, 1.2)
+    const cloudGeo = new THREE.SphereGeometry(155, 32, 20)
+    const cloudMat = new THREE.MeshBasicMaterial({
+      map: cloudTex,
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+    })
+    this._clouds = new THREE.Mesh(cloudGeo, cloudMat)
+    this._clouds.renderOrder = 1
+    this.scene.add(this._clouds)
+
+    // Sun/Moon visible discs (additive for contrast)
+    const sunGeo = new THREE.SphereGeometry(3.2, 20, 14)
+    const sunMat = new THREE.MeshBasicMaterial({
+      color: 0xffc84a,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+    })
     this._sunMesh = new THREE.Mesh(sunGeo, sunMat)
-    this._sunMesh.material.depthTest = false
-    this._sunMesh.material.depthWrite = false
     this._sunMesh.renderOrder = 2
     this._sunMesh.frustumCulled = false
     this.scene.add(this._sunMesh)
 
-    const moonGeo = new THREE.SphereGeometry(2.2, 16, 12)
-    const moonMat = new THREE.MeshBasicMaterial({ color: 0xd6e6ff, transparent: true, opacity: 1.0 })
+    const moonGeo = new THREE.SphereGeometry(2.6, 20, 14)
+    const moonMat = new THREE.MeshBasicMaterial({
+      color: 0xe8f2ff,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+    })
     this._moonMesh = new THREE.Mesh(moonGeo, moonMat)
-    this._moonMesh.material.depthTest = false
-    this._moonMesh.material.depthWrite = false
     this._moonMesh.renderOrder = 2
     this._moonMesh.frustumCulled = false
     this.scene.add(this._moonMesh)
@@ -149,14 +239,20 @@ export class World {
     this._amb.color.setHex(day > 0.5 ? 0x5d7a5d : 0x2a3a52)
 
     // Sky + fog blending
-    const skyDay = new THREE.Color(0x86bff0)
-    const skyDusk = new THREE.Color(0x2f3f6b)
-    const skyNight = new THREE.Color(0x071014)
+    const skyDayTop = new THREE.Color(0x5aa6ff)
+    const skyDayBottom = new THREE.Color(0xbfe7ff)
+    const skyDuskTop = new THREE.Color(0x2b3a7a)
+    const skyDuskBottom = new THREE.Color(0xffb07a)
+    const skyNightTop = new THREE.Color(0x070b18)
+    const skyNightBottom = new THREE.Color(0x0b1626)
 
     const dusk = 1 - Math.abs(day * 2 - 1) // peak at transitions
 
-    const sky = skyNight.clone().lerp(skyDusk, Math.min(1, dusk * 1.15)).lerp(skyDay, day)
-    this._sky.material.color.copy(sky)
+    const top = skyNightTop.clone().lerp(skyDuskTop, Math.min(1, dusk * 1.2)).lerp(skyDayTop, day)
+    const bottom = skyNightBottom.clone().lerp(skyDuskBottom, Math.min(1, dusk * 1.25)).lerp(skyDayBottom, day)
+
+    this._sky.material.uniforms.topColor.value.copy(top)
+    this._sky.material.uniforms.bottomColor.value.copy(bottom)
 
     // Stars visible at night
     if (this._stars) {
@@ -164,9 +260,22 @@ export class World {
       this._stars.position.copy(camera.position)
     }
 
+    // Clouds drift slowly, tint with sky
+    if (this._clouds) {
+      this._cloudT += dt
+      const tex = this._clouds.material.map
+      tex.offset.x = (this._cloudT * 0.002) % 1
+      tex.offset.y = (this._cloudT * 0.001) % 1
+
+      // More visible in day/dusk, faint at night
+      this._clouds.material.opacity = 0.08 + day * 0.22 + dusk * 0.06
+      this._clouds.material.color.copy(bottom.clone().lerp(top, 0.4))
+      this._clouds.position.copy(camera.position)
+    }
+
     // Fade sun/moon brightness a bit with day/night
-    if (this._sunMesh) this._sunMesh.material.opacity = 0.25 + day * 0.75
-    if (this._moonMesh) this._moonMesh.material.opacity = 0.35 + night * 0.65
+    if (this._sunMesh) this._sunMesh.material.opacity = 0.15 + day * 0.95
+    if (this._moonMesh) this._moonMesh.material.opacity = 0.22 + night * 0.78
 
     // Fog density slightly higher at night
     const fogColor = sky.clone().multiplyScalar(0.75)

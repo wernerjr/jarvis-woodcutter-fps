@@ -487,6 +487,9 @@ export class Game {
     this.torchSpot.intensity += (targetSpot - this.torchSpot.intensity) * (simDt > 0 ? 0.25 : 0.0)
     this.torchPoint.intensity += (targetPoint - this.torchPoint.intensity) * (simDt > 0 ? 0.25 : 0.0)
 
+    // Sync flame visuals with the same flicker signal.
+    this.player.setTorchFlicker(flicker, torchOn ? night : 0)
+
     // Sprint FOV (subtle)
     const targetFov = this.player.isSprinting ? 80 : this._baseFov
     this.camera.fov += (targetFov - this.camera.fov) * (simDt > 0 ? 0.10 : 0.0)
