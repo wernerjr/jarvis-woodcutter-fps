@@ -41,6 +41,38 @@ document.querySelector('#invGrid').addEventListener('contextmenu', (e) => {
   game.requestRemoveInventorySlot(idx)
 })
 
+// Drag: inventory -> hotbar
+const invGrid = document.querySelector('#invGrid')
+invGrid.addEventListener('dragstart', (e) => {
+  const slot = e.target?.closest?.('.invSlot')
+  if (!slot) return
+  const idx = Number(slot.dataset.index)
+  if (Number.isNaN(idx)) return
+  e.dataTransfer?.setData('text/plain', String(idx))
+})
+
+document.querySelectorAll('#hotbar .hotSlot').forEach((el) => {
+  el.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    el.classList.add('drop')
+  })
+  el.addEventListener('dragleave', () => el.classList.remove('drop'))
+  el.addEventListener('drop', (e) => {
+    e.preventDefault()
+    el.classList.remove('drop')
+    const invIdx = Number(e.dataTransfer?.getData('text/plain'))
+    const hotIdx = Number(el.getAttribute('data-idx'))
+    if (Number.isNaN(invIdx) || Number.isNaN(hotIdx)) return
+    game.bindHotbar(hotIdx, invIdx)
+  })
+
+  el.addEventListener('click', () => {
+    const hotIdx = Number(el.getAttribute('data-idx'))
+    if (Number.isNaN(hotIdx)) return
+    game.selectHotbar(hotIdx)
+  })
+})
+
 $('#btnPlay').addEventListener('click', () => game.playFromMenu())
 $('#btnControls').addEventListener('click', () => game.openControls('menu'))
 $('#btnClose').addEventListener('click', () => game.tryClose())

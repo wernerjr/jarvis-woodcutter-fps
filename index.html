@@ -36,10 +36,10 @@
         <div id="reticle" aria-hidden="true"></div>
         <div id="toast" role="status" aria-live="polite"></div>
 
-        <div id="hotbar" aria-label="Ferramentas">
-          <div class="hotSlot" data-tool="axe" title="Machado (1)"><span class="k">1</span><span class="ico" aria-hidden="true">🪓</span></div>
-          <div class="hotSlot" data-tool="hand" title="Mão (2)"><span class="k">2</span><span class="ico" aria-hidden="true">✋</span></div>
-          <div class="hotSlot" data-tool="torch" title="Tocha (3)"><span class="k">3</span><span class="ico" aria-hidden="true">🔥</span></div>
+        <div id="hotbar" aria-label="Hotbar">
+          <div class="hotSlot" data-idx="0" title="Slot 1"><span class="k">1</span><span class="ico" aria-hidden="true"> </span></div>
+          <div class="hotSlot" data-idx="1" title="Slot 2"><span class="k">2</span><span class="ico" aria-hidden="true"> </span></div>
+          <div class="hotSlot" data-idx="2" title="Slot 3"><span class="k">3</span><span class="ico" aria-hidden="true"> </span></div>
         </div>
       </div>
 
@@ -107,9 +107,11 @@
             <li><b>ESC</b>: pausar / liberar mouse</li>
             <li><b>I</b>: inventário</li>
             <li><b>1/2/3</b>: machado/mão/tocha</li>
-            <li><b>Segurar clique</b>: cortar/coletar (dependendo da ferramenta)</li>
+            <li><b>Segurar clique</b>: ação (depende da hotbar)</li>
             <li><b>Shift</b>: correr</li>
-            <li><b>Tocha</b>: ilumina mas bloqueia corte/coleta</li>
+            <li><b>I</b>: inventário • <b>C</b>: construção</li>
+            <li><b>Arrastar</b>: inventário → hotbar</li>
+            <li><b>F</b>: acender/apagar fogueira (tocha/mão) • colocar fogueira (slot com fogueira)</li>
             <li><b>Espaço</b>: pular</li>
           </ul>
           <div class="buttons">

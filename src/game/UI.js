@@ -117,19 +117,38 @@ export class UI {
     for (let i = 0; i < slots.length; i++) {
       const s = slots[i]
       const cell = document.createElement('div')
-      cell.className = 'invSlot' + (s ? '' : ' invEmpty')
+      cell.className = 'invSlot' + (s ? ' draggable' : ' invEmpty')
       cell.dataset.index = String(i)
 
       if (s) {
         const item = getItem(s.id)
-        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${s.qty} / 100</div>`
+        cell.draggable = true
+        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${item.stackable ? `${s.qty} / 100` : `Dur: ${s.meta?.dur ?? '-'} `}</div>`
       } else {
-        // Clean empty slot: no placeholders.
         cell.innerHTML = ''
       }
 
       grid.appendChild(cell)
     }
+  }
+
+  renderHotbar(slots, getItem, activeIdx) {
+    const root = document.querySelector('#hotbar')
+    if (!root) return
+    const els = root.querySelectorAll('.hotSlot')
+    els.forEach((el) => {
+      const idx = Number(el.getAttribute('data-idx'))
+      const s = slots[idx]
+      el.classList.toggle('active', idx === activeIdx)
+      const ico = el.querySelector('.ico')
+      if (!ico) return
+      if (!s) {
+        ico.textContent = ' '
+      } else {
+        const it = getItem(s.itemId)
+        ico.textContent = it?.icon ?? ' '
+      }
+    })
   }
 
   setHotbarActive(toolId) {

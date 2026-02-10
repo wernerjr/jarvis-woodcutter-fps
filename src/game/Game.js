@@ -4,6 +4,7 @@ import { World } from './World.js'
 import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
 import { RockManager } from './RockManager.js'
+import { CampfireManager } from './CampfireManager.js'
 import { Sfx } from './Sfx.js'
 import { clamp } from './util.js'
 import { Inventory } from './Inventory.js'
@@ -47,6 +48,7 @@ export class Game {
     this.camera.add(this.torchSpot)
     this.trees = new TreeManager({ scene: this.scene })
     this.rocks = new RockManager({ scene: this.scene })
+    this.fires = new CampfireManager({ scene: this.scene })
     this.sfx = new Sfx()
 
     this.inventory = new Inventory({ slots: 20, maxStack: 100 })
@@ -73,6 +75,11 @@ export class Game {
     this._onPointerLockChange = () => this._onPlockChange()
     this._onMouseDown = (e) => this._onMouseDownAny(e)
     this._onMouseUp = (e) => this._onMouseUpAny(e)
+
+    // Hotbar bindings (inventory items). 'hand' is virtual.
+    this.hotbar = [{ itemId: ItemId.AXE }, { itemId: 'hand' }, { itemId: ItemId.TORCH }]
+    this.hotbarActive = 0
+
     this.tool = 'axe'
 
     this._actionHeld = false
@@ -115,7 +122,7 @@ export class Game {
     this._running = true
     this._loop()
 
-    this.setTool('axe')
+    this.selectHotbar(0)
     this.ui.toast('Play para começar.')
   }
 
@@ -146,17 +153,17 @@ export class Game {
   }
 
   _onKeyDownAny(e) {
-    // Tool hotkeys
+    // Hotbar slots
     if (e.code === 'Digit1') {
-      this.setTool('axe')
+      this.selectHotbar(0)
       return
     }
     if (e.code === 'Digit2') {
-      this.setTool('hand')
+      this.selectHotbar(1)
       return
     }
     if (e.code === 'Digit3') {
-      this.setTool('torch')
+      this.selectHotbar(2)
       return
     }
 
@@ -173,6 +180,12 @@ export class Game {
     // (E kept as alternative interact)
     if (e.code === 'KeyE') {
       if (this.state === 'playing') this._tryInteract()
+      return
+    }
+
+    // Fire interaction / placement
+    if (e.code === 'KeyF') {
+      if (this.state === 'playing') this._handleFireAction()
       return
     }
 
@@ -261,6 +274,7 @@ export class Game {
       this.ui.toast('Seu machado quebrou.', 1100)
       this.inventory.removeOne(ItemId.AXE)
       this.setTool('hand')
+      this._cleanupHotbarBroken(ItemId.AXE)
       return
     }
 
@@ -273,6 +287,7 @@ export class Game {
       this.ui.toast('Machado quebrou!', 1200)
       this.inventory.removeOne(ItemId.AXE)
       this.setTool('hand')
+      this._cleanupHotbarBroken(ItemId.AXE)
     }
 
     // Floating damage number near impact point.
@@ -322,12 +337,14 @@ export class Game {
     this.inventory.add(ItemId.AXE, 1, { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX })
 
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
 
     this.trees.resetAll()
     this.rocks?.resetAll?.()
+    this.fires.resetAll()
     this.player.reset()
 
-    this.setTool('axe')
+    this.selectHotbar(0)
 
     this.state = 'playing'
     this.ui.showHUD()
@@ -367,6 +384,7 @@ export class Game {
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
 
     this.trees.resetAll()
+    this.fires.resetAll()
     this.player.reset()
 
     this.state = 'playing'
@@ -384,6 +402,7 @@ export class Game {
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
 
     this.trees.resetAll()
+    this.fires.resetAll()
     this.player.reset()
 
     this.state = 'menu'
@@ -525,27 +544,128 @@ export class Game {
     }
   }
 
+  _getHotbarItemDef(id) {
+    if (id === 'hand') return { icon: '✋', stackable: false }
+    return ITEMS[id]
+  }
+
   setTool(tool) {
-    if (tool !== 'axe' && tool !== 'hand' && tool !== 'torch') return
-
-    // Require crafted tool in inventory for axe/torch.
-    if (tool === 'axe' && this.inventory.count(ItemId.AXE) <= 0) {
-      this.ui.toast('Você não tem um machado (construa no menu C).', 1200)
-      return
-    }
-    if (tool === 'torch' && this.inventory.count(ItemId.TORCH) <= 0) {
-      this.ui.toast('Você não tem uma tocha (construa no menu C).', 1200)
-      return
-    }
-
+    // Direct tool switch (used by break logic). Does not change hotbar bindings.
     this.tool = tool
-    this.player.setTool(tool)
-    this.ui.setHotbarActive(tool)
+    const modelTool = tool === 'campfire' ? 'hand' : tool
+    this.player.setTool(modelTool)
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+  }
+
+  selectHotbar(idx) {
+    if (idx < 0 || idx >= this.hotbar.length) return
+    this.hotbarActive = idx
+
+    const itemId = this.hotbar[idx]?.itemId
+    let tool = 'hand'
+    if (itemId === ItemId.AXE) tool = 'axe'
+    else if (itemId === ItemId.TORCH) tool = 'torch'
+    else if (itemId === ItemId.CAMPFIRE) tool = 'campfire'
+
+    // Validate inventory for bound items.
+    if (tool === 'axe' && this.inventory.count(ItemId.AXE) <= 0) tool = 'hand'
+    if (tool === 'torch' && this.inventory.count(ItemId.TORCH) <= 0) tool = 'hand'
+    if (tool === 'campfire' && this.inventory.count(ItemId.CAMPFIRE) <= 0) tool = 'hand'
+
+    this.setTool(tool)
 
     if (this.state === 'playing') {
-      const msg = tool === 'axe' ? 'Machado equipado.' : tool === 'hand' ? 'Mão equipada.' : 'Tocha equipada.'
-      this.ui.toast(msg)
+      const msg = tool === 'axe' ? 'Machado equipado.' : tool === 'torch' ? 'Tocha equipada.' : tool === 'campfire' ? 'Fogueira selecionada.' : 'Mão equipada.'
+      this.ui.toast(msg, 900)
     }
+  }
+
+  bindHotbar(hotIdx, invIdx) {
+    const s = this.inventory.slots[invIdx]
+    if (!s) return
+
+    const def = ITEMS[s.id]
+    if (def?.stackable) {
+      this.ui.toast('Arraste um item (ferramenta) não-stackável.', 1100)
+      return
+    }
+
+    if (hotIdx < 0 || hotIdx >= this.hotbar.length) return
+    this.hotbar[hotIdx] = { itemId: s.id }
+
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+  }
+
+  _cleanupHotbarBroken(itemId) {
+    for (let i = 0; i < this.hotbar.length; i++) {
+      if (this.hotbar[i]?.itemId === itemId) this.hotbar[i] = null
+    }
+    if (this.hotbar[this.hotbarActive] == null) {
+      // fallback to hand slot if exists
+      this.tool = 'hand'
+      this.player.setTool('hand')
+    }
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+  }
+
+  _handleFireAction() {
+    if (this.state !== 'playing') return
+    if (document.pointerLockElement !== this.canvas) return
+
+    // If campfire selected: place it.
+    if (this.tool === 'campfire') {
+      if (this.inventory.count(ItemId.CAMPFIRE) <= 0) {
+        this.ui.toast('Você não tem uma fogueira.', 900)
+        return
+      }
+
+      // Place in front of player on ground (y=0 plane).
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
+      const p = this.player.position
+      const pos = { x: p.x + dir.x * 1.4, y: 0, z: p.z + dir.z * 1.4 }
+
+      this.fires.place(pos)
+      this.inventory.removeOne(ItemId.CAMPFIRE)
+      this.ui.toast('Fogueira colocada.', 900)
+
+      if (this.inventory.count(ItemId.CAMPFIRE) <= 0) this._cleanupHotbarBroken(ItemId.CAMPFIRE)
+      return
+    }
+
+    // Otherwise interact with nearest placed fire.
+    const near = this.fires.getNearest({ x: this.player.position.x, z: this.player.position.z }, 2.0)
+    if (!near) {
+      this.ui.toast('Nenhuma fogueira perto.', 800)
+      return
+    }
+
+    if (this.tool === 'torch') {
+      // Need torch that isn't broken.
+      const tmeta = this.inventory.getFirstMeta(ItemId.TORCH)
+      if (!tmeta || tmeta.dur <= 0) {
+        this.ui.toast('Sua tocha apagou.', 900)
+        return
+      }
+      if (this.fires.isLit(near.id)) {
+        this.ui.toast('Já está acesa.', 800)
+        return
+      }
+      this.fires.setLit(near.id, true)
+      this.ui.toast('Fogueira acesa.', 900)
+      return
+    }
+
+    if (this.tool === 'hand') {
+      if (!this.fires.isLit(near.id)) {
+        this.ui.toast('Já está apagada.', 800)
+        return
+      }
+      this.fires.setLit(near.id, false)
+      this.ui.toast('Fogueira apagada.', 900)
+      return
+    }
+
+    this.ui.toast('Use tocha para acender, mão para apagar.', 1100)
   }
 
   _tryInteract() {
@@ -553,7 +673,7 @@ export class Game {
     if (document.pointerLockElement !== this.canvas) return
 
     if (this.tool !== 'hand') {
-      this.ui.toast('Equipe a mão (2) para coletar pedras.', 1100)
+      this.ui.toast('Equipe a mão (hotbar) para coletar pedras.', 1100)
       return
     }
 
@@ -607,6 +727,7 @@ export class Game {
           this.ui.toast('Tocha apagou (quebrou).', 1300)
           this.inventory.removeOne(ItemId.TORCH)
           this.setTool('hand')
+          this._cleanupHotbarBroken(ItemId.TORCH)
         } else {
           this.inventory.setFirstMeta(ItemId.TORCH, { dur: Math.max(0, tmeta.dur - 1) })
         }
@@ -658,6 +779,7 @@ export class Game {
     this.world.update(simDt, { camera: this.camera, player: this.player, time: this.time })
     this.trees.update(simDt)
     this.rocks.update(simDt)
+    this.fires.update(simDt)
 
     this.ui.setTime({
       hhmm: this.time.getHHMM(),

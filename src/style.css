@@ -47,8 +47,9 @@ html,body{height:100%; margin:0; background:var(--bg); overflow:hidden; font-fam
 #reticle{position:fixed; left:50%; top:50%; width:10px; height:10px; margin-left:-5px; margin-top:-5px; border:1px solid rgba(231,240,231,0.9); border-radius:50%; box-shadow:0 0 0 2px rgba(0,0,0,.25);}
 
 #hotbar{position:fixed; left:50%; bottom:14px; transform: translateX(-50%); display:flex; gap:10px; pointer-events:none;}
-.hotSlot{pointer-events:none; border:1px solid var(--stroke); border-radius:12px; padding:8px 10px; background: rgba(10,18,10,0.55); color:var(--muted); font-size:12px; min-width:84px; display:flex; align-items:center; justify-content:center; gap:10px; text-align:center; text-shadow:0 2px 12px rgba(0,0,0,.6)}
-.hotSlot .ico{font-size:18px; line-height:1; color:var(--fg)}
+.hotSlot{pointer-events:auto; border:1px solid var(--stroke); border-radius:12px; padding:8px 10px; background: rgba(10,18,10,0.55); color:var(--muted); font-size:12px; min-width:72px; display:flex; align-items:center; justify-content:center; gap:10px; text-align:center; text-shadow:0 2px 12px rgba(0,0,0,.6)}
+.hotSlot .ico{font-size:20px; line-height:1; color:var(--fg)}
+.hotSlot.drop{border-color: rgba(159,245,168,0.55); background: rgba(159,245,168,0.10)}
 .hotSlot .k{display:inline-block; min-width:14px; padding:1px 6px; border:1px solid rgba(231,240,231,0.10); border-radius:10px; margin-right:6px; color:var(--fg); background: rgba(255,255,255,0.04)}
 .hotSlot.active{border-color: rgba(159,245,168,0.45); background: rgba(159,245,168,0.12); color: var(--fg); transform: translateY(-1px);}
 
@@ -76,6 +77,8 @@ button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,16
 .invGrid{display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-top:10px;}
 .invSlot{border:1px solid var(--stroke); border-radius:12px; padding:10px; min-height:58px; background: rgba(255,255,255,0.04)}
 .invSlot.invEmpty{background: rgba(255,255,255,0.02);}
+.invSlot.draggable{cursor: grab;}
+.invSlot.draggable:active{cursor: grabbing;}
 .invTop{display:flex; align-items:center; gap:8px;}
 .invIcon{font-size:18px; line-height:1}
 .invName{font-weight:700; font-size:12px;}
