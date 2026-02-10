@@ -224,7 +224,8 @@ export class Game {
       return
     }
     if (this.state === 'controls-pause') {
-      this.closeControls()
+      // ESC from pause-controls returns directly to gameplay.
+      this.resume()
       return
     }
 
@@ -299,7 +300,7 @@ export class Game {
     if (!axeSlot || axeSlot.id !== ItemId.AXE || !meta || meta.dur <= 0) {
       this.ui.toast('Seu machado quebrou.', 1100)
       this.hotbar[this.hotbarActive] = null
-      this._cleanupHotbarBroken(ItemId.AXE)
+      this._cleanupHotbarBroken(ItemId.AXE, this.hotbarActive)
       return
     }
 
@@ -312,7 +313,7 @@ export class Game {
     if (meta.dur <= 0) {
       this.ui.toast('Machado quebrou!', 1200)
       this.hotbar[this.hotbarActive] = null
-      this._cleanupHotbarBroken(ItemId.AXE)
+      this._cleanupHotbarBroken(ItemId.AXE, this.hotbarActive)
     }
 
     // Floating damage number near impact point.
@@ -722,14 +723,25 @@ export class Game {
     if (!slot || slot.id !== ItemId.CAMPFIRE) return
 
     this.fires.place({ x: this._ghostX, y: 0, z: this._ghostZ })
-    this.hotbar[this.hotbarActive] = null
+
+    // Consume only the currently selected hotbar stack.
+    slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
+    if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+
     this.ui.toast('Fogueira colocada.', 900)
-    this._cleanupHotbarBroken(ItemId.CAMPFIRE)
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+
+    // Do not clear other campfires bound to other slots.
+    if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
   }
 
-  _cleanupHotbarBroken(itemId) {
-    for (let i = 1; i < this.hotbar.length; i++) {
-      if (this.hotbar[i]?.id === itemId) this.hotbar[i] = null
+  _cleanupHotbarBroken(itemId, onlyIdx = null) {
+    if (typeof onlyIdx === 'number') {
+      if (onlyIdx !== 0 && this.hotbar[onlyIdx]?.id === itemId) this.hotbar[onlyIdx] = null
+    } else {
+      for (let i = 1; i < this.hotbar.length; i++) {
+        if (this.hotbar[i]?.id === itemId) this.hotbar[i] = null
+      }
     }
     this._postMoveUpdate()
   }
@@ -845,14 +857,14 @@ export class Game {
         if (!tslot || tslot.id !== ItemId.TORCH || !tmeta || tmeta.dur <= 0) {
           this.ui.toast('Tocha apagou (quebrou).', 1300)
           this.hotbar[this.hotbarActive] = null
-          this._cleanupHotbarBroken(ItemId.TORCH)
+          this._cleanupHotbarBroken(ItemId.TORCH, this.hotbarActive)
         } else {
           tmeta.dur = Math.max(0, tmeta.dur - 1)
           this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
           if (tmeta.dur <= 0) {
             this.ui.toast('Tocha apagou (quebrou).', 1300)
             this.hotbar[this.hotbarActive] = null
-            this._cleanupHotbarBroken(ItemId.TORCH)
+            this._cleanupHotbarBroken(ItemId.TORCH, this.hotbarActive)
           }
         }
       }
