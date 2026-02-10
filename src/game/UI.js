@@ -138,10 +138,18 @@ export class UI {
     const root = document.querySelector('#hotbar')
     if (!root) return
     const els = root.querySelectorAll('.hotSlot')
+
+    const dragEnabled = document.body.classList.contains('inventory-open')
+
     els.forEach((el) => {
       const idx = Number(el.getAttribute('data-idx'))
       const s = slots[idx]
+
       el.classList.toggle('active', idx === activeIdx)
+
+      // Enable dragging only when inventory is open, and never for slot 1.
+      el.draggable = dragEnabled && idx !== 0 && !!s
+
       const ico = el.querySelector('.hotIco')
       if (!ico) return
 
