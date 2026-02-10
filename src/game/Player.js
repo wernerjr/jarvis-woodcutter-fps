@@ -149,8 +149,6 @@ export class Player {
 
     this._resolveCollisions(next, colliders)
 
-    this.position.copy(next)
-
     // vertical motion (jump + gravity)
     this._vy += this.gravity * dt
     next.y = this.position.y + this._vy * dt
@@ -162,6 +160,9 @@ export class Player {
     } else {
       this._onGround = false
     }
+
+    // Apply final position.
+    this.position.copy(next)
 
     // camera bob
     const moving = dir.lengthSq() > 0

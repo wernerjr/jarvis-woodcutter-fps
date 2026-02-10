@@ -27,7 +27,7 @@ document.querySelector('#invGrid').addEventListener('contextmenu', (e) => {
   e.preventDefault()
   const idx = Number(slot.dataset.index)
   if (Number.isNaN(idx)) return
-  game.removeInventorySlot(idx)
+  game.requestRemoveInventorySlot(idx)
 })
 
 $('#btnPlay').addEventListener('click', () => game.playFromMenu())

@@ -17,24 +17,30 @@ export class RockManager {
   /** @param {{scene: THREE.Scene}} params */
   constructor({ scene }) {
     this.scene = scene
-    this._rocks = []
+    this._rocks = new Map() // id -> mesh
+    this._raycaster = new THREE.Raycaster()
+    this._raycaster.far = 2.5
     this._respawnSec = 8.0
+    this._idCounter = 1
   }
 
   init({ seed = 42, count = 28, radius = 45 } = {}) {
     const rng = mulberry32(seed)
     for (let i = 0; i < count; i++) {
+      const id = String(this._idCounter++)
       const mesh = makeRockMesh(rng)
+      mesh.userData.id = id
+
       const ang = rng() * Math.PI * 2
       const r = (0.15 + rng() * 0.85) * radius
       mesh.position.set(Math.cos(ang) * r, 0.02, Math.sin(ang) * r)
       this.scene.add(mesh)
-      this._rocks.push(mesh)
+      this._rocks.set(id, mesh)
     }
   }
 
   update(dt) {
-    for (const mesh of this._rocks) {
+    for (const mesh of this._rocks.values()) {
       if (mesh.userData.collected) {
         mesh.userData.respawnRemaining = Math.max(0, mesh.userData.respawnRemaining - dt)
         if (mesh.userData.respawnRemaining === 0) {
@@ -49,36 +55,38 @@ export class RockManager {
   }
 
   resetAll() {
-    for (const mesh of this._rocks) {
+    for (const mesh of this._rocks.values()) {
       mesh.userData.collected = false
       mesh.userData.respawnRemaining = 0
       mesh.visible = true
     }
   }
 
-  /**
-   * Auto-pickup closest rock within radius.
-   * @param {{x:number,y:number,z:number}} pos
-   * @param {number} radius
-   */
-  tryPickup(pos, radius = 1.1) {
-    let best = null
-    let bestD2 = radius * radius
-    for (const mesh of this._rocks) {
-      if (!mesh.visible || mesh.userData.collected) continue
-      const dx = mesh.position.x - pos.x
-      const dz = mesh.position.z - pos.z
-      const d2 = dx * dx + dz * dz
-      if (d2 <= bestD2) {
-        bestD2 = d2
-        best = mesh
-      }
-    }
-    if (!best) return false
+  raycastFromCamera(camera) {
+    this._raycaster.setFromCamera({ x: 0, y: 0 }, camera)
 
-    best.userData.collected = true
-    best.userData.respawnRemaining = this._respawnSec
-    best.visible = false
+    const targets = []
+    for (const mesh of this._rocks.values()) {
+      if (!mesh.visible || mesh.userData.collected) continue
+      targets.push(mesh)
+    }
+
+    const hits = this._raycaster.intersectObjects(targets, false)
+    if (!hits.length) return null
+
+    const hit = hits[0]
+    const rockId = hit.object?.userData?.id
+    if (!rockId) return null
+    return { rockId, distance: hit.distance }
+  }
+
+  collect(rockId) {
+    const mesh = this._rocks.get(String(rockId))
+    if (!mesh || !mesh.visible || mesh.userData.collected) return false
+
+    mesh.userData.collected = true
+    mesh.userData.respawnRemaining = this._respawnSec
+    mesh.visible = false
     return true
   }
 }

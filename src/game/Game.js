@@ -44,6 +44,9 @@ export class Game {
     this._onClick = (e) => this._onClickAny(e)
     this.tool = 'axe'
 
+    this._pendingDeleteIdx = null
+    this._pendingDeleteUntil = 0
+
     this._onKeyDown = (e) => this._onKeyDownAny(e)
   }
 
@@ -117,7 +120,16 @@ export class Game {
 
     // Jump
     if (e.code === 'Space') {
-      if (this.state === 'playing') this.player.jump()
+      if (this.state === 'playing') {
+        e.preventDefault?.()
+        this.player.jump()
+      }
+      return
+    }
+
+    // Interact (hand)
+    if (e.code === 'KeyE') {
+      if (this.state === 'playing') this._tryInteract()
       return
     }
 
@@ -319,10 +331,21 @@ export class Game {
     this.ui.showInventory()
   }
 
-  removeInventorySlot(idx) {
-    // Remove items (RMB in UI). Slot becomes clean empty.
-    this.inventory.removeSlot(idx)
-    if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+  requestRemoveInventorySlot(idx) {
+    // Two-step confirm to avoid accidents.
+    const t = performance.now()
+    if (this._pendingDeleteIdx === idx && t < (this._pendingDeleteUntil ?? 0)) {
+      this.inventory.removeSlot(idx)
+      this._pendingDeleteIdx = null
+      this._pendingDeleteUntil = 0
+      this.ui.toast('Item removido.', 900)
+      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      return
+    }
+
+    this._pendingDeleteIdx = idx
+    this._pendingDeleteUntil = t + 2200
+    this.ui.toast('Clique direito de novo para confirmar remoção.', 1400)
   }
 
   async closeInventory() {
@@ -363,6 +386,33 @@ export class Game {
     }
   }
 
+  _tryInteract() {
+    if (this.state !== 'playing') return
+    if (document.pointerLockElement !== this.canvas) return
+
+    if (this.tool !== 'hand') {
+      this.ui.toast('Equipe a mão (2) para coletar pedras.', 1100)
+      return
+    }
+
+    const hit = this.rocks.raycastFromCamera(this.camera)
+    if (!hit || hit.distance > 2.0) {
+      this.ui.toast('Nenhuma pedra perto.', 800)
+      return
+    }
+
+    const ok = this.rocks.collect(hit.rockId)
+    if (!ok) return
+
+    const overflow = this.inventory.add(ItemId.STONE, 1)
+    if (overflow) {
+      this.ui.toast('Inventário cheio: pedra descartada.', 1200)
+    } else {
+      this.ui.toast('Pegou: +1 pedra', 900)
+      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    }
+  }
+
   _loop = () => {
     if (!this._running) return
 
@@ -377,19 +427,6 @@ export class Game {
     this.world.update(simDt, { camera: this.camera, player: this.player })
     this.trees.update(simDt)
     this.rocks.update(simDt)
-
-    // Auto-pickup stones only with hand.
-    if (this.state === 'playing' && this.tool === 'hand') {
-      const picked = this.rocks.tryPickup(this.player.position, 1.15)
-      if (picked) {
-        const overflow = this.inventory.add(ItemId.STONE, 1)
-        if (overflow) {
-          this.ui.toast('Inventário cheio: pedra descartada.', 1200)
-        } else {
-          this.ui.toast('Pegou: +1 pedra', 900)
-        }
-      }
-    }
 
     this.ui.update()
 
