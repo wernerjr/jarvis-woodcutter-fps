@@ -32,18 +32,29 @@ export class World {
     // Simple sky dome
     const skyGeo = new THREE.SphereGeometry(160, 24, 16)
     const skyMat = new THREE.MeshBasicMaterial({ color: 0x1a2a44, side: THREE.BackSide })
+    // Prevent sky from depth-occluding sun/moon meshes.
+    skyMat.depthWrite = false
     this._sky = new THREE.Mesh(skyGeo, skyMat)
+    this._sky.renderOrder = 0
     this.scene.add(this._sky)
 
     // Sun/Moon visible discs
     const sunGeo = new THREE.SphereGeometry(2.6, 16, 12)
     const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff0b3, transparent: true, opacity: 1.0 })
     this._sunMesh = new THREE.Mesh(sunGeo, sunMat)
+    this._sunMesh.material.depthTest = false
+    this._sunMesh.material.depthWrite = false
+    this._sunMesh.renderOrder = 2
+    this._sunMesh.frustumCulled = false
     this.scene.add(this._sunMesh)
 
     const moonGeo = new THREE.SphereGeometry(2.2, 16, 12)
     const moonMat = new THREE.MeshBasicMaterial({ color: 0xd6e6ff, transparent: true, opacity: 1.0 })
     this._moonMesh = new THREE.Mesh(moonGeo, moonMat)
+    this._moonMesh.material.depthTest = false
+    this._moonMesh.material.depthWrite = false
+    this._moonMesh.renderOrder = 2
+    this._moonMesh.frustumCulled = false
     this.scene.add(this._moonMesh)
 
     // Stars (points)
@@ -119,10 +130,12 @@ export class World {
     if (this._sunMesh) {
       this._sunMesh.position.copy(camera.position).addScaledVector(sunDir, skyR)
       this._sunMesh.visible = alt > -0.05
+      this._sunMesh.lookAt(camera.position)
     }
     if (this._moonMesh) {
       this._moonMesh.position.copy(camera.position).addScaledVector(moonDir, skyR)
       this._moonMesh.visible = alt < 0.05
+      this._moonMesh.lookAt(camera.position)
     }
 
     // Light tuning

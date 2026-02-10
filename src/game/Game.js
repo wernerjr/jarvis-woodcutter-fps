@@ -30,10 +30,19 @@ export class Game {
     this.world = new World({ scene: this.scene })
     this.player = new Player({ camera: this.camera, domElement: canvas })
 
-    // Torch light (attached to camera)
-    this.torchLight = new THREE.PointLight(0xffa24a, 0.0, 12, 2)
-    this.torchLight.position.set(0.25, -0.15, -0.35)
-    this.camera.add(this.torchLight)
+    // Torch lights (attached to camera): spot for ground/forward + point for local fill.
+    this.torchPoint = new THREE.PointLight(0xffa24a, 0.0, 18, 1.2)
+    this.torchPoint.position.set(0.25, -0.10, -0.25)
+    this.camera.add(this.torchPoint)
+
+    this.torchTarget = new THREE.Object3D()
+    this.torchTarget.position.set(0, -0.35, -2.0)
+    this.camera.add(this.torchTarget)
+
+    this.torchSpot = new THREE.SpotLight(0xffb06a, 0.0, 26, Math.PI / 4.5, 0.55, 1.2)
+    this.torchSpot.position.set(0.15, -0.05, -0.10)
+    this.torchSpot.target = this.torchTarget
+    this.camera.add(this.torchSpot)
     this.trees = new TreeManager({ scene: this.scene })
     this.rocks = new RockManager({ scene: this.scene })
     this.sfx = new Sfx()
@@ -471,8 +480,12 @@ export class Game {
     const night = 1 - this.time.getDayFactor()
     const torchOn = this.tool === 'torch'
     const flicker = 0.90 + 0.10 * Math.sin(performance.now() * 0.018) + 0.05 * Math.sin(performance.now() * 0.041)
-    const targetTorch = torchOn ? (0.6 + night * 1.2) * flicker : 0.0
-    this.torchLight.intensity += (targetTorch - this.torchLight.intensity) * (simDt > 0 ? 0.25 : 0.0)
+
+    const targetSpot = torchOn ? (1.0 + night * 2.2) * flicker : 0.0
+    const targetPoint = torchOn ? (0.25 + night * 0.85) * flicker : 0.0
+
+    this.torchSpot.intensity += (targetSpot - this.torchSpot.intensity) * (simDt > 0 ? 0.25 : 0.0)
+    this.torchPoint.intensity += (targetPoint - this.torchPoint.intensity) * (simDt > 0 ? 0.25 : 0.0)
 
     // Sprint FOV (subtle)
     const targetFov = this.player.isSprinting ? 80 : this._baseFov
