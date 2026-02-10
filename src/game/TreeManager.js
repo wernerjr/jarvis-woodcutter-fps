@@ -30,7 +30,7 @@ function makeTreeMesh(rng) {
     trunkR,
     leafR,
     cut: false,
-    respawnAtMs: 0,
+    respawnRemaining: 0,
   }
 
   return group
@@ -45,7 +45,7 @@ export class TreeManager {
     this._raycaster = new THREE.Raycaster()
     this._raycaster.far = 5
 
-    this._respawnMs = 5000
+    this._respawnSec = 5.0
     this._idCounter = 1
 
     this._tmpVec = new THREE.Vector3()
@@ -76,19 +76,18 @@ export class TreeManager {
   }
 
   update(dt) {
-    // update colliders + respawn
+    // update colliders + respawn (dt-based so pause freezes timers)
     const t = performance.now()
     for (const { mesh, sphere } of this._trees.values()) {
       // keep collider centered if animating
       const trunkH = mesh.userData.trunkH
       sphere.center.set(mesh.position.x, mesh.position.y + trunkH * 0.8, mesh.position.z)
 
-      if (mesh.userData.cut && mesh.userData.respawnAtMs && t >= mesh.userData.respawnAtMs) {
-        this._respawn(mesh)
-      }
-
-      // simple "sway" for alive trees
-      if (!mesh.userData.cut) {
+      if (mesh.userData.cut) {
+        mesh.userData.respawnRemaining = Math.max(0, (mesh.userData.respawnRemaining ?? 0) - dt)
+        if (mesh.userData.respawnRemaining === 0) this._respawn(mesh)
+      } else {
+        // simple "sway" for alive trees
         const sway = Math.sin((mesh.position.x + mesh.position.z + t * 0.0006)) * 0.01
         mesh.rotation.z = sway
       }
@@ -123,9 +122,9 @@ export class TreeManager {
     if (mesh.userData.cut) return false
 
     mesh.userData.cut = true
-    mesh.userData.respawnAtMs = performance.now() + this._respawnMs
+    mesh.userData.respawnRemaining = this._respawnSec
 
-    // quick cut animation: shrink + tilt
+    // cut animation: shrink + tilt
     mesh.rotation.x = -0.08
     mesh.scale.set(1, 0.2, 1)
     mesh.position.y = 0.05
@@ -138,12 +137,19 @@ export class TreeManager {
     return true
   }
 
+  resetAll() {
+    for (const { mesh } of this._trees.values()) {
+      this._respawn(mesh)
+    }
+  }
+
   _respawn(mesh) {
     mesh.userData.cut = false
-    mesh.userData.respawnAtMs = 0
+    mesh.userData.respawnRemaining = 0
 
     mesh.scale.set(1, 1, 1)
     mesh.rotation.x = 0
+    mesh.rotation.z = 0
     mesh.position.y = 0
 
     for (const child of mesh.children) child.visible = true

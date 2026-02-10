@@ -6,17 +6,63 @@
     <title>Jarvis — Robô Lenhador (FPS)</title>
   </head>
   <body>
-    <div id="ui">
-      <div id="title">Jarvis — Robô Lenhador</div>
-      <div id="hint">Clique para capturar o mouse (Pointer Lock)</div>
-      <div id="help">
-        <div><b>Controles</b>: WASD mover • Mouse olhar • Clique esquerdo cortar • ESC liberar mouse</div>
-      </div>
-      <div id="stats">Árvores cortadas: <span id="score">0</span></div>
-      <div id="reticle" aria-hidden="true"></div>
-      <div id="toast" role="status" aria-live="polite"></div>
-    </div>
     <canvas id="game" tabindex="0"></canvas>
+
+    <!-- UI overlays -->
+    <div id="ui">
+      <!-- HUD (in-game) -->
+      <div id="hud" class="panel">
+        <div id="title">Jarvis — Robô Lenhador</div>
+        <div id="stats">Árvores cortadas: <span id="score">0</span></div>
+        <div id="reticle" aria-hidden="true"></div>
+        <div id="toast" role="status" aria-live="polite"></div>
+      </div>
+
+      <!-- Main menu -->
+      <div id="menu" class="overlay" role="dialog" aria-modal="true" aria-label="Menu inicial">
+        <div class="card">
+          <h1>Jarvis — Robô Lenhador</h1>
+          <p class="muted">FPS simples: corte árvores, elas reaparecem depois de um tempo.</p>
+          <div class="buttons">
+            <button id="btnPlay" class="primary">Play</button>
+            <button id="btnControls">Controls</button>
+            <button id="btnClose">Exit</button>
+          </div>
+          <p class="muted small">Dica: clique para capturar o mouse (Pointer Lock). ESC abre o menu de pausa.</p>
+        </div>
+      </div>
+
+      <!-- Pause menu -->
+      <div id="pause" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Menu de pausa">
+        <div class="card">
+          <h2>Pausado</h2>
+          <div class="buttons">
+            <button id="btnResume" class="primary">Resume</button>
+            <button id="btnRestart">Restart</button>
+            <button id="btnPauseControls">Controls</button>
+            <button id="btnQuit">Quit to menu</button>
+          </div>
+          <p class="muted small">ESC para retomar / abrir pausa.</p>
+        </div>
+      </div>
+
+      <!-- Controls modal -->
+      <div id="controls" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Controles">
+        <div class="card">
+          <h2>Controles</h2>
+          <ul class="controlsList">
+            <li><b>WASD</b>: mover</li>
+            <li><b>Mouse</b>: olhar</li>
+            <li><b>Clique esquerdo</b>: cortar (perto da árvore)</li>
+            <li><b>ESC</b>: pausar / liberar mouse</li>
+          </ul>
+          <div class="buttons">
+            <button id="btnControlsBack" class="primary">Back</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

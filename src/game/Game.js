@@ -4,11 +4,11 @@ import { World } from './World.js'
 import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
 import { Sfx } from './Sfx.js'
-import { clamp, nowMs } from './util.js'
+import { clamp } from './util.js'
 
 export class Game {
   /**
-   * @param {{canvas: HTMLCanvasElement, ui: {score: HTMLElement, hint: HTMLElement, toast: HTMLElement}}} params
+   * @param {{canvas: HTMLCanvasElement, ui: import('./UI.js').UI}} params
    */
   constructor({ canvas, ui }) {
     this.canvas = canvas
@@ -30,19 +30,22 @@ export class Game {
     this.score = 0
     this._running = false
 
+    /** @type {'menu'|'playing'|'paused'|'controls-menu'|'controls-pause'} */
+    this.state = 'menu'
+
     this._onResize = () => this._resize()
     this._onPointerLockChange = () => this._onPlockChange()
     this._onClick = (e) => this._onClickAny(e)
-
-    this._toastTimer = 0
+    this._onKeyDown = (e) => this._onKeyDownAny(e)
   }
 
   start() {
     this._resize()
     window.addEventListener('resize', this._onResize)
     document.addEventListener('pointerlockchange', this._onPointerLockChange)
+    window.addEventListener('keydown', this._onKeyDown)
 
-    // User gesture: click canvas to pointer-lock + enable audio.
+    // Click canvas: attempt chop (only when playing + locked)
     this.canvas.addEventListener('click', this._onClick)
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
 
@@ -55,13 +58,14 @@ export class Game {
     this._running = true
     this._loop()
 
-    this._toast('Clique para começar (capturar mouse).')
+    this.ui.toast('Play para começar.')
   }
 
   stop() {
     this._running = false
     window.removeEventListener('resize', this._onResize)
     document.removeEventListener('pointerlockchange', this._onPointerLockChange)
+    window.removeEventListener('keydown', this._onKeyDown)
     this.canvas.removeEventListener('click', this._onClick)
   }
 
@@ -75,17 +79,41 @@ export class Game {
   _onPlockChange() {
     const locked = document.pointerLockElement === this.canvas
     this.player.setLocked(locked)
-    this.ui.hint.textContent = locked ? 'ESC para liberar o mouse' : 'Clique para capturar o mouse (Pointer Lock)'
+
+    // If we were playing and pointer lock is lost, pause.
+    if (!locked && this.state === 'playing') {
+      this.pause('pointerlock')
+    }
+  }
+
+  _onKeyDownAny(e) {
+    if (e.code !== 'Escape') return
+
+    // In menus, ESC closes controls.
+    if (this.state === 'controls-menu') {
+      this.closeControls()
+      return
+    }
+    if (this.state === 'controls-pause') {
+      this.closeControls()
+      return
+    }
+
+    // In-game: ESC toggles pause/resume.
+    if (this.state === 'playing') {
+      this.pause('esc')
+      return
+    }
+    if (this.state === 'paused') {
+      this.resume()
+      return
+    }
   }
 
   async _onClickAny(e) {
-    // First click: request pointer lock. Subsequent clicks: chop.
-    if (document.pointerLockElement !== this.canvas) {
-      this.canvas.focus()
-      this.canvas.requestPointerLock()
-      await this.sfx.enable()
-      return
-    }
+    // Only chop during play + locked.
+    if (this.state !== 'playing') return
+    if (document.pointerLockElement !== this.canvas) return
 
     if (e.button !== 0) return
     this._tryChop()
@@ -108,19 +136,108 @@ export class Game {
     const result = this.trees.chop(hit.treeId)
     if (!result) return
 
+    // Swing + score increments exactly when chop() succeeds.
     this.player.swing()
 
     this.score += 1
-    this.ui.score.textContent = String(this.score)
+    this.ui.setScore(this.score)
 
     this.sfx.chop()
-    this._toast(`Árvore cortada! (+1)`)
+    this.ui.toast('Árvore cortada! (+1)')
   }
 
-  _toast(text) {
-    this.ui.toast.textContent = text
-    this.ui.toast.classList.add('show')
-    this._toastTimer = nowMs() + 1100
+  async playFromMenu() {
+    this.score = 0
+    this.ui.setScore(0)
+    this.trees.resetAll()
+    this.player.reset()
+
+    this.state = 'playing'
+    this.ui.showHUD()
+
+    await this.sfx.enable()
+    await this._lockPointer()
+
+    this.ui.toast('Corte árvores!')
+  }
+
+  pause(reason = 'esc') {
+    if (this.state !== 'playing') return
+    this.state = 'paused'
+
+    this.player.setLocked(false)
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+
+    this.ui.showPause()
+    if (reason === 'pointerlock') this.ui.toast('Pausado (mouse destravado).')
+  }
+
+  async resume() {
+    if (this.state !== 'paused') return
+    this.state = 'playing'
+    this.ui.showHUD()
+
+    await this.sfx.enable()
+    await this._lockPointer()
+  }
+
+  restart() {
+    // Restart from pause: reset score + world and keep in playing state.
+    this.score = 0
+    this.ui.setScore(0)
+    this.trees.resetAll()
+    this.player.reset()
+
+    this.state = 'playing'
+    this.ui.showHUD()
+    this._lockPointer()
+    this.ui.toast('Reiniciado.')
+  }
+
+  quitToMenu() {
+    // Quit resets progress.
+    this.score = 0
+    this.ui.setScore(0)
+    this.trees.resetAll()
+    this.player.reset()
+
+    this.state = 'menu'
+    this.player.setLocked(false)
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+    this.ui.showMenu()
+  }
+
+  openControls(from) {
+    if (from === 'pause') this.state = 'controls-pause'
+    else this.state = 'controls-menu'
+    this.ui.showControls()
+  }
+
+  closeControls() {
+    if (this.state === 'controls-pause') {
+      this.state = 'paused'
+      this.ui.showPause()
+      return
+    }
+
+    this.state = 'menu'
+    this.ui.showMenu()
+  }
+
+  tryClose() {
+    // Best-effort: browsers usually block window.close if not opened by script.
+    window.close()
+    this.ui.toast('Se não fechar, use a aba do navegador para sair.', 1800)
+  }
+
+  async _lockPointer() {
+    if (document.pointerLockElement === this.canvas) return
+    this.canvas.focus()
+    try {
+      this.canvas.requestPointerLock()
+    } catch {
+      // ignore
+    }
   }
 
   _loop = () => {
@@ -128,14 +245,13 @@ export class Game {
 
     const dt = clamp(this.clock.getDelta(), 0, 0.033)
 
-    this.player.update(dt)
-    this.world.update(dt, { camera: this.camera, player: this.player })
-    this.trees.update(dt)
+    // Freeze simulation when not playing.
+    const simDt = this.state === 'playing' ? dt : 0
 
-    if (this._toastTimer && nowMs() > this._toastTimer) {
-      this._toastTimer = 0
-      this.ui.toast.classList.remove('show')
-    }
+    this.player.update(simDt)
+    this.world.update(simDt, { camera: this.camera, player: this.player })
+    this.trees.update(simDt)
+    this.ui.update()
 
     this.renderer.render(this.scene, this.camera)
     requestAnimationFrame(this._loop)

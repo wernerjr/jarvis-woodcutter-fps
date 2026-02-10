@@ -22,6 +22,8 @@ export class Player {
     this.moveSpeed = 6.0
     this.lookSpeed = 0.002
 
+    this._swingDuration = 0.42
+
     this._keys = new Set()
     this._locked = false
 
@@ -71,11 +73,21 @@ export class Player {
   }
 
   swing() {
-    this._swingT = 0.18
+    this._swingT = this._swingDuration
+  }
+
+  reset() {
+    this.position.set(0, 1.65, 6)
+    this.velocity.set(0, 0, 0)
+    this.yaw.rotation.y = Math.PI
+    this.pitch.rotation.x = 0
+    this._swingT = 0
   }
 
   update(dt) {
-    const forward = Number(this._keys.has('KeyW')) - Number(this._keys.has('KeyS'))
+    // Correct FPS convention: W forward, S backward.
+    // (Three.js camera faces -Z; we map forward to -Z.)
+    const forward = Number(this._keys.has('KeyS')) - Number(this._keys.has('KeyW'))
     const strafe = Number(this._keys.has('KeyD')) - Number(this._keys.has('KeyA'))
 
     const dir = new THREE.Vector3(strafe, 0, forward)
@@ -104,12 +116,18 @@ export class Player {
     const bob = moving ? Math.sin(this._bobT) * 0.03 * this._bobFactor : 0
     this.pitch.position.y = bob
 
-    // swing animation
+    // swing animation (slower + easing, framerate independent)
     if (this._swingT > 0) this._swingT = Math.max(0, this._swingT - dt)
-    const s = this._swingT > 0 ? (1 - this._swingT / 0.18) : 0
-    const swing = s > 0 ? Math.sin(s * Math.PI) : 0
-    this._axe.rotation.z = -0.45 - swing * 0.85
-    this._axe.rotation.x = -0.25 + swing * 0.35
+
+    const dur = this._swingDuration
+    const p = this._swingT > 0 ? (1 - this._swingT / dur) : 0
+
+    // easeInOutCubic
+    const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
+    const swing = Math.sin(ease * Math.PI)
+
+    this._axe.rotation.z = -0.45 - swing * 0.90
+    this._axe.rotation.x = -0.25 + swing * 0.45
 
     this._applyTransforms()
   }
