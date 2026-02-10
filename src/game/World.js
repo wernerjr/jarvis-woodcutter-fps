@@ -278,7 +278,7 @@ export class World {
     if (this._moonMesh) this._moonMesh.material.opacity = 0.22 + night * 0.78
 
     // Fog density slightly higher at night
-    const fogColor = sky.clone().multiplyScalar(0.75)
+    const fogColor = bottom.clone().lerp(top, 0.65).multiplyScalar(0.75)
     this.scene.fog.color.copy(fogColor)
     this.scene.fog.density = 0.020 + night * 0.010
 
