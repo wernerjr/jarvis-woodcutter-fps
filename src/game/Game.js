@@ -45,7 +45,7 @@ export class Game {
     document.addEventListener('pointerlockchange', this._onPointerLockChange)
     window.addEventListener('keydown', this._onKeyDown)
 
-    // Click canvas: attempt chop (only when playing + locked)
+    // Click canvas: swing (only when playing + locked)
     this.canvas.addEventListener('click', this._onClick)
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
 
@@ -54,6 +54,13 @@ export class Game {
     this.scene.add(this.player.yaw)
 
     this.trees.init({ seed: 1337, count: 42, radius: 42 })
+
+    // Swing impacts trigger hit detection in a narrow window.
+    this.player.onImpact(() => {
+      if (this.state !== 'playing') return
+      if (document.pointerLockElement !== this.canvas) return
+      this._tryChop()
+    })
 
     this._running = true
     this._loop()
@@ -111,12 +118,13 @@ export class Game {
   }
 
   async _onClickAny(e) {
-    // Only chop during play + locked.
+    // Swing is always allowed in-game (even if no target). Hit is applied on impact window.
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
 
     if (e.button !== 0) return
-    this._tryChop()
+    this.player.swing()
+    this.sfx.swing()
   }
 
   _tryChop() {
@@ -136,9 +144,7 @@ export class Game {
     const result = this.trees.chop(hit.treeId)
     if (!result) return
 
-    // Swing + score increments exactly when chop() succeeds.
-    this.player.swing()
-
+    // Score increments exactly when chop() succeeds.
     this.score += 1
     this.ui.setScore(this.score)
 
@@ -248,7 +254,9 @@ export class Game {
     // Freeze simulation when not playing.
     const simDt = this.state === 'playing' ? dt : 0
 
-    this.player.update(simDt)
+    const colliders = this.state === 'playing' ? this.trees.getTrunkColliders() : []
+
+    this.player.update(simDt, colliders)
     this.world.update(simDt, { camera: this.camera, player: this.player })
     this.trees.update(simDt)
     this.ui.update()

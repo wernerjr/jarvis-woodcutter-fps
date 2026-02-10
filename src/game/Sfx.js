@@ -37,6 +37,11 @@ export class Sfx {
     osc.stop(t0 + dur + 0.02)
   }
 
+  swing() {
+    // light whoosh
+    this._beep({ freq: 420, bendTo: 240, dur: 0.07, type: 'triangle', gain: 0.10 })
+  }
+
   chop() {
     // metallic thunk + woody tick
     this._beep({ freq: 160, bendTo: 90, dur: 0.09, type: 'square', gain: 0.35 })

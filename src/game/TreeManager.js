@@ -63,7 +63,7 @@ export class TreeManager {
       mesh.position.set(Math.cos(ang) * r, 0, Math.sin(ang) * r)
       mesh.rotation.y = rng() * Math.PI * 2
 
-      // Collider approx: sphere around trunk center
+      // Collider approx: sphere around trunk center (for raycast grouping)
       const trunkH = mesh.userData.trunkH
       const leafR = mesh.userData.leafR
       const sph = new THREE.Sphere(mesh.position.clone().add(new THREE.Vector3(0, trunkH * 0.8, 0)), Math.max(0.5, leafR * 0.75))
@@ -92,6 +92,16 @@ export class TreeManager {
         mesh.rotation.z = sway
       }
     }
+  }
+
+  getTrunkColliders() {
+    const out = []
+    for (const { mesh } of this._trees.values()) {
+      if (!mesh.visible) continue
+      if (mesh.userData.cut) continue
+      out.push({ x: mesh.position.x, z: mesh.position.z, r: Math.max(0.18, mesh.userData.trunkR) + 0.08 })
+    }
+    return out
   }
 
   raycastFromCamera(camera) {

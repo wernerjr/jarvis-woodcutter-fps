@@ -24,6 +24,13 @@ export class Player {
 
     this._swingDuration = 0.42
 
+    // Collision capsule approximation (XZ circle)
+    this.radius = 0.35
+
+    this._swingActive = false
+    this._impactDone = false
+    this._onImpact = null
+
     this._keys = new Set()
     this._locked = false
 
@@ -74,6 +81,8 @@ export class Player {
 
   swing() {
     this._swingT = this._swingDuration
+    this._swingActive = true
+    this._impactDone = false
   }
 
   reset() {
@@ -82,9 +91,20 @@ export class Player {
     this.yaw.rotation.y = Math.PI
     this.pitch.rotation.x = 0
     this._swingT = 0
+    this._swingActive = false
+    this._impactDone = false
   }
 
-  update(dt) {
+  /** @param {( )=>void} fn */
+  onImpact(fn) {
+    this._onImpact = fn
+  }
+
+  /**
+   * @param {number} dt
+   * @param {{x:number,z:number,r:number}[]} colliders
+   */
+  update(dt, colliders = []) {
     // Correct FPS convention: W forward, S backward.
     // (Three.js camera faces -Z; we map forward to -Z.)
     const forward = Number(this._keys.has('KeyS')) - Number(this._keys.has('KeyW'))
@@ -101,9 +121,14 @@ export class Player {
     this.velocity.x = dir.x * speed
     this.velocity.z = dir.z * speed
 
-    // integrate
-    this.position.x += this.velocity.x * dt
-    this.position.z += this.velocity.z * dt
+    // integrate (XZ)
+    const next = this.position.clone()
+    next.x += this.velocity.x * dt
+    next.z += this.velocity.z * dt
+
+    this._resolveCollisions(next, colliders)
+
+    this.position.copy(next)
 
     // keep on ground at fixed height
     this.position.y = 1.65
@@ -121,6 +146,16 @@ export class Player {
 
     const dur = this._swingDuration
     const p = this._swingT > 0 ? (1 - this._swingT / dur) : 0
+
+    // Impact window: call once around the peak.
+    if (this._swingActive) {
+      const impactP = 0.58
+      if (!this._impactDone && p >= impactP) {
+        this._impactDone = true
+        this._onImpact?.()
+      }
+      if (p >= 1) this._swingActive = false
+    }
 
     // easeInOutCubic
     const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
@@ -160,6 +195,31 @@ export class Player {
     group.rotation.set(-0.25, 0.25, -0.45)
 
     return group
+  }
+
+  _resolveCollisions(nextPos, colliders) {
+    // Simple stable circle-vs-circle push-out in XZ.
+    // Iterate a couple times to handle multiple overlaps.
+    for (let iter = 0; iter < 2; iter++) {
+      let any = false
+      for (const c of colliders) {
+        const dx = nextPos.x - c.x
+        const dz = nextPos.z - c.z
+        const rr = this.radius + c.r
+        const d2 = dx * dx + dz * dz
+        if (d2 >= rr * rr || d2 === 0) continue
+
+        const d = Math.sqrt(d2)
+        const pen = rr - d
+        const nx = dx / d
+        const nz = dz / d
+
+        nextPos.x += nx * pen
+        nextPos.z += nz * pen
+        any = true
+      }
+      if (!any) break
+    }
   }
 
   _applyTransforms() {
