@@ -16,8 +16,14 @@ export class Player {
 
     this.camera.position.set(0, 0, 0)
 
-    this.position = new THREE.Vector3(0, 1.65, 6)
+    this.eyeHeight = 1.65
+    this.position = new THREE.Vector3(0, this.eyeHeight, 6)
     this.velocity = new THREE.Vector3()
+
+    this.gravity = -18
+    this.jumpSpeed = 6.4
+    this._vy = 0
+    this._onGround = true
 
     this.moveSpeed = 6.0
     this.lookSpeed = 0.002
@@ -43,6 +49,10 @@ export class Player {
     this._axePivot = pivot
     this._axeModel = model
     this.camera.add(this._axePivot)
+
+    this._hand = this._makeHand()
+    this.camera.add(this._hand)
+    this._hand.visible = false
 
     this._onKeyDown = (e) => this._keys.add(e.code)
     this._onKeyUp = (e) => this._keys.delete(e.code)
@@ -88,13 +98,21 @@ export class Player {
   }
 
   reset() {
-    this.position.set(0, 1.65, 6)
+    this.position.set(0, this.eyeHeight, 6)
     this.velocity.set(0, 0, 0)
+    this._vy = 0
+    this._onGround = true
     this.yaw.rotation.y = Math.PI
     this.pitch.rotation.x = 0
     this._swingT = 0
     this._swingActive = false
     this._impactDone = false
+  }
+
+  jump() {
+    if (!this._onGround) return
+    this._vy = this.jumpSpeed
+    this._onGround = false
   }
 
   /** @param {( )=>void} fn */
@@ -127,13 +145,23 @@ export class Player {
     const next = this.position.clone()
     next.x += this.velocity.x * dt
     next.z += this.velocity.z * dt
+    next.y = this.position.y
 
     this._resolveCollisions(next, colliders)
 
     this.position.copy(next)
 
-    // keep on ground at fixed height
-    this.position.y = 1.65
+    // vertical motion (jump + gravity)
+    this._vy += this.gravity * dt
+    next.y = this.position.y + this._vy * dt
+
+    if (next.y <= this.eyeHeight) {
+      next.y = this.eyeHeight
+      this._vy = 0
+      this._onGround = true
+    } else {
+      this._onGround = false
+    }
 
     // camera bob
     const moving = dir.lengthSq() > 0
@@ -141,7 +169,8 @@ export class Player {
     else this._bobT = 0
 
     const bob = moving ? Math.sin(this._bobT) * 0.03 * this._bobFactor : 0
-    this.pitch.position.y = bob
+    const jumpBob = this._onGround ? 0 : -0.03
+    this.pitch.position.y = bob + jumpBob
 
     // swing animation (slower + easing, framerate independent)
     if (this._swingT > 0) this._swingT = Math.max(0, this._swingT - dt)
@@ -212,6 +241,30 @@ export class Player {
 
     pivot.add(model)
     return { pivot, model }
+  }
+
+  setTool(toolId) {
+    // Show axe only when equipped.
+    if (this._axePivot) this._axePivot.visible = toolId === 'axe'
+    if (this._hand) this._hand.visible = toolId === 'hand'
+  }
+
+  _makeHand() {
+    const g = new THREE.Group()
+    const palmGeo = new THREE.BoxGeometry(0.12, 0.10, 0.18)
+    const palmMat = new THREE.MeshStandardMaterial({ color: 0x9aa4ad, roughness: 0.55, metalness: 0.25 })
+    const palm = new THREE.Mesh(palmGeo, palmMat)
+    palm.position.set(0.28, -0.26, -0.42)
+
+    const fingerGeo = new THREE.BoxGeometry(0.10, 0.05, 0.12)
+    const fingerMat = new THREE.MeshStandardMaterial({ color: 0xcbd2d8, roughness: 0.5, metalness: 0.35 })
+    const fingers = new THREE.Mesh(fingerGeo, fingerMat)
+    fingers.position.set(0.32, -0.30, -0.50)
+
+    g.add(palm)
+    g.add(fingers)
+    g.rotation.set(-0.05, 0.35, 0.05)
+    return g
   }
 
   _resolveCollisions(nextPos, colliders) {

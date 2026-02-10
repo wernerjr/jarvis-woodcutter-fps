@@ -3,6 +3,7 @@ import { Renderer } from './Renderer.js'
 import { World } from './World.js'
 import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
+import { RockManager } from './RockManager.js'
 import { Sfx } from './Sfx.js'
 import { clamp } from './util.js'
 import { Inventory } from './Inventory.js'
@@ -27,6 +28,7 @@ export class Game {
     this.world = new World({ scene: this.scene })
     this.player = new Player({ camera: this.camera, domElement: canvas })
     this.trees = new TreeManager({ scene: this.scene })
+    this.rocks = new RockManager({ scene: this.scene })
     this.sfx = new Sfx()
 
     this.inventory = new Inventory({ slots: 20, maxStack: 100 })
@@ -40,6 +42,8 @@ export class Game {
     this._onResize = () => this._resize()
     this._onPointerLockChange = () => this._onPlockChange()
     this._onClick = (e) => this._onClickAny(e)
+    this.tool = 'axe'
+
     this._onKeyDown = (e) => this._onKeyDownAny(e)
   }
 
@@ -58,17 +62,20 @@ export class Game {
     this.scene.add(this.player.yaw)
 
     this.trees.init({ seed: 1337, count: 42, radius: 42 })
+    this.rocks.init({ seed: 2026, count: 32, radius: 45 })
 
     // Swing impacts trigger hit detection in a narrow window.
     this.player.onImpact(() => {
       if (this.state !== 'playing') return
       if (document.pointerLockElement !== this.canvas) return
+      if (this.tool !== 'axe') return
       this._tryChop()
     })
 
     this._running = true
     this._loop()
 
+    this.setTool('axe')
     this.ui.toast('Play para começar.')
   }
 
@@ -98,6 +105,22 @@ export class Game {
   }
 
   _onKeyDownAny(e) {
+    // Tool hotkeys
+    if (e.code === 'Digit1') {
+      this.setTool('axe')
+      return
+    }
+    if (e.code === 'Digit2') {
+      this.setTool('hand')
+      return
+    }
+
+    // Jump
+    if (e.code === 'Space') {
+      if (this.state === 'playing') this.player.jump()
+      return
+    }
+
     // Inventory toggle (in-game only)
     if (e.code === 'KeyI') {
       if (this.state === 'playing') {
@@ -202,7 +225,10 @@ export class Game {
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
 
     this.trees.resetAll()
+    this.rocks?.resetAll?.()
     this.player.reset()
+
+    this.setTool('axe')
 
     this.state = 'playing'
     this.ui.showHUD()
@@ -210,7 +236,7 @@ export class Game {
     await this.sfx.enable()
     await this._lockPointer()
 
-    this.ui.toast('Corte árvores! (I = inventário)')
+    this.ui.toast('Corte árvores! (I inventário • 1/2 ferramenta • Espaço pular)')
   }
 
   pause(reason = 'esc') {
@@ -293,6 +319,12 @@ export class Game {
     this.ui.showInventory()
   }
 
+  removeInventorySlot(idx) {
+    // Remove items (RMB in UI). Slot becomes clean empty.
+    this.inventory.removeSlot(idx)
+    if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+  }
+
   async closeInventory() {
     if (this.state !== 'inventory') return
     this.state = 'playing'
@@ -320,6 +352,17 @@ export class Game {
     }
   }
 
+  setTool(tool) {
+    if (tool !== 'axe' && tool !== 'hand') return
+    this.tool = tool
+    this.player.setTool(tool)
+    this.ui.setHotbarActive(tool)
+
+    if (this.state === 'playing') {
+      this.ui.toast(tool === 'axe' ? 'Machado equipado.' : 'Mão equipada.')
+    }
+  }
+
   _loop = () => {
     if (!this._running) return
 
@@ -333,6 +376,21 @@ export class Game {
     this.player.update(simDt, colliders)
     this.world.update(simDt, { camera: this.camera, player: this.player })
     this.trees.update(simDt)
+    this.rocks.update(simDt)
+
+    // Auto-pickup stones only with hand.
+    if (this.state === 'playing' && this.tool === 'hand') {
+      const picked = this.rocks.tryPickup(this.player.position, 1.15)
+      if (picked) {
+        const overflow = this.inventory.add(ItemId.STONE, 1)
+        if (overflow) {
+          this.ui.toast('Inventário cheio: pedra descartada.', 1200)
+        } else {
+          this.ui.toast('Pegou: +1 pedra', 900)
+        }
+      }
+    }
+
     this.ui.update()
 
     this.renderer.render(this.scene, this.camera)

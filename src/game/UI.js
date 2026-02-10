@@ -74,13 +74,25 @@ export class UI {
       const s = slots[i]
       const cell = document.createElement('div')
       cell.className = 'invSlot' + (s ? '' : ' invEmpty')
-      if (!s) {
-        cell.innerHTML = `<div class="invTop"><div class="invIcon">·</div><div class="invName">Vazio</div></div><div class="invQty">Slot ${i + 1}</div>`
-      } else {
+      cell.dataset.index = String(i)
+
+      if (s) {
         const item = getItem(s.id)
         cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${s.qty} / 100</div>`
+      } else {
+        // Clean empty slot: no placeholders.
+        cell.innerHTML = ''
       }
+
       grid.appendChild(cell)
+    }
+  }
+
+  setHotbarActive(toolId) {
+    const el = document.querySelector('#hotbar')
+    if (!el) return
+    for (const s of el.querySelectorAll('.hotSlot')) {
+      s.classList.toggle('active', s.getAttribute('data-tool') === toolId)
     }
   }
 }

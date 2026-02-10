@@ -20,6 +20,16 @@ const game = new Game({ canvas, ui })
 // Menu buttons
 const $ = (id) => document.querySelector(id)
 
+// Inventory interactions: right-click a filled slot to remove it.
+document.querySelector('#invGrid').addEventListener('contextmenu', (e) => {
+  const slot = e.target?.closest?.('.invSlot')
+  if (!slot) return
+  e.preventDefault()
+  const idx = Number(slot.dataset.index)
+  if (Number.isNaN(idx)) return
+  game.removeInventorySlot(idx)
+})
+
 $('#btnPlay').addEventListener('click', () => game.playFromMenu())
 $('#btnControls').addEventListener('click', () => game.openControls('menu'))
 $('#btnClose').addEventListener('click', () => game.tryClose())

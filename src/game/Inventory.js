@@ -13,6 +13,12 @@ export class Inventory {
     this.slots = Array.from({ length: this.slotCount }, () => null)
   }
 
+  /** @param {number} idx */
+  removeSlot(idx) {
+    if (idx < 0 || idx >= this.slots.length) return
+    this.slots[idx] = null
+  }
+
   /**
    * Adds quantity of an item. Returns leftover (discarded).
    * @param {string} id
