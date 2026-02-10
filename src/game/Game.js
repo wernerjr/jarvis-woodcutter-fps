@@ -8,6 +8,7 @@ import { Sfx } from './Sfx.js'
 import { clamp } from './util.js'
 import { Inventory } from './Inventory.js'
 import { ITEMS, ItemId } from './items.js'
+import { TimeSystem } from './TimeSystem.js'
 
 export class Game {
   /**
@@ -32,6 +33,7 @@ export class Game {
     this.sfx = new Sfx()
 
     this.inventory = new Inventory({ slots: 20, maxStack: 100 })
+    this.time = new TimeSystem({ startHours: 9.0 })
 
     this.score = 0
     this._running = false
@@ -434,9 +436,20 @@ export class Game {
     const colliders = this.state === 'playing' ? this.trees.getTrunkColliders() : []
 
     this.player.update(simDt, colliders)
-    this.world.update(simDt, { camera: this.camera, player: this.player })
+
+    // Time freezes when not playing (we pass simDt).
+    this.time.update(simDt)
+
+    this.world.update(simDt, { camera: this.camera, player: this.player, time: this.time })
     this.trees.update(simDt)
     this.rocks.update(simDt)
+
+    this.ui.setTime({
+      hhmm: this.time.getHHMM(),
+      norm: this.time.norm,
+      dayFactor: this.time.getDayFactor(),
+      proximity: this.time.getTransitionProximity(),
+    })
 
     this.ui.update()
 

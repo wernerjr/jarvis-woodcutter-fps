@@ -13,6 +13,18 @@
       <!-- HUD (in-game) -->
       <div id="hud" class="panel">
         <div id="title">Jarvis — Robô Lenhador</div>
+
+        <div id="timeHud" aria-label="Relógio">
+          <div id="timeRow">
+            <div id="timeIcons">
+              <span id="icoSun" title="Dia" aria-hidden="true">☀️</span>
+              <span id="icoMoon" title="Noite" aria-hidden="true">🌙</span>
+            </div>
+            <div id="clock">00:00</div>
+          </div>
+          <div id="timeBar"><div id="timeMarker"></div></div>
+        </div>
+
         <div id="stats">Árvores cortadas: <span id="score">0</span></div>
         <div id="reticle" aria-hidden="true"></div>
         <div id="toast" role="status" aria-live="polite"></div>

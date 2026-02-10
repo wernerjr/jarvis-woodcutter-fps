@@ -1,5 +1,5 @@
 export class UI {
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -94,5 +94,28 @@ export class UI {
     for (const s of el.querySelectorAll('.hotSlot')) {
       s.classList.toggle('active', s.getAttribute('data-tool') === toolId)
     }
+  }
+
+  /** @param {{hhmm:string, norm:number, dayFactor:number, proximity:number}} t */
+  setTime(t) {
+    if (!this.els.clockEl) return
+
+    this.els.clockEl.textContent = t.hhmm
+
+    const bar = this.els.timeMarkerEl?.parentElement
+    if (bar && this.els.timeMarkerEl) {
+      const w = bar.clientWidth
+      const x = Math.round(t.norm * (w - 12))
+      this.els.timeMarkerEl.style.transform = `translateX(${x}px)`
+    }
+
+    const isDay = t.dayFactor >= 0.5
+    const prox = t.proximity
+
+    this.els.icoSunEl.classList.toggle('active', isDay || (!isDay && prox > 0.55))
+    this.els.icoMoonEl.classList.toggle('active', !isDay || (isDay && prox > 0.55))
+
+    this.els.icoSunEl.style.opacity = String(0.45 + t.dayFactor * 0.55)
+    this.els.icoMoonEl.style.opacity = String(0.45 + (1 - t.dayFactor) * 0.55)
   }
 }

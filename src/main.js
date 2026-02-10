@@ -13,6 +13,10 @@ const ui = new UI({
   controlsEl: document.querySelector('#controls'),
   inventoryEl: document.querySelector('#inventory'),
   invGridEl: document.querySelector('#invGrid'),
+  clockEl: document.querySelector('#clock'),
+  timeMarkerEl: document.querySelector('#timeMarker'),
+  icoSunEl: document.querySelector('#icoSun'),
+  icoMoonEl: document.querySelector('#icoMoon'),
 })
 
 const game = new Game({ canvas, ui })
