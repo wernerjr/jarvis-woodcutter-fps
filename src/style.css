@@ -66,6 +66,13 @@ button:hover{border-color: rgba(159,245,168,0.35); background: rgba(255,255,255,
 button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,168,0.10)}
 .controlsList{margin:10px 0 0 18px; color:var(--muted)}
 
+.craftList{display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px;}
+.craftRow{border:1px solid var(--stroke); border-radius:12px; padding:10px; background: rgba(255,255,255,0.04)}
+.craftTop{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+.craftName{font-weight:800;}
+.craftReq{margin-top:6px; color:var(--muted); font-size:12px;}
+.craftRow button{pointer-events:auto;}
+
 .invGrid{display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-top:10px;}
 .invSlot{border:1px solid var(--stroke); border-radius:12px; padding:10px; min-height:58px; background: rgba(255,255,255,0.04)}
 .invSlot.invEmpty{background: rgba(255,255,255,0.02);}

@@ -1,5 +1,5 @@
 export class UI {
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -56,6 +56,7 @@ export class UI {
 
   showInventory() {
     this.els.inventoryEl.classList.remove('hidden')
+    this.els.craftingEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
@@ -66,7 +67,50 @@ export class UI {
     this.els.inventoryEl.classList.add('hidden')
   }
 
+  showCrafting() {
+    this.els.craftingEl.classList.remove('hidden')
+    this.els.inventoryEl.classList.add('hidden')
+    this.els.controlsEl.classList.add('hidden')
+    this.els.menuEl.classList.add('hidden')
+    this.els.pauseEl.classList.add('hidden')
+    this.els.hudEl.classList.remove('hidden')
+  }
+
+  hideCrafting() {
+    this.els.craftingEl.classList.add('hidden')
+  }
+
   /** @param {(null|{id:string, qty:number})[]} slots @param {(id:string)=>{name:string, icon:string}} getItem */
+  renderCrafting(recipes, invCount, getItem, onCraft) {
+    const root = this.els.craftListEl
+    root.innerHTML = ''
+
+    for (const r of recipes) {
+      const row = document.createElement('div')
+      row.className = 'craftRow'
+
+      const can = r.cost.every((c) => invCount(c.id) >= c.qty)
+      const req = r.cost
+        .map((c) => {
+          const it = getItem(c.id)
+          const have = invCount(c.id)
+          return `${it.icon} ${it.name}: ${have}/${c.qty}`
+        })
+        .join(' • ')
+
+      row.innerHTML = `
+        <div class="craftTop">
+          <div class="craftName">${r.name}</div>
+          <button ${can ? '' : 'disabled'} data-recipe="${r.id}">${can ? 'Construir' : 'Falta recurso'}</button>
+        </div>
+        <div class="craftReq">${req}</div>
+      `
+
+      row.querySelector('button')?.addEventListener('click', () => onCraft(r.id))
+      root.appendChild(row)
+    }
+  }
+
   renderInventory(slots, getItem) {
     const grid = this.els.invGridEl
     grid.innerHTML = ''

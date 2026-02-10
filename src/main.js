@@ -13,6 +13,8 @@ const ui = new UI({
   controlsEl: document.querySelector('#controls'),
   inventoryEl: document.querySelector('#inventory'),
   invGridEl: document.querySelector('#invGrid'),
+  craftingEl: document.querySelector('#crafting'),
+  craftListEl: document.querySelector('#craftList'),
   clockEl: document.querySelector('#clock'),
   timeMarkerEl: document.querySelector('#timeMarker'),
   icoSunEl: document.querySelector('#icoSun'),
@@ -51,6 +53,7 @@ $('#btnPerfToggle').addEventListener('click', () => game.togglePerf())
 
 $('#btnControlsBack').addEventListener('click', () => game.closeControls())
 $('#btnInvClose').addEventListener('click', () => game.closeInventory())
+$('#btnCraftClose').addEventListener('click', () => game.closeCrafting())
 
 // Start at main menu
 ui.showMenu()

@@ -11,6 +11,7 @@ import { ITEMS, ItemId } from './items.js'
 import { TimeSystem } from './TimeSystem.js'
 import { Perf } from './Perf.js'
 import { DamageNumbers } from './DamageNumbers.js'
+import { RECIPES, DURABILITY } from './recipes.js'
 
 export class Game {
   /**
@@ -57,10 +58,15 @@ export class Game {
 
     this.axeDamage = 12
 
+    // Tool durability state (mirrors first inventory instance)
+    this._axeBroken = false
+    this._torchBroken = false
+    this._torchTick = 0
+
     this.score = 0
     this._running = false
 
-    /** @type {'menu'|'playing'|'paused'|'inventory'|'controls-menu'|'controls-pause'} */
+    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'controls-menu'|'controls-pause'} */
     this.state = 'menu'
 
     this._onResize = () => this._resize()
@@ -180,6 +186,16 @@ export class Game {
       return
     }
 
+    // Crafting toggle
+    if (e.code === 'KeyC') {
+      if (this.state === 'playing') {
+        this.openCrafting()
+      } else if (this.state === 'crafting') {
+        this.closeCrafting()
+      }
+      return
+    }
+
     if (e.code !== 'Escape') return
 
     // In menus, ESC closes controls.
@@ -203,6 +219,10 @@ export class Game {
     }
     if (this.state === 'inventory') {
       this.closeInventory()
+      return
+    }
+    if (this.state === 'crafting') {
+      this.closeCrafting()
       return
     }
   }
@@ -235,9 +255,25 @@ export class Game {
     }
 
     // Apply damage per-swing (TreeManager ignores falling/cut).
+    // Durability: consume 1 per valid hit that deals damage.
+    const meta = this.inventory.getFirstMeta(ItemId.AXE)
+    if (!meta || meta.dur <= 0) {
+      this.ui.toast('Seu machado quebrou.', 1100)
+      this.inventory.removeOne(ItemId.AXE)
+      this.setTool('hand')
+      return
+    }
+
     const dmg = this.axeDamage
     const dmgResult = this.trees.damage(hit.treeId, dmg, this.player.position)
     if (!dmgResult) return
+
+    this.inventory.setFirstMeta(ItemId.AXE, { dur: Math.max(0, meta.dur - 1) })
+    if (meta.dur - 1 <= 0) {
+      this.ui.toast('Machado quebrou!', 1200)
+      this.inventory.removeOne(ItemId.AXE)
+      this.setTool('hand')
+    }
 
     // Floating damage number near impact point.
     const p = hit.point
@@ -281,6 +317,10 @@ export class Game {
     this.score = 0
     this.ui.setScore(0)
     this.inventory.clear()
+
+    // Start with one axe so the game is playable; torch comes from crafting.
+    this.inventory.add(ItemId.AXE, 1, { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX })
+
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
 
     this.trees.resetAll()
@@ -323,6 +363,7 @@ export class Game {
     this.score = 0
     this.ui.setScore(0)
     this.inventory.clear()
+    this.inventory.add(ItemId.AXE, 1, { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX })
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
 
     this.trees.resetAll()
@@ -339,6 +380,7 @@ export class Game {
     this.score = 0
     this.ui.setScore(0)
     this.inventory.clear()
+    this.inventory.add(ItemId.AXE, 1, { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX })
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
 
     this.trees.resetAll()
@@ -376,6 +418,58 @@ export class Game {
 
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     this.ui.showInventory()
+  }
+
+  openCrafting() {
+    if (this.state !== 'playing') return
+    this.state = 'crafting'
+
+    this.player.setLocked(false)
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+
+    this.ui.renderCrafting(RECIPES, (id) => this.inventory.count(id), (id) => ITEMS[id], (rid) => this.craft(rid))
+    this.ui.showCrafting()
+  }
+
+  closeCrafting() {
+    if (this.state !== 'crafting') return
+    this.state = 'playing'
+
+    this.ui.hideCrafting()
+    this.ui.showHUD()
+
+    this._lockPointer()
+  }
+
+  craft(recipeId) {
+    const r = RECIPES.find((x) => x.id === recipeId)
+    if (!r) return
+
+    const can = r.cost.every((c) => this.inventory.count(c.id) >= c.qty)
+    if (!can) {
+      this.ui.toast('Faltam recursos.', 900)
+      return
+    }
+
+    // debit
+    for (const c of r.cost) this.inventory.remove(c.id, c.qty)
+
+    // add output
+    const overflow = this.inventory.add(r.output.id, r.output.qty, r.output.meta)
+    if (overflow) {
+      this.ui.toast('Inventário cheio: item descartado.', 1200)
+    } else {
+      this.ui.toast(`Construído: ${r.name}`, 1000)
+    }
+
+    // refresh crafting/inventory UIs
+    if (this.state === 'crafting') {
+      this.ui.renderCrafting(RECIPES, (id) => this.inventory.count(id), (id) => ITEMS[id], (rid) => this.craft(rid))
+    }
+    if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+
+    // If crafted a tool, allow equipping.
+    this.ui.setHotbarActive(this.tool)
   }
 
   requestRemoveInventorySlot(idx) {
@@ -433,6 +527,17 @@ export class Game {
 
   setTool(tool) {
     if (tool !== 'axe' && tool !== 'hand' && tool !== 'torch') return
+
+    // Require crafted tool in inventory for axe/torch.
+    if (tool === 'axe' && this.inventory.count(ItemId.AXE) <= 0) {
+      this.ui.toast('Você não tem um machado (construa no menu C).', 1200)
+      return
+    }
+    if (tool === 'torch' && this.inventory.count(ItemId.TORCH) <= 0) {
+      this.ui.toast('Você não tem uma tocha (construa no menu C).', 1200)
+      return
+    }
+
     this.tool = tool
     this.player.setTool(tool)
     this.ui.setHotbarActive(tool)
@@ -488,9 +593,26 @@ export class Game {
 
     this.player.update(simDt, colliders)
 
-    // Torch light intensity (mainly useful at night)
+    // Torch durability + light intensity (mainly useful at night)
     const night = 1 - this.time.getDayFactor()
     const torchOn = this.tool === 'torch'
+
+    // Durability drains while equipped.
+    if (simDt > 0 && torchOn) {
+      this._torchTick += simDt
+      if (this._torchTick >= 1.0) {
+        this._torchTick = 0
+        const tmeta = this.inventory.getFirstMeta(ItemId.TORCH)
+        if (!tmeta || tmeta.dur <= 0) {
+          this.ui.toast('Tocha apagou (quebrou).', 1300)
+          this.inventory.removeOne(ItemId.TORCH)
+          this.setTool('hand')
+        } else {
+          this.inventory.setFirstMeta(ItemId.TORCH, { dur: Math.max(0, tmeta.dur - 1) })
+        }
+      }
+    }
+
     const flicker = 0.90 + 0.10 * Math.sin(performance.now() * 0.018) + 0.05 * Math.sin(performance.now() * 0.041)
 
     const targetSpot = torchOn ? (1.0 + night * 2.2) * flicker : 0.0
