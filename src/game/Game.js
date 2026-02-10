@@ -10,6 +10,7 @@ import { Inventory } from './Inventory.js'
 import { ITEMS, ItemId } from './items.js'
 import { TimeSystem } from './TimeSystem.js'
 import { Perf } from './Perf.js'
+import { DamageNumbers } from './DamageNumbers.js'
 
 export class Game {
   /**
@@ -51,6 +52,10 @@ export class Game {
     this.time = new TimeSystem({ startHours: 9.0 })
     this.perf = new Perf()
     this.perfEnabled = false
+
+    this.damageNumbers = new DamageNumbers({ container: document.querySelector('#floaters') })
+
+    this.axeDamage = 12
 
     this.score = 0
     this._running = false
@@ -229,10 +234,19 @@ export class Game {
       return
     }
 
-    const result = this.trees.chop(hit.treeId, this.player.position)
-    if (!result) return
+    // Apply damage per-swing (TreeManager ignores falling/cut).
+    const dmg = this.axeDamage
+    const dmgResult = this.trees.damage(hit.treeId, dmg, this.player.position)
+    if (!dmgResult) return
 
-    // Score increments exactly when chop() succeeds.
+    // Floating damage number near impact point.
+    const p = hit.point
+    p.y += 0.25
+    this.damageNumbers.spawn(p, `-${dmg}`)
+
+    // Only when HP reaches 0: count as cut + loot.
+    if (!dmgResult.cut) return
+
     this.score += 1
     this.ui.setScore(this.score)
 
@@ -249,7 +263,6 @@ export class Game {
     if (overflowStick) dropped.push(`${overflowStick} ${ITEMS[ItemId.STICK].name}`)
     if (overflowLeaf) dropped.push(`${overflowLeaf} ${ITEMS[ItemId.LEAF].name}`)
 
-    // Overflow behavior: discard excedente (inventário cheio) e notificar.
     const msg = dropped.length
       ? `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas (excedente descartado)`
       : `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas`
@@ -257,7 +270,6 @@ export class Game {
     this.sfx.chop()
     this.ui.toast(msg, 1400)
 
-    // If inventory is open, refresh it.
     if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
   }
 
@@ -531,6 +543,8 @@ export class Game {
       dayFactor: this.time.getDayFactor(),
       proximity: this.time.getTransitionProximity(),
     })
+
+    this.damageNumbers.update(simDt, this.camera)
 
     this.ui.update()
 

@@ -5,6 +5,11 @@ function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3)
 }
 
+function rollHp() {
+  // Simple tuning: multiple hits needed, but not too many.
+  return 30 + Math.floor(Math.random() * 21) // 30..50
+}
+
 function makeTreeMesh(rng) {
   const group = new THREE.Group()
 
@@ -29,10 +34,13 @@ function makeTreeMesh(rng) {
   group.add(trunk)
   group.add(leaf)
 
+  const maxHp = rollHp()
   group.userData = {
     trunkH,
     trunkR,
     leafR,
+    maxHp,
+    hp: maxHp,
     cut: false,
     falling: false,
     fallT: 0,
@@ -151,7 +159,7 @@ export class TreeManager {
     if (!obj?.userData?.id) return null
 
     const treeId = obj.userData.id
-    return { treeId, distance: hit.distance }
+    return { treeId, distance: hit.distance, point: hit.point.clone() }
   }
 
   chop(treeId, playerPos) {
@@ -161,7 +169,7 @@ export class TreeManager {
 
     if (mesh.userData.cut || mesh.userData.falling) return false
 
-    // Start falling animation. Tree is considered "cut" for score purposes now.
+    // Start falling animation. Tree is considered "cut" for score/loot purposes now.
     mesh.userData.falling = true
     mesh.userData.fallT = 0
 
@@ -186,6 +194,33 @@ export class TreeManager {
     return true
   }
 
+  /**
+   * Applies damage. Returns state for UI.
+   * @param {string} treeId
+   * @param {number} dmg
+   * @param {any} playerPos
+   */
+  damage(treeId, dmg, playerPos) {
+    const item = this._trees.get(String(treeId))
+    if (!item) return null
+    const { mesh } = item
+
+    if (mesh.userData.cut || mesh.userData.falling) return null
+
+    mesh.userData.hp = Math.max(-9999, (mesh.userData.hp ?? mesh.userData.maxHp) - dmg)
+
+    const cutNow = mesh.userData.hp <= 0
+    if (cutNow) {
+      const ok = this.chop(treeId, playerPos)
+      return { cut: ok, hp: 0, maxHp: mesh.userData.maxHp }
+    }
+
+    // Minor feedback: tiny trunk tilt.
+    mesh.rotation.x = -0.01
+
+    return { cut: false, hp: mesh.userData.hp, maxHp: mesh.userData.maxHp }
+  }
+
   resetAll() {
     for (const { mesh } of this._trees.values()) {
       this._respawn(mesh)
@@ -197,6 +232,10 @@ export class TreeManager {
     mesh.userData.falling = false
     mesh.userData.fallT = 0
     mesh.userData.respawnRemaining = 0
+
+    // Reset HP (reroll to keep some variety per respawn)
+    mesh.userData.maxHp = rollHp()
+    mesh.userData.hp = mesh.userData.maxHp
 
     mesh.visible = true
     mesh.scale.set(1, 1, 1)
