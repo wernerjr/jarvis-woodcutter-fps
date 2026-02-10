@@ -151,18 +151,37 @@ export class UI {
       el.draggable = dragEnabled && idx !== 0 && !!s
 
       const ico = el.querySelector('.hotIco')
-      if (!ico) return
+      const durFill = el.querySelector('.hotDurFill')
+      const durRoot = el.querySelector('.hotDur')
 
       if (idx === 0) {
-        ico.textContent = '✋'
+        if (ico) ico.textContent = '✋'
+        if (durRoot) durRoot.style.opacity = '0'
         return
       }
 
       if (!s) {
-        ico.textContent = ''
+        if (ico) ico.textContent = ''
+        if (durRoot) durRoot.style.opacity = '0'
+        if (durFill) durFill.style.width = '0%'
+        return
+      }
+
+      const it = getItem(s.id)
+      if (ico) ico.textContent = it?.icon ?? ''
+
+      const dur = s.meta?.dur
+      const maxDur = s.meta?.maxDur
+      if (durRoot && durFill && typeof dur === 'number' && typeof maxDur === 'number' && maxDur > 0) {
+        durRoot.style.opacity = '1'
+        const p = Math.max(0, Math.min(1, dur / maxDur))
+        durFill.style.width = `${Math.round(p * 100)}%`
+
+        // color ramp
+        const col = p > 0.6 ? 'rgba(159,245,168,0.75)' : p > 0.3 ? 'rgba(255,220,120,0.78)' : 'rgba(255,120,120,0.78)'
+        durFill.style.background = col
       } else {
-        const it = getItem(s.id)
-        ico.textContent = it?.icon ?? ''
+        if (durRoot) durRoot.style.opacity = '0'
       }
     })
   }

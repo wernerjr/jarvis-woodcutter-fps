@@ -13,6 +13,8 @@ import { TimeSystem } from './TimeSystem.js'
 import { Perf } from './Perf.js'
 import { DamageNumbers } from './DamageNumbers.js'
 import { RECIPES, DURABILITY } from './recipes.js'
+import { CampfireGhost } from './CampfireGhost.js'
+import { raycastGround } from './raycastGround.js'
 
 export class Game {
   /**
@@ -60,7 +62,14 @@ export class Game {
 
     this.axeDamage = 12
 
-    // Tool durability state (mirrors first inventory instance)
+    this._placingCampfire = false
+    this._ghost = new CampfireGhost()
+    this.scene.add(this._ghost.mesh)
+    this._ghostX = 0
+    this._ghostZ = 0
+    this._ghostValid = false
+
+    // Tool durability state
     this._axeBroken = false
     this._torchBroken = false
     this._torchTick = 0
@@ -239,14 +248,34 @@ export class Game {
   }
 
   _onMouseDownAny(e) {
-    if (e.button !== 0) return
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
 
+    // Right mouse: campfire placement hold
+    if (e.button === 2) {
+      if (this.tool === 'campfire' && this.hotbarActive !== 0) {
+        this._placingCampfire = true
+        this._ghost.setVisible(true)
+      }
+      return
+    }
+
+    if (e.button !== 0) return
     this._actionHeld = true
   }
 
   _onMouseUpAny(e) {
+    if (this.state !== 'playing') return
+
+    if (e.button === 2) {
+      if (this._placingCampfire) {
+        this._placingCampfire = false
+        this._ghost.setVisible(false)
+        if (this._ghostValid) this._placeCampfireAtGhost()
+      }
+      return
+    }
+
     if (e.button !== 0) return
     this._actionHeld = false
   }
@@ -650,6 +679,8 @@ export class Game {
     if (this.state === 'inventory') {
       this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
       this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+    } else {
+      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
     }
 
     // If active slot is now empty, fallback to hand.
@@ -658,6 +689,43 @@ export class Game {
     } else {
       this.selectHotbar(this.hotbarActive)
     }
+  }
+
+  _updateCampfireGhost() {
+    const p = raycastGround(this.camera)
+    if (!p) {
+      this._ghostValid = false
+      this._ghost.setValid(false)
+      return
+    }
+
+    // Snap slightly
+    const x = Math.round(p.x * 10) / 10
+    const z = Math.round(p.z * 10) / 10
+    this._ghostX = x
+    this._ghostZ = z
+
+    // Validity rules: not too close to player or other fires.
+    const dx = x - this.player.position.x
+    const dz = z - this.player.position.z
+    const d = Math.hypot(dx, dz)
+
+    const nearFire = this.fires.getNearest({ x, z }, 1.2)
+
+    const ok = d >= 1.0 && !nearFire
+    this._ghostValid = ok
+    this._ghost.setValid(ok)
+    this._ghost.setPos(x, z)
+  }
+
+  _placeCampfireAtGhost() {
+    const slot = this.hotbar[this.hotbarActive]
+    if (!slot || slot.id !== ItemId.CAMPFIRE) return
+
+    this.fires.place({ x: this._ghostX, y: 0, z: this._ghostZ })
+    this.hotbar[this.hotbarActive] = null
+    this.ui.toast('Fogueira colocada.', 900)
+    this._cleanupHotbarBroken(ItemId.CAMPFIRE)
   }
 
   _cleanupHotbarBroken(itemId) {
@@ -671,25 +739,9 @@ export class Game {
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
 
-    // If campfire selected: place it.
+    // Campfire placement is now mouse-hold + ghost; F only toggles light/extinguish.
     if (this.tool === 'campfire') {
-      if (!this.hotbar[this.hotbarActive] || this.hotbar[this.hotbarActive].id !== ItemId.CAMPFIRE) {
-        this.ui.toast('Selecione uma fogueira na hotbar.', 900)
-        return
-      }
-
-      // Place in front of player on ground (y=0 plane).
-      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
-      const p = this.player.position
-      const pos = { x: p.x + dir.x * 1.4, y: 0, z: p.z + dir.z * 1.4 }
-
-      this.fires.place(pos)
-      // consume from hotbar slot
-      this.hotbar[this.hotbarActive] = null
-      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
-      this.ui.toast('Fogueira colocada.', 900)
-
-      this._cleanupHotbarBroken(ItemId.CAMPFIRE)
+      this.ui.toast('Segure o botão direito para posicionar a fogueira.', 1100)
       return
     }
 
@@ -770,6 +822,11 @@ export class Game {
 
     // Freeze simulation when not playing (pause/inventory/menus).
     const simDt = this.state === 'playing' ? dt : 0
+
+    // Ghost placement update
+    if (simDt > 0 && this._placingCampfire) {
+      this._updateCampfireGhost()
+    }
 
     const colliders = this.state === 'playing' ? this.trees.getTrunkColliders() : []
 

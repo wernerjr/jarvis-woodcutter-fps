@@ -121,6 +121,9 @@ export class Player {
   setTorchFlicker(f, heat01) {
     this._torchFlicker = f
     this._torchHeat = heat01
+
+    // Flame visibility follows heat.
+    if (this._torchFlame) this._torchFlame.visible = heat01 > 0.01
   }
 
   isSwinging() {
@@ -348,6 +351,7 @@ export class Player {
     const flame = new THREE.Mesh(flameGeo, flameMat)
     flame.position.set(0.30, -0.56, -0.50)
     flame.rotation.x = Math.PI
+    flame.visible = false
 
     torch.add(stick)
     torch.add(head)
