@@ -99,6 +99,8 @@ export class Game {
     this._pendingDeleteIdx = null
     this._pendingDeleteUntil = 0
 
+    this._pendingRelockUntil = 0
+
     this._onKeyDown = (e) => this._onKeyDownAny(e)
   }
 
@@ -392,13 +394,26 @@ export class Game {
     if (reason === 'pointerlock') this.ui.toast('Pausado (mouse destravado).')
   }
 
-  async resume() {
-    if (this.state !== 'paused') return
+  async returnToGameMode() {
+    // Centralized UI exit -> gameplay, with best-effort pointer lock restore.
     this.state = 'playing'
+
+    this.ui.hideInventory?.()
+    this.ui.hideCrafting?.()
     this.ui.showHUD()
 
     await this.sfx.enable()
-    await this._lockPointer()
+
+    // ESC can make browsers picky; retry quickly and also arm a fallback on next click.
+    this._pendingRelockUntil = performance.now() + 1200
+    this._attemptRelock()
+    setTimeout(() => this._attemptRelock(), 50)
+    setTimeout(() => this._attemptRelock(), 250)
+  }
+
+  async resume() {
+    if (this.state !== 'paused') return
+    await this.returnToGameMode()
   }
 
   restart() {
@@ -486,14 +501,9 @@ export class Game {
     this.ui.showCrafting()
   }
 
-  closeCrafting() {
+  async closeCrafting() {
     if (this.state !== 'crafting') return
-    this.state = 'playing'
-
-    this.ui.hideCrafting()
-    this.ui.showHUD()
-
-    this._lockPointer()
+    await this.returnToGameMode()
   }
 
   craft(recipeId) {
@@ -555,13 +565,7 @@ export class Game {
 
   async closeInventory() {
     if (this.state !== 'inventory') return
-    this.state = 'playing'
-
-    this.ui.hideInventory()
-    this.ui.showHUD()
-
-    await this.sfx.enable()
-    await this._lockPointer()
+    await this.returnToGameMode()
   }
 
   tryClose() {
@@ -570,14 +574,20 @@ export class Game {
     this.ui.toast('Se não fechar, use a aba do navegador para sair.', 1800)
   }
 
-  async _lockPointer() {
+  _attemptRelock() {
+    if (this.state !== 'playing') return
     if (document.pointerLockElement === this.canvas) return
+
     this.canvas.focus()
     try {
       this.canvas.requestPointerLock()
     } catch {
       // ignore
     }
+  }
+
+  async _lockPointer() {
+    this._attemptRelock()
   }
 
   _getHotbarItemDef(id) {
