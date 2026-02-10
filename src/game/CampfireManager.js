@@ -28,10 +28,25 @@ function makeCampfireMesh() {
   const ember = new THREE.Mesh(emberGeo, emberMat)
   ember.position.set(0, 0.12, 0)
 
+  // Flame (bigger than torch) - only visible when lit
+  const flameGeo = new THREE.ConeGeometry(0.16, 0.45, 12)
+  const flameMat = new THREE.MeshStandardMaterial({
+    color: 0xffb24a,
+    emissive: 0xff6a00,
+    emissiveIntensity: 1.2,
+    transparent: true,
+    opacity: 0.0,
+  })
+  const flame = new THREE.Mesh(flameGeo, flameMat)
+  flame.position.set(0, 0.40, 0)
+  flame.rotation.x = Math.PI
+
   g.add(base)
   g.add(ember)
+  g.add(flame)
 
   g.userData.ember = ember
+  g.userData.flame = flame
   return g
 }
 
@@ -42,6 +57,9 @@ export class CampfireManager {
     /** @type {Map<string, {mesh:THREE.Group, light:THREE.PointLight, lit:boolean}>} */
     this._fires = new Map()
     this._idCounter = 1
+
+    // Provided by Game each frame (so campfire can be ~3x torch brightness).
+    this._torchMain = 1.0
   }
 
   /** @param {{x:number,y:number,z:number}} pos */
@@ -50,8 +68,8 @@ export class CampfireManager {
     const mesh = makeCampfireMesh()
     mesh.position.set(pos.x, 0, pos.z)
 
-    const light = new THREE.PointLight(0xffa24a, 0.0, 10, 1.2)
-    light.position.set(0, 0.6, 0)
+    const light = new THREE.PointLight(0xffa24a, 0.0, 16, 1.2)
+    light.position.set(0, 0.65, 0)
     mesh.add(light)
 
     this.scene.add(mesh)
@@ -70,13 +88,38 @@ export class CampfireManager {
   update(dt) {
     const t = performance.now() * 0.001
     for (const f of this._fires.values()) {
-      if (!f.lit) continue
-      // gentle flicker
-      const flick = 0.9 + 0.1 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 12.7)
-      f.light.intensity = 1.4 * flick
       const ember = f.mesh.userData.ember
-      if (ember?.material) ember.material.emissiveIntensity = 0.8 * flick
+      const flame = f.mesh.userData.flame
+
+      if (!f.lit) {
+        f.light.intensity = 0
+        if (ember?.material) ember.material.emissiveIntensity = 0
+        if (flame?.material) {
+          flame.material.opacity = 0
+          flame.material.emissiveIntensity = 0.2
+        }
+        continue
+      }
+
+      // gentle flicker (reuse torch main scale to keep ~3x brightness)
+      const flick = 0.9 + 0.1 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 12.7)
+      const I = this._torchMain * 3.0 * flick
+
+      f.light.intensity = I
+      f.light.distance = 16
+
+      if (ember?.material) ember.material.emissiveIntensity = 0.45 + 0.35 * flick
+      if (flame?.material) {
+        flame.material.opacity = 0.55 + 0.25 * flick
+        flame.material.emissiveIntensity = 1.1 + 1.3 * flick
+        flame.scale.set(1, 0.9 + 0.35 * flick, 1)
+      }
     }
+  }
+
+  /** @param {number} torchMain */
+  setTorchMain(torchMain) {
+    this._torchMain = torchMain
   }
 
   /** @param {{x:number,z:number}} p */
@@ -99,9 +142,11 @@ export class CampfireManager {
     const f = this._fires.get(String(id))
     if (!f) return false
     f.lit = !!lit
-    f.light.intensity = f.lit ? 1.4 : 0.0
+    f.light.intensity = f.lit ? this._torchMain * 3.0 : 0.0
     const ember = f.mesh.userData.ember
+    const flame = f.mesh.userData.flame
     if (ember?.material) ember.material.emissiveIntensity = f.lit ? 0.8 : 0.0
+    if (flame?.material) flame.material.opacity = f.lit ? 0.7 : 0.0
     return true
   }
 

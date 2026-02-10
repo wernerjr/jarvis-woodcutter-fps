@@ -803,11 +803,17 @@ export class Game {
 
     const flicker = 0.90 + 0.10 * Math.sin(performance.now() * 0.018) + 0.05 * Math.sin(performance.now() * 0.041)
 
-    const targetSpot = torchOn ? (1.0 + night * 2.2) * flicker : 0.0
-    const targetPoint = torchOn ? (0.25 + night * 0.85) * flicker : 0.0
+    // Torch baseline brightness signal (used for campfire target = 3x).
+    const torchMain = (1.6 + night * 3.0) * flicker
+
+    const targetSpot = torchOn ? torchMain : 0.0
+    const targetPoint = torchOn ? torchMain * 0.55 : 0.0
 
     this.torchSpot.intensity += (targetSpot - this.torchSpot.intensity) * (simDt > 0 ? 0.25 : 0.0)
     this.torchPoint.intensity += (targetPoint - this.torchPoint.intensity) * (simDt > 0 ? 0.25 : 0.0)
+
+    // Provide baseline to campfire (so it can be ~3x torch brightness).
+    this.fires.setTorchMain(torchMain)
 
     // Sync flame visuals with the same flicker signal.
     this.player.setTorchFlicker(flicker, torchOn ? night : 0)
