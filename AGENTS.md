@@ -26,7 +26,7 @@ Foco em **clareza visual**, **performance** e **arquitetura simples** (vanilla J
   - `CampfireManager.js` + `CampfireGhost.js` (fogueira)
   - `ForgeManager.js` + `ForgeGhost.js` (fornalha: combustível + fundição + VFX)
   - `ForgeTableManager.js` + `ForgeTableGhost.js` (estação de forja de metal)
-  - `GrassManager.js` (foliage instanciado/culling)
+  - `GrassManager.js` (foliage instanciado/culling; ver `docs/environment.md` para tuning)
 
 ## Contratos internos (o que manter estável)
 ### 1) Item slot

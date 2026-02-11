@@ -1,0 +1,19 @@
+# Ambiente (iluminação, visibilidade e grama)
+
+## Grass settings (size/density)
+Implementação: `src/game/GrassManager.js`
+
+Parâmetros principais:
+- `bladeGeo`: tamanho base do tufo (largura/altura do plano)
+- `h` / `w`: escala por instância (altura e largura) — **afinamos reduzindo `w` mais que `h`**
+- `instancesPerChunk`: densidade por chunk
+- `viewDist`: distância de render (culling por chunk)
+- `clear[]`: círculos para limpar grama em áreas de gameplay (spawn, trilha, mina)
+
+Config atual (2026-02-11):
+- Tufo base ~0.15×0.225 e escala por instância (w ~0.10–0.15, h ~0.16–0.30)
+- Objetivo: grama ≈ 1/4 do tamanho anterior e mais fina, mantendo densidade.
+
+Dicas:
+- Se ficar ralo demais: aumente levemente `instancesPerChunk` (+10–20%) ou reduza thinning (`if (rand() < 0.22)`).
+- Se pesar GPU: reduza `instancesPerChunk` ou `viewDist`.

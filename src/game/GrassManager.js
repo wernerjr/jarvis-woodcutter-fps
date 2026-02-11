@@ -39,9 +39,10 @@ export class GrassManager {
   init({ seed = 777, radius = 90 } = {}) {
     this.resetAll()
 
-    // Low-poly tuft: 2 crossed planes (billboard-ish), no texture (avoids overdraw from alpha textures).
-    const bladeGeo = new THREE.PlaneGeometry(0.6, 0.9, 1, 1)
-    bladeGeo.translate(0, 0.45, 0)
+    // Low-poly tuft: 2 crossed planes (billboard-ish), no texture.
+    // Tuned smaller + thinner for clarity near player.
+    const bladeGeo = new THREE.PlaneGeometry(0.15, 0.225, 1, 1)
+    bladeGeo.translate(0, 0.1125, 0)
 
     const geo = new THREE.BufferGeometry()
     // merge two planes rotated 90deg
@@ -162,8 +163,9 @@ export class GrassManager {
 
           p.set(x, 0.01, z)
           q.setFromEuler(new THREE.Euler(0, rand() * Math.PI * 2, 0))
-          const h = 0.65 + rand() * 0.55
-          const w = 0.85 + rand() * 0.35
+          // ~1/4 size overall; thinner width than height.
+          const h = 0.16 + rand() * 0.14
+          const w = 0.10 + rand() * 0.05
           sc.set(w, h, w)
 
           m.compose(p, q, sc)
