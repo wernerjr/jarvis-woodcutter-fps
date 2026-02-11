@@ -20,6 +20,7 @@ const ui = new UI({
   forgeInvGridEl: document.querySelector('#forgeInvGrid'),
   forgeTableEl: document.querySelector('#forgeTable'),
   forgeTableListEl: document.querySelector('#forgeTableList'),
+  actionWheelEl: document.querySelector('#actionWheel'),
   craftingEl: document.querySelector('#crafting'),
   craftListEl: document.querySelector('#craftList'),
   clockEl: document.querySelector('#clock'),

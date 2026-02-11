@@ -44,7 +44,7 @@ docker compose up -d --build
 - Shift: correr | Espaço: pular
 - 1–0: hotbar
 - I: inventário | C: construção
-- F: interagir com fogueira (tocha/mão) / ações específicas
+- F: interagir com estruturas sob a mira (toque) • segurar F: roda Abrir/Recolher/Destruir
 - ESC: pausa (não fecha modais)
 
 ## Estrutura do repo

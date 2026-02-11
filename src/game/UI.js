@@ -1,4 +1,33 @@
 export class UI {
+  setInteractHint(text) {
+    const el = document.querySelector('#interactHint')
+    if (!el) return
+    if (!text) {
+      el.classList.add('hidden')
+      el.textContent = ''
+      return
+    }
+    el.textContent = text
+    el.classList.remove('hidden')
+  }
+
+  showWheel() {
+    this.els.actionWheelEl?.classList.remove('hidden')
+  }
+
+  hideWheel() {
+    this.els.actionWheelEl?.classList.add('hidden')
+    this.setWheelActive(null)
+  }
+
+  setWheelActive(action) {
+    const root = this.els.actionWheelEl
+    if (!root) return
+    for (const el of root.querySelectorAll('.wheelItem')) {
+      el.classList.toggle('active', action && el.getAttribute('data-action') === action)
+    }
+  }
+
   _toolLine(s) {
     const dur = s?.meta?.dur
     const maxDur = s?.meta?.maxDur
@@ -11,7 +40,7 @@ export class UI {
     return `Dur: ${dur ?? '-'}`
   }
 
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0

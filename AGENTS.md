@@ -10,6 +10,7 @@ Foco em **clareza visual**, **performance** e **arquitetura simples** (vanilla J
 - Inventário: `20` slots, stacks até `100`, overflow vira toast e é descartado.
 - Hotbar: `10` slots (slot 1 = mão fixa). Drag-and-drop normal é inventário↔hotbar; forja tem inventário embutido.
 - ESC **não fecha modais** (fecha só via botões). ESC só alterna pausa quando não há modal.
+- Interação com estruturas colocadas: **F tap** = ação principal; **F hold** = roda Abrir/Recolher/Destruir (reticle + alcance).
 
 ## Mapa rápido de sistemas (arquivos principais)
 - `src/game/Game.js`: “orquestrador” (state machine, loop, input, pointer lock, hotbar/tools, crafting, integra managers).

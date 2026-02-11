@@ -116,4 +116,12 @@ export class ForgeTableManager {
   get(id) {
     return this._tables.get(String(id))
   }
+
+  remove(id) {
+    const t = this._tables.get(String(id))
+    if (!t) return false
+    t.mesh.removeFromParent()
+    this._tables.delete(String(id))
+    return true
+  }
 }

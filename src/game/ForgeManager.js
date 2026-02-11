@@ -238,6 +238,14 @@ export class ForgeManager {
     return this._forges.get(String(id))
   }
 
+  remove(id) {
+    const f = this._forges.get(String(id))
+    if (!f) return false
+    f.mesh.removeFromParent()
+    this._forges.delete(String(id))
+    return true
+  }
+
   /** @param {number} dt */
   update(dt) {
     if (dt <= 0) return

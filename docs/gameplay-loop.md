@@ -9,4 +9,5 @@
 
 Notas:
 - Inventário: 20 slots, stacks até 100, overflow é descartado com toast.
+- Interação com estruturas colocadas: **F toque** usa/abre; **F segurar** abre roda com Abrir/Recolher/Destruir.
 - Simulação congela fora do modo playing, com exceções explícitas (forja aberta).

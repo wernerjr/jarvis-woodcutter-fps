@@ -34,6 +34,7 @@
 
         <div id="stats">Árvores cortadas: <span id="score">0</span></div>
         <div id="reticle" aria-hidden="true"></div>
+        <div id="interactHint" class="interactHint hidden" aria-live="polite"></div>
         <div id="toast" role="status" aria-live="polite"></div>
 
         <div id="hotbar" aria-label="Hotbar">
@@ -61,6 +62,16 @@
             <button id="btnClose">Exit</button>
           </div>
           <p class="muted small">Dica: clique para capturar o mouse (Pointer Lock). ESC abre o menu de pausa.</p>
+        </div>
+      </div>
+
+      <!-- Action wheel (hold F) -->
+      <div id="actionWheel" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Ações">
+        <div class="wheel">
+          <div class="wheelCenter">F</div>
+          <div class="wheelItem" data-action="open">Abrir</div>
+          <div class="wheelItem" data-action="pickup">Recolher</div>
+          <div class="wheelItem danger" data-action="destroy">Destruir</div>
         </div>
       </div>
 

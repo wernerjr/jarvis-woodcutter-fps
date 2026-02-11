@@ -107,7 +107,7 @@ export class Game {
     this.score = 0
     this._running = false
 
-    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'forge'|'forgeTable'|'controls-menu'|'controls-pause'} */
+    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'forge'|'forgeTable'|'wheel'|'controls-menu'|'controls-pause'} */
     this.state = 'menu'
 
     this._onResize = () => this._resize()
@@ -131,7 +131,17 @@ export class Game {
 
     this._pendingRelockUntil = 0
 
+    // F interaction (tap vs hold wheel)
+    this._fDown = false
+    this._fDownAt = 0
+    this._fHoldTimer = 0
+    this._wheelOpen = false
+    this._wheelAction = null
+    this._wheelTarget = null
+
     this._onKeyDown = (e) => this._onKeyDownAny(e)
+    this._onKeyUp = (e) => this._onKeyUpAny(e)
+    this._onMouseMoveUI = (e) => this._onMouseMoveUIAny(e)
   }
 
   start() {
@@ -139,6 +149,8 @@ export class Game {
     window.addEventListener('resize', this._onResize)
     document.addEventListener('pointerlockchange', this._onPointerLockChange)
     window.addEventListener('keydown', this._onKeyDown)
+    window.addEventListener('keyup', this._onKeyUp)
+    window.addEventListener('mousemove', this._onMouseMoveUI)
 
     // Mouse button: hold-to-act
     this.canvas.addEventListener('mousedown', this._onMouseDown)
@@ -180,6 +192,8 @@ export class Game {
     window.removeEventListener('resize', this._onResize)
     document.removeEventListener('pointerlockchange', this._onPointerLockChange)
     window.removeEventListener('keydown', this._onKeyDown)
+    window.removeEventListener('keyup', this._onKeyUp)
+    window.removeEventListener('mousemove', this._onMouseMoveUI)
     this.canvas.removeEventListener('mousedown', this._onMouseDown)
     window.removeEventListener('mouseup', this._onMouseUp)
   }
@@ -231,9 +245,9 @@ export class Game {
       return
     }
 
-    // Fire interaction / placement
+    // Interaction wheel (tap/hold)
     if (e.code === 'KeyF') {
-      if (this.state === 'playing') this._handleFireAction()
+      this._onFDown(e)
       return
     }
 
@@ -280,17 +294,250 @@ export class Game {
       return
     }
 
-    // ESC does not close "modals" (inventory/crafting/forge/forgeTable/controls). Use buttons.
+    if (this.state === 'wheel') {
+      // Close wheel safely (no action)
+      this._closeWheel(false)
+      return
+    }
+
+    // ESC does not close "modals" (inventory/crafting/forge/forgeTable/wheel/controls). Use buttons.
     if (
       this.state === 'inventory' ||
       this.state === 'crafting' ||
       this.state === 'forge' ||
       this.state === 'forgeTable' ||
+      this.state === 'wheel' ||
       this.state === 'controls-menu' ||
       this.state === 'controls-pause'
     ) {
       return
     }
+  }
+
+  _onKeyUpAny(e) {
+    if (e.code === 'KeyF') {
+      this._onFUp(e)
+    }
+  }
+
+  _onMouseMoveUIAny(e) {
+    if (!this._wheelOpen) return
+    this._updateWheelSelectionFromMouse(e.clientX, e.clientY)
+  }
+
+  _onFDown(e) {
+    if (this._fDown) return
+    if (this.state !== 'playing') return
+    if (document.pointerLockElement !== this.canvas) return
+
+    const t = this._getInteractTarget()
+    if (!t) return
+
+    this._fDown = true
+    this._fDownAt = performance.now()
+    this._wheelTarget = t
+    this._wheelAction = null
+
+    // Hold threshold: open wheel.
+    this._fHoldTimer = window.setTimeout(() => {
+      if (!this._fDown) return
+      if (this.state !== 'playing') return
+      this._openWheel(t)
+    }, 360)
+
+    e.preventDefault?.()
+  }
+
+  _onFUp(e) {
+    if (!this._fDown) return
+    this._fDown = false
+    if (this._fHoldTimer) {
+      clearTimeout(this._fHoldTimer)
+      this._fHoldTimer = 0
+    }
+
+    // If wheel is open, execute selection.
+    if (this._wheelOpen) {
+      this._closeWheel(true)
+      e.preventDefault?.()
+      return
+    }
+
+    // Tap: primary action.
+    const target = this._wheelTarget
+    this._wheelTarget = null
+    if (target && this.state === 'playing') {
+      this._interactPrimary(target)
+    }
+
+    e.preventDefault?.()
+  }
+
+  _openWheel(target) {
+    this._wheelOpen = true
+    this.state = 'wheel'
+
+    // Release pointer lock so we can use mouse position.
+    this.player.setLocked(false)
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+
+    this.ui.showWheel?.()
+    this.ui.setInteractHint('Solte F em: Abrir / Recolher / Destruir')
+
+    // Default selection.
+    this._wheelAction = null
+  }
+
+  _closeWheel(runAction) {
+    const target = this._wheelTarget
+    const action = this._wheelAction
+
+    this._wheelOpen = false
+    this._wheelAction = null
+    this._wheelTarget = null
+
+    this.ui.hideWheel?.()
+    this.ui.setInteractHint(null)
+
+    // Back to game first (relock), then run action (may open UI).
+    if (this.state === 'wheel') this.state = 'playing'
+
+    if (runAction && target && action) {
+      this._runWheelAction(target, action)
+      return
+    }
+
+    // no action: return to game mode
+    this.returnToGameMode()
+  }
+
+  _updateWheelSelectionFromMouse(x, y) {
+    const cx = window.innerWidth / 2
+    const cy = window.innerHeight / 2
+    const dx = x - cx
+    const dy = y - cy
+
+    const d = Math.hypot(dx, dy)
+    if (d < 28) {
+      this._wheelAction = null
+      this.ui.setWheelActive?.(null)
+      return
+    }
+
+    // Map to 3 sectors: up=open, left=pickup, right=destroy
+    if (dy < -Math.abs(dx) * 0.6) this._wheelAction = 'open'
+    else if (dx < 0) this._wheelAction = 'pickup'
+    else this._wheelAction = 'destroy'
+
+    this.ui.setWheelActive?.(this._wheelAction)
+  }
+
+  _getInteractTarget() {
+    if (this.state !== 'playing') return null
+    if (document.pointerLockElement !== this.canvas) return null
+
+    // Prefer raycast under reticle.
+    let best = null
+
+    const trySet = (kind, id, dist, primaryLabel) => {
+      if (!id) return
+      if (!best || dist < best.dist) best = { kind, id, dist, primaryLabel }
+    }
+
+    // Forge table
+    if (!this._inMine) {
+      const ft = this.forgeTables.raycastFromCamera(this.camera)
+      if (ft && ft.distance <= 2.8) trySet('forgeTable', ft.forgeTableId, ft.distance, 'Abrir')
+
+      const f = this.forges.raycastFromCamera(this.camera)
+      if (f && f.distance <= 2.6) trySet('forge', f.forgeId, f.distance, 'Abrir')
+
+      const c = this.fires.raycastFromCamera?.(this.camera)
+      if (c && c.distance <= 2.6) {
+        const lit = this.fires.isLit(c.campfireId)
+        trySet('campfire', c.campfireId, c.distance, lit ? 'Apagar' : 'Acender')
+      }
+    }
+
+    return best ? { kind: best.kind, id: best.id, primaryLabel: best.primaryLabel } : null
+  }
+
+  _interactPrimary(t) {
+    if (!t) return
+    if (t.kind === 'forge') return this.openForge(t.id)
+    if (t.kind === 'forgeTable') return this.openForgeTable(t.id)
+    if (t.kind === 'campfire') return this._campfireToggle(t.id)
+  }
+
+  _runWheelAction(t, action) {
+    if (action === 'open') return this._interactPrimary(t)
+
+    if (action === 'pickup') {
+      const ok = this._pickupStructure(t)
+      if (ok) this.returnToGameMode()
+      return
+    }
+
+    if (action === 'destroy') {
+      this._destroyStructure(t)
+      this.returnToGameMode()
+    }
+  }
+
+  _pickupStructure(t) {
+    if (!t) return false
+
+    const itemId = t.kind === 'forge' ? ItemId.FORGE : t.kind === 'forgeTable' ? ItemId.FORGE_TABLE : t.kind === 'campfire' ? ItemId.CAMPFIRE : null
+    if (!itemId) return false
+
+    const overflow = this.inventory.add(itemId, 1)
+    if (overflow) {
+      this.ui.toast('Inventário cheio.', 1000)
+      return false
+    }
+
+    const removed = t.kind === 'forge' ? this.forges.remove(t.id) : t.kind === 'forgeTable' ? this.forgeTables.remove(t.id) : this.fires.remove(t.id)
+    if (!removed) {
+      // rollback add (best-effort)
+      this.inventory.remove(itemId, 1)
+      this.ui.toast('Falha ao recolher.', 1000)
+      return false
+    }
+
+    this.ui.toast('Recolhido.', 900)
+    return true
+  }
+
+  _destroyStructure(t) {
+    if (!t) return
+    if (t.kind === 'forge') this.forges.remove(t.id)
+    else if (t.kind === 'forgeTable') this.forgeTables.remove(t.id)
+    else if (t.kind === 'campfire') this.fires.remove(t.id)
+    this.ui.toast('Destruído.', 900)
+  }
+
+  _campfireToggle(id) {
+    // Light if holding torch, otherwise extinguish if lit.
+    const lit = this.fires.isLit(id)
+
+    if (!lit) {
+      if (this.tool !== 'torch') {
+        this.ui.toast('Equipe a tocha para acender.', 1100)
+        return
+      }
+      const tslot = this.hotbar[this.hotbarActive]
+      const tmeta = tslot?.meta
+      if (!tslot || tslot.id !== ItemId.TORCH || !tmeta || tmeta.dur <= 0) {
+        this.ui.toast('Sua tocha apagou.', 900)
+        return
+      }
+      this.fires.setLit(id, true)
+      this.ui.toast('Fogueira acesa.', 900)
+      return
+    }
+
+    this.fires.setLit(id, false)
+    this.ui.toast('Fogueira apagada.', 900)
   }
 
   _onMouseDownAny(e) {
@@ -1316,75 +1563,16 @@ export class Game {
     this._postMoveUpdate()
   }
 
-  _handleFireAction() {
-    if (this.state !== 'playing') return
-    if (document.pointerLockElement !== this.canvas) return
-
-    // Campfire placement is now mouse-hold + ghost; F only toggles light/extinguish.
-    if (this.tool === 'campfire') {
-      this.ui.toast('Segure o botão direito para posicionar a fogueira.', 1100)
-      return
-    }
-
-    // Otherwise interact with nearest placed fire.
-    const near = this.fires.getNearest({ x: this.player.position.x, z: this.player.position.z }, 2.0)
-    if (!near) {
-      this.ui.toast('Nenhuma fogueira perto.', 800)
-      return
-    }
-
-    if (this.tool === 'torch') {
-      // Need equipped torch that isn't broken.
-      const tslot = this.hotbar[this.hotbarActive]
-      const tmeta = tslot?.meta
-      if (!tslot || tslot.id !== ItemId.TORCH || !tmeta || tmeta.dur <= 0) {
-        this.ui.toast('Sua tocha apagou.', 900)
-        return
-      }
-      if (this.fires.isLit(near.id)) {
-        this.ui.toast('Já está acesa.', 800)
-        return
-      }
-      this.fires.setLit(near.id, true)
-      this.ui.toast('Fogueira acesa.', 900)
-      return
-    }
-
-    if (this.tool === 'hand') {
-      if (!this.fires.isLit(near.id)) {
-        this.ui.toast('Já está apagada.', 800)
-        return
-      }
-      this.fires.setLit(near.id, false)
-      this.ui.toast('Fogueira apagada.', 900)
-      return
-    }
-
-    this.ui.toast('Use tocha para acender, mão para apagar.', 1100)
-  }
+  // Legacy campfire interaction removed: all placed-structure interaction is via F (tap/hold wheel).
 
   _tryInteract() {
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
 
+    // Only used for rock pickup; placed-structure interaction is via F.
     if (this.tool !== 'hand') {
       this.ui.toast('Equipe a mão (hotbar) para interagir.', 1100)
       return
-    }
-
-    // Forge / Forge Table interactions
-    if (!this._inMine) {
-      const ftHit = this.forgeTables.raycastFromCamera(this.camera)
-      if (ftHit && ftHit.distance <= 2.8) {
-        this.openForgeTable(ftHit.forgeTableId)
-        return
-      }
-
-      const fHit = this.forges.raycastFromCamera(this.camera)
-      if (fHit && fHit.distance <= 2.6) {
-        this.openForge(fHit.forgeId)
-        return
-      }
     }
 
     const hit = this.rocks.raycastFromCamera(this.camera)
@@ -1415,6 +1603,15 @@ export class Game {
     // Perf overlay updates even in pause/menus (cheap).
     this.perf.update(dt)
     this.ui.setPerf({ fps: this.perf.fps, frameMs: this.perf.frameMs, memMB: this.perf.memMB })
+
+    // Contextual interaction hint (only when playing + locked).
+    if (this.state === 'playing' && document.pointerLockElement === this.canvas) {
+      const t = this._getInteractTarget()
+      if (t) this.ui.setInteractHint(`F: ${t.primaryLabel} • Segure F: mais opções`)
+      else this.ui.setInteractHint(null)
+    } else if (this.state !== 'wheel') {
+      this.ui.setInteractHint(null)
+    }
 
     // Freeze most simulation when not playing (pause/inventory/menus).
     // Forge continues processing while its UI is open.

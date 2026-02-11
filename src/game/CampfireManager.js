@@ -51,6 +51,7 @@ function makeCampfireMesh() {
 }
 
 export class CampfireManager {
+  _ray = new THREE.Raycaster()
   /** @param {{scene: THREE.Scene}} params */
   constructor({ scene }) {
     this.scene = scene
@@ -166,4 +167,37 @@ export class CampfireManager {
   isLit(id) {
     return !!this._fires.get(String(id))?.lit
   }
+
+  /** @param {THREE.Camera} camera */
+  raycastFromCamera(camera) {
+    const origin = new THREE.Vector3()
+    const dir = new THREE.Vector3()
+    camera.getWorldPosition(origin)
+    camera.getWorldDirection(dir)
+
+    this._ray.set(origin, dir)
+    this._ray.far = 3.0
+
+    const roots = []
+    for (const f of this._fires.values()) roots.push(f.mesh)
+
+    const hits = this._ray.intersectObjects(roots, true)
+    if (!hits.length) return null
+
+    let obj = hits[0].object
+    while (obj && !obj.userData.id && obj.parent) obj = obj.parent
+    const campfireId = obj?.userData?.id
+    if (!campfireId) return null
+
+    return { campfireId: String(campfireId), point: hits[0].point, distance: hits[0].distance }
+  }
+
+  remove(id) {
+    const f = this._fires.get(String(id))
+    if (!f) return false
+    f.mesh.removeFromParent()
+    this._fires.delete(String(id))
+    return true
+  }
 }
+
