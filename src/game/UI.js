@@ -79,8 +79,11 @@ export class UI {
   showForge() {
     document.body.classList.add('forge-open')
     document.body.classList.remove('inventory-open')
+
+    // Forge UI is used together with the inventory (side-by-side).
     this.els.forgeEl.classList.remove('hidden')
-    this.els.inventoryEl.classList.add('hidden')
+    this.els.inventoryEl.classList.remove('hidden')
+
     this.els.craftingEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
     this.els.menuEl.classList.add('hidden')
