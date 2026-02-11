@@ -55,6 +55,7 @@ export class Game {
     this.trees = new TreeManager({ scene: this.scene })
     this.rocks = new RockManager({ scene: this.scene })
     this.fires = new CampfireManager({ scene: this.scene })
+    this.forges = new ForgeManager({ scene: this.scene })
     this.mine = new MineManager({ scene: this.scene })
     this.ores = new OreManager({ scene: this.scene })
 
