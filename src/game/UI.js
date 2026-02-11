@@ -130,32 +130,7 @@ export class UI {
     }
   }
 
-  renderForge(forge, getItem, meta = { secondsPerIngot: 10 }) {
-    const mk = (kind, root, slots) => {
-      root.innerHTML = ''
-      for (let i = 0; i < slots.length; i++) {
-        const s = slots[i]
-        const el = document.createElement('div')
-        el.className = 'forgeSlot' + (s ? '' : ' empty')
-        el.draggable = !!s
-        el.dataset.kind = kind
-        el.dataset.index = String(i)
-
-        if (!s) {
-          el.innerHTML = `<div class="line1"><div class="ico">+</div><div class="qty">vazio</div></div><div class="muted small">&nbsp;</div>`
-        } else {
-          const it = getItem(s.id)
-          el.innerHTML = `<div class="line1"><div class="ico">${it?.icon ?? ''}</div><div class="qty">${s.qty}</div></div><div class="muted small">${it?.name ?? s.id}</div>`
-        }
-
-        root.appendChild(el)
-      }
-    }
-
-    mk('fuel', this.els.forgeFuelEl, forge.fuel)
-    mk('in', this.els.forgeInEl, forge.input)
-    mk('out', this.els.forgeOutEl, forge.output)
-
+  updateForgeStatus(forge, meta = { secondsPerIngot: 10 }) {
     // status widgets (optional elements)
     const fuelSecs = Math.max(0, Math.floor(forge.burn || 0))
     const oreCount = (forge.input || []).reduce((a, s) => a + (s?.id === 'iron_ore' ? s.qty : 0), 0)
@@ -203,6 +178,35 @@ export class UI {
       if (timeLeft) timeLeft.textContent = '—'
       if (fill) fill.style.width = '0%'
     }
+  }
+
+  renderForge(forge, getItem, meta = { secondsPerIngot: 10 }) {
+    const mk = (kind, root, slots) => {
+      root.innerHTML = ''
+      for (let i = 0; i < slots.length; i++) {
+        const s = slots[i]
+        const el = document.createElement('div')
+        el.className = 'forgeSlot' + (s ? '' : ' empty')
+        el.draggable = !!s
+        el.dataset.kind = kind
+        el.dataset.index = String(i)
+
+        if (!s) {
+          el.innerHTML = `<div class="line1"><div class="ico">+</div><div class="qty">vazio</div></div><div class="muted small">&nbsp;</div>`
+        } else {
+          const it = getItem(s.id)
+          el.innerHTML = `<div class="line1"><div class="ico">${it?.icon ?? ''}</div><div class="qty">${s.qty}</div></div><div class="muted small">${it?.name ?? s.id}</div>`
+        }
+
+        root.appendChild(el)
+      }
+    }
+
+    mk('fuel', this.els.forgeFuelEl, forge.fuel)
+    mk('in', this.els.forgeInEl, forge.input)
+    mk('out', this.els.forgeOutEl, forge.output)
+
+    this.updateForgeStatus(forge, meta)
   }
 
   /** @param {(null|{id:string, qty:number})[]} slots @param {(id:string)=>{name:string, icon:string}} getItem */

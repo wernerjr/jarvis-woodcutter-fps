@@ -298,6 +298,10 @@ export class Game {
   }
 
   _onMouseUpAny(e) {
+    // Always clear held action on mouseup, even when a UI is open.
+    if (e.button === 0) this._actionHeld = false
+
+    // Placement finalize only happens while playing.
     if (this.state !== 'playing') return
 
     if (e.button === 0 && this._placingCampfire) {
@@ -313,9 +317,6 @@ export class Game {
       if (this._ghostValid) this._placeForgeAtGhost()
       return
     }
-
-    if (e.button !== 0) return
-    this._actionHeld = false
   }
 
   _tryMine() {
@@ -1242,8 +1243,10 @@ export class Game {
     this.perf.update(dt)
     this.ui.setPerf({ fps: this.perf.fps, frameMs: this.perf.frameMs, memMB: this.perf.memMB })
 
-    // Freeze simulation when not playing (pause/inventory/menus).
+    // Freeze most simulation when not playing (pause/inventory/menus).
+    // Forge continues processing while its UI is open.
     const simDt = this.state === 'playing' ? dt : 0
+    const forgeDt = this.state === 'playing' || this.state === 'forge' ? dt : 0
 
     // Ghost placement update
     if (simDt > 0 && this._placingCampfire) {
@@ -1345,8 +1348,14 @@ export class Game {
     this.trees.update(simDt)
     this.rocks.update(simDt)
     this.fires.update(simDt)
-    this.forges.update(simDt)
+    this.forges.update(forgeDt)
     this.ores.update(simDt)
+
+    // Live forge HUD updates while forge UI is open.
+    if (this.state === 'forge' && this._activeForgeId) {
+      const f = this.forges.get(this._activeForgeId)
+      if (f) this.ui.updateForgeStatus?.(f, { secondsPerIngot: this.forges.secondsPerIngot })
+    }
 
     this.ui.setTime({
       hhmm: this.time.getHHMM(),
