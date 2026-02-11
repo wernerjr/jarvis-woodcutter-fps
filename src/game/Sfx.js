@@ -53,6 +53,12 @@ export class Sfx {
     this._beep({ freq: 520, bendTo: 220, dur: 0.06, type: 'triangle', gain: 0.18 })
   }
 
+  mine() {
+    // stony clang
+    this._beep({ freq: 220, bendTo: 140, dur: 0.08, type: 'square', gain: 0.30 })
+    this._beep({ freq: 620, bendTo: 360, dur: 0.05, type: 'triangle', gain: 0.12 })
+  }
+
   click() {
     this._beep({ freq: 260, bendTo: 200, dur: 0.045, type: 'sine', gain: 0.12 })
   }

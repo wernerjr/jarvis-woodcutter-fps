@@ -4,10 +4,12 @@ export const RecipeId = {
   TORCH: 'torch',
   AXE: 'axe',
   CAMPFIRE: 'campfire',
+  PICKAXE: 'pickaxe',
 }
 
 export const DURABILITY = {
   AXE_MAX: 60,
+  PICKAXE_MAX: 80,
   TORCH_MAX: 180, // seconds
 }
 
@@ -37,6 +39,15 @@ export const RECIPES = [
     cost: [
       { id: ItemId.STICK, qty: 8 },
       { id: ItemId.LEAF, qty: 12 },
+    ],
+  },
+  {
+    id: RecipeId.PICKAXE,
+    name: 'Picareta',
+    output: { id: ItemId.PICKAXE, qty: 1, meta: { dur: DURABILITY.PICKAXE_MAX, maxDur: DURABILITY.PICKAXE_MAX } },
+    cost: [
+      { id: ItemId.STICK, qty: 4 },
+      { id: ItemId.STONE, qty: 6 },
     ],
   },
 ]

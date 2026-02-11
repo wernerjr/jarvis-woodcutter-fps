@@ -5,6 +5,8 @@ import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
 import { RockManager } from './RockManager.js'
 import { CampfireManager } from './CampfireManager.js'
+import { MineManager } from './MineManager.js'
+import { OreManager } from './OreManager.js'
 import { Sfx } from './Sfx.js'
 import { clamp } from './util.js'
 import { Inventory } from './Inventory.js'
@@ -51,7 +53,11 @@ export class Game {
     this.trees = new TreeManager({ scene: this.scene })
     this.rocks = new RockManager({ scene: this.scene })
     this.fires = new CampfireManager({ scene: this.scene })
+    this.mine = new MineManager({ scene: this.scene })
+    this.ores = new OreManager({ scene: this.scene })
     this.sfx = new Sfx()
+
+    this.pickaxeDamage = 10
 
     this.inventory = new Inventory({ slots: 20, maxStack: 100 })
     this.time = new TimeSystem({ startHours: 9.0 })
@@ -122,12 +128,16 @@ export class Game {
     this.trees.init({ seed: 1337, count: 42, radius: 42 })
     this.rocks.init({ seed: 2026, count: 32, radius: 45 })
 
+    this.mine.init()
+    this.ores.init({ points: this.mine.getOreSpawnPoints() })
+
     // Swing impacts trigger hit detection in a narrow window.
     this.player.onImpact(() => {
       if (this.state !== 'playing') return
       if (document.pointerLockElement !== this.canvas) return
-      if (this.tool !== 'axe') return
-      this._tryChop()
+
+      if (this.tool === 'axe') this._tryChop()
+      else if (this.tool === 'pickaxe') this._tryMine()
     })
 
     this._running = true
@@ -279,6 +289,59 @@ export class Game {
     this._actionHeld = false
   }
 
+  _tryMine() {
+    const hit = this.ores.raycastFromCamera(this.camera)
+    if (!hit) {
+      this.sfx.click()
+      return
+    }
+
+    if (hit.distance > 3.0) {
+      this.ui.toast('Muito longe.')
+      this.sfx.click()
+      return
+    }
+
+    const slot = this.hotbar[this.hotbarActive]
+    const meta = slot?.meta
+    if (!slot || slot.id !== ItemId.PICKAXE || !meta || meta.dur <= 0) {
+      this.ui.toast('Sua picareta quebrou.', 1100)
+      this.hotbar[this.hotbarActive] = null
+      this._cleanupHotbarBroken(ItemId.PICKAXE, this.hotbarActive)
+      return
+    }
+
+    const dmg = this.pickaxeDamage
+    const r = this.ores.damage(hit.oreId, dmg)
+    if (!r) return
+
+    meta.dur = Math.max(0, meta.dur - 1)
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+    if (meta.dur <= 0) {
+      this.ui.toast('Picareta quebrou!', 1200)
+      this.hotbar[this.hotbarActive] = null
+      this._cleanupHotbarBroken(ItemId.PICKAXE, this.hotbarActive)
+    }
+
+    const p = hit.point
+    p.y += 0.18
+    this.damageNumbers.spawn(p, `-${dmg}`)
+
+    this.sfx.mine()
+
+    if (!r.broke) return
+
+    const overflow = this.inventory.add(ItemId.IRON_ORE, 2)
+    if (overflow) {
+      this.ui.toast('Inventário cheio: minério descartado.', 1200)
+      this.sfx.click()
+    } else {
+      this.ui.toast('Loot: +2 minério de ferro', 1100)
+      this.sfx.pickup()
+      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    }
+  }
+
   _tryChop() {
     const hit = this.trees.raycastFromCamera(this.camera)
     if (!hit) {
@@ -368,6 +431,8 @@ export class Game {
     this.trees.resetAll()
     this.rocks?.resetAll?.()
     this.fires.resetAll()
+    this.ores.resetAll()
+    this.ores.init({ points: this.mine.getOreSpawnPoints() })
     this.player.reset()
 
     this.selectHotbar(0)
@@ -626,12 +691,13 @@ export class Game {
 
     // Tool resolution
     if (s.id === ItemId.AXE) this.setTool('axe')
+    else if (s.id === ItemId.PICKAXE) this.setTool('pickaxe')
     else if (s.id === ItemId.TORCH) this.setTool('torch')
     else if (s.id === ItemId.CAMPFIRE) this.setTool('campfire')
     else this.setTool('hand')
 
     if (this.state === 'playing') {
-      const msg = this.tool === 'axe' ? 'Machado equipado.' : this.tool === 'torch' ? 'Tocha equipada.' : this.tool === 'campfire' ? 'Fogueira selecionada.' : 'Mão equipada.'
+      const msg = this.tool === 'axe' ? 'Machado equipado.' : this.tool === 'pickaxe' ? 'Picareta equipada.' : this.tool === 'torch' ? 'Tocha equipada.' : this.tool === 'campfire' ? 'Fogueira selecionada.' : 'Mão equipada.'
       this.ui.toast(msg, 900)
     }
   }
@@ -856,7 +922,7 @@ export class Game {
       this._updateCampfireGhost()
     }
 
-    const colliders = this.state === 'playing' ? this.trees.getTrunkColliders() : []
+    const colliders = this.state === 'playing' ? this.trees.getTrunkColliders().concat(this.mine.getColliders()) : []
 
     this.player.update(simDt, colliders)
 
@@ -916,7 +982,7 @@ export class Game {
         this.player.handAction()
         this._tryInteract()
         this._actionCooldown = 0.22
-      } else if (this.tool === 'axe') {
+      } else if (this.tool === 'axe' || this.tool === 'pickaxe') {
         if (!this.player.isSwinging()) {
           this.player.swing()
           this.sfx.swing()
@@ -939,6 +1005,7 @@ export class Game {
     this.trees.update(simDt)
     this.rocks.update(simDt)
     this.fires.update(simDt)
+    this.ores.update(simDt)
 
     this.ui.setTime({
       hhmm: this.time.getHHMM(),

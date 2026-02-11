@@ -313,7 +313,7 @@ export class Player {
 
   setTool(toolId) {
     // Show models based on tool.
-    if (this._axePivot) this._axePivot.visible = toolId === 'axe'
+    if (this._axePivot) this._axePivot.visible = toolId === 'axe' || toolId === 'pickaxe'
     if (this._hand) this._hand.visible = toolId === 'hand'
     if (this._torch) this._torch.visible = toolId === 'torch'
     if (this._torchFlame) this._torchFlame.visible = toolId === 'torch'
