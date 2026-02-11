@@ -4,6 +4,7 @@ import { World } from './World.js'
 import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
 import { RockManager } from './RockManager.js'
+import { GrassManager } from './GrassManager.js'
 import { CampfireManager } from './CampfireManager.js'
 import { ForgeManager } from './ForgeManager.js'
 import { ForgeTableManager } from './ForgeTableManager.js'
@@ -40,6 +41,7 @@ export class Game {
 
     this.world = new World({ scene: this.scene })
     this.player = new Player({ camera: this.camera, domElement: canvas })
+    this.grass = new GrassManager({ scene: this.scene })
 
     // Torch lights (attached to camera): spot for ground/forward + point for local fill.
     this.torchPoint = new THREE.PointLight(0xffa24a, 0.0, 18, 1.2)
@@ -152,6 +154,8 @@ export class Game {
 
     this.mine.init()
     this.ores.init({ points: this.mine.getOreSpawnPoints() })
+
+    this.grass.init({ seed: 909, radius: 92 })
 
     this._ensureFadeOverlay()
 
@@ -1533,6 +1537,7 @@ export class Game {
     this.fires.update(simDt)
     this.forges.update(forgeDt)
     this.ores.update(simDt)
+    this.grass.update(simDt, this.player.position)
 
     // Live forge UI updates while forge UI is open.
     if (this.state === 'forge' && this._activeForgeId) {
