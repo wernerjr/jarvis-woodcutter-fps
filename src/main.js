@@ -220,6 +220,7 @@ $('#btnInvClose').addEventListener('click', () => game.closeInventory())
 $('#btnCraftClose').addEventListener('click', () => game.closeCrafting())
 $('#btnForgeClose').addEventListener('click', () => game.closeForge())
 $('#btnForgeCollect').addEventListener('click', () => game.collectAllForgeOutput())
+$('#btnForgeStart').addEventListener('click', () => game.toggleForgeEnabled())
 
 // Start at main menu
 ui.showMenu()

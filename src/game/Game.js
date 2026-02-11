@@ -605,7 +605,7 @@ export class Game {
 
     this.ui.showForge()
     this.ui.renderForgeInventory(this.inventory.slots, (id) => ITEMS[id])
-    this.ui.renderForge(f, (id) => ITEMS[id])
+    this.ui.renderForge(f, (id) => ITEMS[id], { secondsPerIngot: this.forges.secondsPerIngot })
   }
 
   openCrafting() {
@@ -711,6 +711,24 @@ export class Game {
       const empty = f.input.findIndex((x) => !x)
       if (empty >= 0) return void this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind: 'in', idx: empty })
     }
+  }
+
+  toggleForgeEnabled() {
+    if (this.state !== 'forge') return
+    const f = this._activeForgeId ? this.forges.get(this._activeForgeId) : null
+    if (!f) return
+
+    const hasFuel = (f.fuel || []).some((s) => s && s.qty > 0)
+    const hasOre = (f.input || []).some((s) => s && s.qty > 0)
+
+    if (!hasFuel || !hasOre) {
+      this.ui.toast('Adicione combustível e minério.', 1000)
+      return
+    }
+
+    f.enabled = !f.enabled
+    this.ui.toast(f.enabled ? 'Forja ligada.' : 'Forja desligada.', 900)
+    this._postMoveUpdate()
   }
 
   forgeSlotClick(kind, idx) {
@@ -1012,7 +1030,7 @@ export class Game {
         this.ui.renderForgeInventory(this.inventory.slots, (id) => ITEMS[id])
         if (this._activeForgeId) {
           const f = this.forges.get(this._activeForgeId)
-          if (f) this.ui.renderForge(f, (id) => ITEMS[id])
+          if (f) this.ui.renderForge(f, (id) => ITEMS[id], { secondsPerIngot: this.forges.secondsPerIngot })
         }
       }
 

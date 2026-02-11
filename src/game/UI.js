@@ -130,7 +130,7 @@ export class UI {
     }
   }
 
-  renderForge(forge, getItem) {
+  renderForge(forge, getItem, meta = { secondsPerIngot: 10 }) {
     const mk = (kind, root, slots) => {
       root.innerHTML = ''
       for (let i = 0; i < slots.length; i++) {
@@ -155,6 +155,54 @@ export class UI {
     mk('fuel', this.els.forgeFuelEl, forge.fuel)
     mk('in', this.els.forgeInEl, forge.input)
     mk('out', this.els.forgeOutEl, forge.output)
+
+    // status widgets (optional elements)
+    const fuelSecs = Math.max(0, Math.floor(forge.burn || 0))
+    const oreCount = (forge.input || []).reduce((a, s) => a + (s?.id === 'iron_ore' ? s.qty : 0), 0)
+
+    const fuelStat = document.querySelector('#forgeFuelStat')
+    const inStat = document.querySelector('#forgeInStat')
+    if (fuelStat) fuelStat.textContent = `Combustível: ${fuelSecs}s`
+    if (inStat) inStat.textContent = `Minério: ${oreCount}`
+
+    const btn = document.querySelector('#btnForgeStart')
+    const hint = document.querySelector('#forgeStartHint')
+    const flame = document.querySelector('#forgeFlame')
+
+    const hasFuel = (forge.fuel || []).some((s) => s && s.qty > 0)
+    const hasOre = (forge.input || []).some((s) => s && s.qty > 0)
+
+    if (btn) {
+      const canStart = hasFuel && hasOre
+      btn.disabled = !canStart
+      btn.textContent = forge.enabled ? 'Forja ligada' : 'Iniciar fundição'
+      btn.classList.toggle('on', !!forge.enabled)
+    }
+
+    if (hint) {
+      if (forge.enabled) hint.textContent = 'A forja está ligada. Ela funde enquanto houver combustível e minério.'
+      else hint.textContent = hasFuel && hasOre ? 'Pronto: clique em Iniciar fundição.' : 'Adicione combustível e minério para iniciar.'
+    }
+
+    if (flame) flame.classList.toggle('on', !!forge.enabled && (forge.burn || 0) > 0)
+
+    // progress bar
+    const secPer = meta?.secondsPerIngot ?? 10
+    const progText = document.querySelector('#forgeProgText')
+    const timeLeft = document.querySelector('#forgeTimeLeft')
+    const fill = document.querySelector('#forgeBarFill')
+
+    if (forge.enabled && (forge.burn || 0) > 0 && hasOre) {
+      const p = Math.max(0, Math.min(1, (forge.prog || 0) / secPer))
+      const left = Math.max(0, Math.ceil(secPer - (forge.prog || 0)))
+      if (progText) progText.textContent = 'Processando…'
+      if (timeLeft) timeLeft.textContent = `${left}s restantes`
+      if (fill) fill.style.width = `${Math.round(p * 100)}%`
+    } else {
+      if (progText) progText.textContent = forge.enabled ? 'Aguardando recursos…' : 'Parado'
+      if (timeLeft) timeLeft.textContent = '—'
+      if (fill) fill.style.width = '0%'
+    }
   }
 
   /** @param {(null|{id:string, qty:number})[]} slots @param {(id:string)=>{name:string, icon:string}} getItem */

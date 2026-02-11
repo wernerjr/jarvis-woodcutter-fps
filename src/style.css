@@ -102,22 +102,44 @@ body.state-menu #stats{opacity:0.85;}
 body.state-menu #hud{display:none;}
 
 /* Forge UI */
-body.forge-open #forge.overlay{display:block;}
+body.forge-open #forge.overlay{display:flex;}
 body.forge-open #inventory.overlay{display:none;}
 
-.forgePanel{max-width:1060px}
+#forge.overlay{background:rgba(0,0,0,.52)}
+#forge .card.forgePanel{width:min(78vw, 1200px); height:min(78vh, 860px); max-width:none; display:flex; flex-direction:column}
+
 .forgeHeader{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
-.forgeSplit{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px}
-.forgeLeft,.forgeRight{padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(0,0,0,.14)}
-.forgeIconRow{font-size:38px;opacity:.9;margin:2px 0 10px}
+
+.forgeWide{flex:1; display:grid; grid-template-columns: 1.2fr 0.9fr 0.8fr; gap:14px; margin-top:10px; min-height:0}
+.forgeBlock{padding:12px; border:1px solid rgba(255,255,255,.10); border-radius:14px; background:rgba(0,0,0,.16); min-height:0; overflow:auto}
+.forgeBlockTitle{font-weight:800; letter-spacing:.2px; margin-bottom:8px}
+
 .forgeInvGrid{margin-top:10px}
 
-.forgeGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:10px 0 12px}
-.forgeTitle{font-weight:700;margin-bottom:6px}
-.forgeSlots{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-.forgeSlot{min-height:56px;border-radius:10px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.22);padding:8px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer}
+.forgeHero{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:2px 0 10px}
+.forgeFlame{font-size:46px; opacity:.55; filter:grayscale(0.25)}
+.forgeFlame.on{opacity:1; animation: forgePulse 0.45s infinite alternate}
+@keyframes forgePulse{from{transform:scale(1)} to{transform:scale(1.08)}}
+.forgeHint{font-size:13px; line-height:1.35}
+
+.forgeGrid{display:grid; grid-template-columns: 1fr 1fr; gap:12px}
+.forgeTitle{font-weight:800; margin:2px 0 4px}
+.forgeTitle.small{font-weight:800; font-size:12px; opacity:.9}
+.forgeSlots{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:8px}
+.forgeOutSlots{grid-template-columns:repeat(2,1fr)}
+
+.forgeSlot{min-height:64px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.22); padding:10px; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer}
 .forgeSlot.empty{opacity:.55}
-.forgeSlot .line1{display:flex;justify-content:space-between;align-items:center}
-.forgeSlot .ico{font-size:20px}
-.forgeSlot .qty{font-size:12px;opacity:.75}
-#btnForgeCollect.small{padding:8px 10px;margin-top:8px}
+.forgeSlot .line1{display:flex; justify-content:space-between; align-items:center}
+.forgeSlot .ico{font-size:22px}
+.forgeSlot .qty{font-size:12px; opacity:.75}
+
+.forgeStat{margin-top:8px; font-size:12px; color:rgba(255,255,255,.72)}
+
+button.wide{width:100%; padding:12px 14px; margin-top:10px}
+#btnForgeStart.on{background:rgba(159,245,168,0.18); border-color:rgba(159,245,168,0.38)}
+
+.forgeProg{margin-top:12px}
+.forgeProgTop{display:flex; justify-content:space-between; align-items:baseline; gap:10px}
+.forgeBar{height:10px; border-radius:999px; background:rgba(255,255,255,.10); overflow:hidden; margin-top:6px}
+.forgeBarFill{height:100%; width:0%; background:linear-gradient(90deg, rgba(255,182,106,.75), rgba(255,120,120,.75));}

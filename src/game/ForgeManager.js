@@ -95,6 +95,7 @@ export class ForgeManager {
       output: [null, null],
       burn: 0,
       prog: 0,
+      enabled: false,
     })
 
     return id
@@ -159,14 +160,14 @@ export class ForgeManager {
     this._t += dt
 
     for (const f of this._forges.values()) {
-      // burn down
-      if (f.burn > 0) f.burn = Math.max(0, f.burn - dt)
+      // burn down (only while enabled)
+      if (f.enabled && f.burn > 0) f.burn = Math.max(0, f.burn - dt)
 
       // if we have burn and input ore and output has room -> progress
       const hasOre = f.input.some((s) => s && s.id === ItemId.IRON_ORE && s.qty > 0)
       const outSpace = this._outputHasSpace(f)
 
-      if (f.burn > 0 && hasOre && outSpace) {
+      if (f.enabled && f.burn > 0 && hasOre && outSpace) {
         f.prog += dt
         if (f.prog >= this.secondsPerIngot) {
           f.prog = 0
@@ -175,8 +176,8 @@ export class ForgeManager {
         }
       }
 
-      // auto-consume fuel if we need burn time and have fuel items
-      if ((f.burn <= 0.1 || (f.burn > 0 && f.burn < 2.5 && hasOre)) && this._hasFuelItem(f)) {
+      // auto-consume fuel only when enabled (so player must explicitly start)
+      if (f.enabled && (f.burn <= 0.1 || (f.burn > 0 && f.burn < 2.5 && hasOre)) && this._hasFuelItem(f)) {
         // consume one unit at a time to keep UX predictable
         this._consumeOneFuel(f)
       }
@@ -184,7 +185,7 @@ export class ForgeManager {
       // visuals
       const ember = f.mesh.userData.ember
       const flick = 0.9 + 0.1 * Math.sin(this._t * 7.2) + 0.06 * Math.sin(this._t * 11.9)
-      const heat01 = Math.min(1, f.burn / 12)
+      const heat01 = Math.min(1, (f.enabled ? f.burn : 0) / 12)
       const I = this._torchMain * 1.4 * heat01 * flick
 
       f.light.intensity = I

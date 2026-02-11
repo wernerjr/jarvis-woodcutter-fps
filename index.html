@@ -93,32 +93,53 @@
             </div>
           </div>
 
-          <div class="forgeSplit">
-            <div class="forgeLeft">
-              <div class="forgeTitle">Inventário</div>
+          <div class="forgeWide">
+            <div class="forgeBlock forgeInv">
+              <div class="forgeBlockTitle">Inventário</div>
               <div id="forgeInvGrid" class="invGrid forgeInvGrid"></div>
             </div>
 
-            <div class="forgeRight">
-              <div class="forgeTitle">Forja</div>
-              <div class="forgeIconRow" aria-hidden="true">⚒️</div>
+            <div class="forgeBlock forgeCore">
+              <div class="forgeBlockTitle">Forja</div>
+              <div class="forgeHero">
+                <div id="forgeFlame" class="forgeFlame" aria-hidden="true">🔥</div>
+                <div class="forgeHint">
+                  <div class="muted">1) Coloque combustível</div>
+                  <div class="muted">2) Coloque minério</div>
+                  <div class="muted">3) Clique em <b>Iniciar fundição</b></div>
+                </div>
+              </div>
 
               <div class="forgeGrid">
                 <div class="forgeCol">
-                  <div class="forgeTitle small">Combustível</div>
+                  <div class="forgeTitle">Combustível</div>
+                  <div class="muted small">Arraste 🪵 tronco / 🪵 galho / 🍃 folha</div>
                   <div id="forgeFuel" class="forgeSlots" data-kind="fuel"></div>
-                  <div class="muted small">🪵 tronco • 🪵 galho • 🍃 folha</div>
+                  <div class="forgeStat" id="forgeFuelStat">Combustível: 0s</div>
                 </div>
                 <div class="forgeCol">
-                  <div class="forgeTitle small">Entrada</div>
+                  <div class="forgeTitle">Entrada</div>
+                  <div class="muted small">Arraste 🔩 minério de ferro</div>
                   <div id="forgeIn" class="forgeSlots" data-kind="in"></div>
-                  <div class="muted small">🔩 minério de ferro</div>
+                  <div class="forgeStat" id="forgeInStat">Minério: 0</div>
                 </div>
-                <div class="forgeCol">
-                  <div class="forgeTitle small">Saída</div>
-                  <div id="forgeOut" class="forgeSlots" data-kind="out"></div>
-                  <div class="muted small">Arraste as barras para o inventário</div>
+              </div>
+            </div>
+
+            <div class="forgeBlock forgeOut">
+              <div class="forgeBlockTitle">Saída</div>
+              <div class="muted small">Arraste as barras para o inventário</div>
+              <div id="forgeOut" class="forgeSlots forgeOutSlots" data-kind="out"></div>
+
+              <button id="btnForgeStart" class="primary wide">Iniciar fundição</button>
+              <div class="muted small" id="forgeStartHint">Adicione combustível e minério para iniciar.</div>
+
+              <div class="forgeProg">
+                <div class="forgeProgTop">
+                  <div id="forgeProgText">Parado</div>
+                  <div id="forgeTimeLeft" class="muted small">—</div>
                 </div>
+                <div class="forgeBar"><div id="forgeBarFill" class="forgeBarFill"></div></div>
               </div>
             </div>
           </div>
