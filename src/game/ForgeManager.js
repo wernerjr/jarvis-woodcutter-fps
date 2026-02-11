@@ -96,6 +96,7 @@ export class ForgeManager {
       burn: 0,
       prog: 0,
       enabled: false,
+      dirty: true,
     })
 
     return id
@@ -173,13 +174,14 @@ export class ForgeManager {
           f.prog = 0
           this._consumeOneOre(f)
           this._addOutput(f, ItemId.IRON_INGOT, 1)
+          f.dirty = true
         }
       }
 
       // auto-consume fuel only when enabled (so player must explicitly start)
       if (f.enabled && (f.burn <= 0.1 || (f.burn > 0 && f.burn < 2.5 && hasOre)) && this._hasFuelItem(f)) {
         // consume one unit at a time to keep UX predictable
-        this._consumeOneFuel(f)
+        if (this._consumeOneFuel(f)) f.dirty = true
       }
 
       // visuals
@@ -213,6 +215,7 @@ export class ForgeManager {
       if (s.qty <= 0) f.fuel[i] = null
 
       f.burn += add
+      f.dirty = true
       // cap so it doesn't grow unbounded
       f.burn = Math.min(f.burn, 90)
       return true
@@ -226,6 +229,7 @@ export class ForgeManager {
       if (!s || s.id !== ItemId.IRON_ORE) continue
       s.qty -= 1
       if (s.qty <= 0) f.input[i] = null
+      f.dirty = true
       return true
     }
     return false
@@ -248,6 +252,7 @@ export class ForgeManager {
         const take = Math.min(space, qty)
         s.qty += take
         qty -= take
+        f.dirty = true
         if (qty <= 0) return true
       }
     }
@@ -257,6 +262,7 @@ export class ForgeManager {
         const take = Math.min(100, qty)
         f.output[i] = { id, qty: take }
         qty -= take
+        f.dirty = true
         if (qty <= 0) return true
       }
     }

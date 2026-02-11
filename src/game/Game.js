@@ -1351,10 +1351,16 @@ export class Game {
     this.forges.update(forgeDt)
     this.ores.update(simDt)
 
-    // Live forge HUD updates while forge UI is open.
+    // Live forge UI updates while forge UI is open.
     if (this.state === 'forge' && this._activeForgeId) {
       const f = this.forges.get(this._activeForgeId)
-      if (f) this.ui.updateForgeStatus?.(f, { secondsPerIngot: this.forges.secondsPerIngot })
+      if (f) {
+        this.ui.updateForgeStatus?.(f, { secondsPerIngot: this.forges.secondsPerIngot })
+        if (f.dirty) {
+          f.dirty = false
+          this.ui.renderForge(f, (id) => ITEMS[id], { secondsPerIngot: this.forges.secondsPerIngot })
+        }
+      }
     }
 
     this.ui.setTime({
