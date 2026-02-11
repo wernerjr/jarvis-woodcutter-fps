@@ -5,6 +5,7 @@ export const RecipeId = {
   AXE: 'axe',
   CAMPFIRE: 'campfire',
   PICKAXE: 'pickaxe',
+  FORGE: 'forge',
 }
 
 export const DURABILITY = {
@@ -48,6 +49,16 @@ export const RECIPES = [
     cost: [
       { id: ItemId.STICK, qty: 4 },
       { id: ItemId.STONE, qty: 6 },
+    ],
+  },
+  {
+    id: RecipeId.FORGE,
+    name: 'Forja',
+    output: { id: ItemId.FORGE, qty: 1 },
+    // pedras + troncos: base pesada com alimentação a lenha
+    cost: [
+      { id: ItemId.STONE, qty: 14 },
+      { id: ItemId.LOG, qty: 3 },
     ],
   },
 ]

@@ -79,6 +79,36 @@
         </div>
       </div>
 
+      <!-- Forge -->
+      <div id="forge" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Forja">
+        <div class="card">
+          <h2>Forja</h2>
+          <p class="muted small">Coloque combustível + minério para produzir barras de ferro.</p>
+
+          <div class="forgeGrid">
+            <div class="forgeCol">
+              <div class="forgeTitle">Combustível</div>
+              <div id="forgeFuel" class="forgeSlots" data-kind="fuel"></div>
+              <div class="muted small">Aceita: 🪵 tronco, 🪵 galho, 🍃 folha</div>
+            </div>
+            <div class="forgeCol">
+              <div class="forgeTitle">Entrada</div>
+              <div id="forgeIn" class="forgeSlots" data-kind="in"></div>
+              <div class="muted small">Aceita: 🔩 minério de ferro</div>
+            </div>
+            <div class="forgeCol">
+              <div class="forgeTitle">Saída</div>
+              <div id="forgeOut" class="forgeSlots" data-kind="out"></div>
+              <button id="btnForgeCollect" class="small">Coletar tudo</button>
+            </div>
+          </div>
+
+          <div class="buttons">
+            <button id="btnForgeClose" class="primary">Close</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Crafting -->
       <div id="crafting" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Construção">
         <div class="card">

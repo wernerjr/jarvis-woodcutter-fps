@@ -5,6 +5,7 @@ import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
 import { RockManager } from './RockManager.js'
 import { CampfireManager } from './CampfireManager.js'
+import { ForgeManager } from './ForgeManager.js'
 import { MineManager } from './MineManager.js'
 import { OreManager } from './OreManager.js'
 import { Sfx } from './Sfx.js'
@@ -16,6 +17,7 @@ import { Perf } from './Perf.js'
 import { DamageNumbers } from './DamageNumbers.js'
 import { RECIPES, DURABILITY } from './recipes.js'
 import { CampfireGhost } from './CampfireGhost.js'
+import { ForgeGhost } from './ForgeGhost.js'
 import { raycastGround } from './raycastGround.js'
 
 export class Game {
@@ -73,8 +75,16 @@ export class Game {
     this.axeDamage = 12
 
     this._placingCampfire = false
+    this._placingForge = false
+
+    this._activeForgeId = null
+
     this._ghost = new CampfireGhost()
+    this._forgeGhost = new ForgeGhost()
+
     this.scene.add(this._ghost.mesh)
+    this.scene.add(this._forgeGhost.mesh)
+
     this._ghostX = 0
     this._ghostZ = 0
     this._ghostValid = false
@@ -87,7 +97,7 @@ export class Game {
     this.score = 0
     this._running = false
 
-    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'controls-menu'|'controls-pause'} */
+    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'forge'|'controls-menu'|'controls-pause'} */
     this.state = 'menu'
 
     this._onResize = () => this._resize()
@@ -258,8 +268,8 @@ export class Game {
       return
     }
 
-    // ESC does not close "modals" (inventory/crafting/controls). Use buttons.
-    if (this.state === 'inventory' || this.state === 'crafting' || this.state === 'controls-menu' || this.state === 'controls-pause') {
+    // ESC does not close "modals" (inventory/crafting/forge/controls). Use buttons.
+    if (this.state === 'inventory' || this.state === 'crafting' || this.state === 'forge' || this.state === 'controls-menu' || this.state === 'controls-pause') {
       return
     }
   }
@@ -268,11 +278,16 @@ export class Game {
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
 
-    // Left mouse: campfire placement hold
+    // Left mouse: placement hold
     if (e.button === 0) {
       if (this.tool === 'campfire' && this.hotbarActive !== 0) {
         this._placingCampfire = true
         this._ghost.setVisible(true)
+        return
+      }
+      if (this.tool === 'forge' && this.hotbarActive !== 0 && !this._inMine) {
+        this._placingForge = true
+        this._forgeGhost.setVisible(true)
         return
       }
     }
@@ -288,6 +303,13 @@ export class Game {
       this._placingCampfire = false
       this._ghost.setVisible(false)
       if (this._ghostValid) this._placeCampfireAtGhost()
+      return
+    }
+
+    if (e.button === 0 && this._placingForge) {
+      this._placingForge = false
+      this._forgeGhost.setVisible(false)
+      if (this._ghostValid) this._placeForgeAtGhost()
       return
     }
 
@@ -437,6 +459,7 @@ export class Game {
     this.trees.resetAll()
     this.rocks?.resetAll?.()
     this.fires.resetAll()
+    this.forges.resetAll()
     this.ores.resetAll()
     this.ores.init({ points: this.mine.getOreSpawnPoints() })
     this.player.reset()
@@ -470,6 +493,7 @@ export class Game {
 
     this.ui.hideInventory?.()
     this.ui.hideCrafting?.()
+    this.ui.hideForge?.()
     this.ui.showHUD()
 
     await this.sfx.enable()
@@ -567,6 +591,22 @@ export class Game {
     this.ui.showInventory()
   }
 
+  openForge(forgeId) {
+    if (this.state !== 'playing') return
+    const f = this.forges.get(forgeId)
+    if (!f) return
+
+    this.state = 'forge'
+    this._activeForgeId = forgeId
+
+    this.player.setLocked(false)
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+
+    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this.ui.showForge()
+    this.ui.renderForge(f, (id) => ITEMS[id])
+  }
+
   openCrafting() {
     if (this.state !== 'playing') return
     this.state = 'crafting'
@@ -644,6 +684,93 @@ export class Game {
   async closeInventory() {
     if (this.state !== 'inventory') return
     await this.returnToGameMode()
+  }
+
+  async closeForge() {
+    if (this.state !== 'forge') return
+    this._activeForgeId = null
+    await this.returnToGameMode()
+  }
+
+  forgeQuickAddFromInventory(invIdx) {
+    if (this.state !== 'forge') return
+    const f = this._activeForgeId ? this.forges.get(this._activeForgeId) : null
+    if (!f) return
+
+    const s = this.inventory.slots[invIdx]
+    if (!s) return
+
+    // Prefer fuel if item is fuel, otherwise input if ore.
+    if (s.id === ItemId.LOG || s.id === ItemId.STICK || s.id === ItemId.LEAF) {
+      const empty = f.fuel.findIndex((x) => !x)
+      if (empty >= 0) return void this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind: 'fuel', idx: empty })
+    }
+
+    if (s.id === ItemId.IRON_ORE) {
+      const empty = f.input.findIndex((x) => !x)
+      if (empty >= 0) return void this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind: 'in', idx: empty })
+    }
+  }
+
+  forgeSlotClick(kind, idx) {
+    if (this.state !== 'forge') return
+    const f = this._activeForgeId ? this.forges.get(this._activeForgeId) : null
+    if (!f) return
+
+    if (kind === 'out') {
+      // click-to-collect one stack
+      const s = f.output[idx]
+      if (!s) return
+      const overflow = this.inventory.add(s.id, s.qty)
+      const moved = s.qty - (overflow || 0)
+      if (moved > 0) {
+        s.qty -= moved
+        if (s.qty <= 0) f.output[idx] = null
+        this.ui.toast(`Coletou: +${moved} ${ITEMS[s.id]?.name ?? s.id}`, 900)
+        this._postMoveUpdate()
+      } else {
+        this.ui.toast('Inventário cheio.', 900)
+      }
+      return
+    }
+
+    // Clicking fuel/input slot pulls back to inventory.
+    const arr = kind === 'fuel' ? f.fuel : f.input
+    const s = arr[idx]
+    if (!s) return
+
+    const overflow = this.inventory.add(s.id, s.qty)
+    const moved = s.qty - (overflow || 0)
+    if (moved > 0) {
+      s.qty -= moved
+      if (s.qty <= 0) arr[idx] = null
+      this._postMoveUpdate()
+    } else {
+      this.ui.toast('Inventário cheio.', 900)
+    }
+  }
+
+  collectAllForgeOutput() {
+    if (this.state !== 'forge') return
+    const f = this._activeForgeId ? this.forges.get(this._activeForgeId) : null
+    if (!f) return
+
+    let total = 0
+    for (let i = 0; i < f.output.length; i++) {
+      const s = f.output[i]
+      if (!s) continue
+      const overflow = this.inventory.add(s.id, s.qty)
+      const moved = s.qty - (overflow || 0)
+      if (moved > 0) {
+        total += moved
+        s.qty -= moved
+        if (s.qty <= 0) f.output[i] = null
+      }
+    }
+
+    this._postMoveUpdate()
+    if (total > 0) this.ui.toast(`Coletou: +${total} barras`, 1000)
+    else this.ui.toast('Nada para coletar (ou inventário cheio).', 1000)
   }
 
   tryClose() {
@@ -750,7 +877,7 @@ export class Game {
 
   setTool(tool) {
     this.tool = tool
-    const modelTool = tool === 'campfire' ? 'hand' : tool
+    const modelTool = tool === 'campfire' || tool === 'forge' ? 'hand' : tool
     this.player.setTool(modelTool)
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
   }
@@ -775,10 +902,22 @@ export class Game {
     else if (s.id === ItemId.PICKAXE) this.setTool('pickaxe')
     else if (s.id === ItemId.TORCH) this.setTool('torch')
     else if (s.id === ItemId.CAMPFIRE) this.setTool('campfire')
+    else if (s.id === ItemId.FORGE) this.setTool('forge')
     else this.setTool('hand')
 
     if (this.state === 'playing') {
-      const msg = this.tool === 'axe' ? 'Machado equipado.' : this.tool === 'pickaxe' ? 'Picareta equipada.' : this.tool === 'torch' ? 'Tocha equipada.' : this.tool === 'campfire' ? 'Fogueira selecionada.' : 'Mão equipada.'
+      const msg =
+        this.tool === 'axe'
+          ? 'Machado equipado.'
+          : this.tool === 'pickaxe'
+            ? 'Picareta equipada.'
+            : this.tool === 'torch'
+              ? 'Tocha equipada.'
+              : this.tool === 'campfire'
+                ? 'Fogueira selecionada.'
+                : this.tool === 'forge'
+                  ? 'Forja selecionada.'
+                  : 'Mão equipada.'
       this.ui.toast(msg, 900)
     }
   }
@@ -791,13 +930,25 @@ export class Game {
   moveItem(from, to) {
     if (!from || !to) return
 
-    const get = (loc) => {
+    const forge = this._activeForgeId ? this.forges.get(this._activeForgeId) : null
+
+    const get = (loc, kind = null) => {
       if (loc === 'inv') return this.inventory.slots
-      return this.hotbar
+      if (loc === 'hot') return this.hotbar
+      if (loc === 'forge') {
+        if (!forge) return null
+        if (kind === 'fuel') return forge.fuel
+        if (kind === 'in') return forge.input
+        if (kind === 'out') return forge.output
+        return null
+      }
+      return null
     }
 
-    const srcArr = get(from.from)
-    const dstArr = get(to.to)
+    const srcArr = get(from.from, from.kind)
+    const dstArr = get(to.to, to.kind)
+    if (!srcArr || !dstArr) return
+
     const sIdx = from.idx
     const dIdx = to.idx
 
@@ -806,6 +957,19 @@ export class Game {
 
     const src = srcArr[sIdx]
     if (!src) return
+
+    // Forge slot rules
+    if (to.to === 'forge') {
+      if (to.kind === 'out') return
+      if (to.kind === 'fuel') {
+        const ok = src.id === ItemId.LOG || src.id === ItemId.STICK || src.id === ItemId.LEAF
+        if (!ok) return
+      }
+      if (to.kind === 'in') {
+        const ok = src.id === ItemId.IRON_ORE
+        if (!ok) return
+      }
+    }
 
     const dst = dstArr[dIdx]
 
@@ -839,9 +1003,13 @@ export class Game {
     // Keep hand fixed.
     this.hotbar[0] = { id: 'hand', qty: 1 }
 
-    // Re-render if inventory open.
-    if (this.state === 'inventory') {
+    // Re-render if inventory/forge open.
+    if (this.state === 'inventory' || this.state === 'forge') {
       this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      if (this.state === 'forge' && this._activeForgeId) {
+        const f = this.forges.get(this._activeForgeId)
+        if (f) this.ui.renderForge(f, (id) => ITEMS[id])
+      }
       this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
     } else {
       this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
@@ -880,6 +1048,52 @@ export class Game {
     this._ghostValid = ok
     this._ghost.setValid(ok)
     this._ghost.setPos(x, z)
+  }
+
+  _updateForgeGhost() {
+    const p = raycastGround(this.camera)
+    if (!p) {
+      this._ghostValid = false
+      this._forgeGhost.setValid(false)
+      return
+    }
+
+    const x = Math.round(p.x * 10) / 10
+    const z = Math.round(p.z * 10) / 10
+    this._ghostX = x
+    this._ghostZ = z
+
+    const dx = x - this.player.position.x
+    const dz = z - this.player.position.z
+    const d = Math.hypot(dx, dz)
+
+    const nearFire = this.fires.getNearest({ x, z }, 1.4)
+    const nearForge = this._getNearestForge({ x, z }, 1.6)
+
+    const ok = d >= 1.2 && !nearFire && !nearForge
+    this._ghostValid = ok
+    this._forgeGhost.setValid(ok)
+    this._forgeGhost.mesh.position.set(x, 0, z)
+  }
+
+  _getNearestForge(pos, radius) {
+    return this.forges.getNearest(pos, radius)
+  }
+
+  _placeForgeAtGhost() {
+    const slot = this.hotbar[this.hotbarActive]
+    if (!slot || slot.id !== ItemId.FORGE) return
+
+    this.forges.place({ x: this._ghostX, z: this._ghostZ })
+
+    // Consume current hotbar stack
+    slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
+    if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+
+    this.ui.toast('Forja colocada.', 900)
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+
+    if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
   }
 
   _placeCampfireAtGhost() {
@@ -962,8 +1176,17 @@ export class Game {
     if (document.pointerLockElement !== this.canvas) return
 
     if (this.tool !== 'hand') {
-      this.ui.toast('Equipe a mão (hotbar) para coletar pedras.', 1100)
+      this.ui.toast('Equipe a mão (hotbar) para interagir.', 1100)
       return
+    }
+
+    // Forge interaction
+    if (!this._inMine) {
+      const fHit = this.forges.raycastFromCamera(this.camera)
+      if (fHit && fHit.distance <= 2.6) {
+        this.openForge(fHit.forgeId)
+        return
+      }
     }
 
     const hit = this.rocks.raycastFromCamera(this.camera)
@@ -1002,9 +1225,15 @@ export class Game {
     if (simDt > 0 && this._placingCampfire) {
       this._updateCampfireGhost()
     }
+    if (simDt > 0 && this._placingForge) {
+      this._updateForgeGhost()
+    }
 
     const colliders = this.state === 'playing'
-      ? this.trees.getTrunkColliders().concat(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
+      ? this.trees
+          .getTrunkColliders()
+          .concat(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
+          .concat(this._inMine ? [] : this.forges.getColliders())
       : []
 
     this.player.update(simDt, colliders)
@@ -1047,8 +1276,9 @@ export class Game {
     this.torchSpot.intensity += (targetSpot - this.torchSpot.intensity) * (simDt > 0 ? 0.25 : 0.0)
     this.torchPoint.intensity += (targetPoint - this.torchPoint.intensity) * (simDt > 0 ? 0.25 : 0.0)
 
-    // Provide baseline to campfire (so it can be ~3x torch brightness).
+    // Provide baseline to campfire/forge lighting.
     this.fires.setTorchMain(torchMain)
+    this.forges.setTorchMain(torchMain)
 
     // Sync flame visuals with the same flicker signal.
     this.player.setTorchFlicker(flicker, torchOn ? night : 0)
@@ -1091,6 +1321,7 @@ export class Game {
     this.trees.update(simDt)
     this.rocks.update(simDt)
     this.fires.update(simDt)
+    this.forges.update(simDt)
     this.ores.update(simDt)
 
     this.ui.setTime({

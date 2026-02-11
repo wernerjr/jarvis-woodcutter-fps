@@ -13,6 +13,10 @@ const ui = new UI({
   controlsEl: document.querySelector('#controls'),
   inventoryEl: document.querySelector('#inventory'),
   invGridEl: document.querySelector('#invGrid'),
+  forgeEl: document.querySelector('#forge'),
+  forgeFuelEl: document.querySelector('#forgeFuel'),
+  forgeInEl: document.querySelector('#forgeIn'),
+  forgeOutEl: document.querySelector('#forgeOut'),
   craftingEl: document.querySelector('#crafting'),
   craftListEl: document.querySelector('#craftList'),
   clockEl: document.querySelector('#clock'),
@@ -44,7 +48,7 @@ document.querySelector('#invGrid').addEventListener('contextmenu', (e) => {
 // Drag: inventory <-> hotbar (only when inventory is open)
 const invGrid = document.querySelector('#invGrid')
 invGrid.addEventListener('dragstart', (e) => {
-  if (!document.body.classList.contains('inventory-open')) return
+  if (!document.body.classList.contains('inventory-open') && !document.body.classList.contains('forge-open')) return
   const slot = e.target?.closest?.('.invSlot')
   if (!slot) return
   const idx = Number(slot.dataset.index)
@@ -53,12 +57,12 @@ invGrid.addEventListener('dragstart', (e) => {
 })
 
 invGrid.addEventListener('dragover', (e) => {
-  if (!document.body.classList.contains('inventory-open')) return
+  if (!document.body.classList.contains('inventory-open') && !document.body.classList.contains('forge-open')) return
   e.preventDefault()
 })
 
 invGrid.addEventListener('drop', (e) => {
-  if (!document.body.classList.contains('inventory-open')) return
+  if (!document.body.classList.contains('inventory-open') && !document.body.classList.contains('forge-open')) return
   const data = e.dataTransfer?.getData('application/json')
   if (!data) return
   let payload
@@ -74,6 +78,61 @@ invGrid.addEventListener('drop', (e) => {
   if (Number.isNaN(toIdx)) return
 
   game.moveItem(payload, { to: 'inv', idx: toIdx })
+})
+
+// Click inventory while forge open: quick-transfer to forge
+invGrid.addEventListener('click', (e) => {
+  if (!document.body.classList.contains('forge-open')) return
+  const slot = e.target?.closest?.('.invSlot')
+  if (!slot) return
+  const idx = Number(slot.dataset.index)
+  if (Number.isNaN(idx)) return
+  game.forgeQuickAddFromInventory(idx)
+})
+
+// Drag/drop: inventory <-> forge slots
+const forgeRoot = document.querySelector('#forge')
+forgeRoot?.addEventListener('dragstart', (e) => {
+  if (!document.body.classList.contains('forge-open')) return
+  const slot = e.target?.closest?.('.forgeSlot')
+  if (!slot) return
+  const kind = slot.dataset.kind
+  const idx = Number(slot.dataset.index)
+  if (!kind || Number.isNaN(idx)) return
+  e.dataTransfer?.setData('application/json', JSON.stringify({ from: 'forge', kind, idx }))
+})
+
+forgeRoot?.addEventListener('dragover', (e) => {
+  if (!document.body.classList.contains('forge-open')) return
+  const slot = e.target?.closest?.('.forgeSlot')
+  if (!slot) return
+  e.preventDefault()
+})
+
+forgeRoot?.addEventListener('drop', (e) => {
+  if (!document.body.classList.contains('forge-open')) return
+  const slot = e.target?.closest?.('.forgeSlot')
+  if (!slot) return
+  const kind = slot.dataset.kind
+  const idx = Number(slot.dataset.index)
+  if (!kind || Number.isNaN(idx)) return
+
+  const data = e.dataTransfer?.getData('application/json')
+  if (!data) return
+  let payload
+  try { payload = JSON.parse(data) } catch { return }
+
+  game.moveItem(payload, { to: 'forge', kind, idx })
+})
+
+forgeRoot?.addEventListener('click', (e) => {
+  if (!document.body.classList.contains('forge-open')) return
+  const slot = e.target?.closest?.('.forgeSlot')
+  if (!slot) return
+  const kind = slot.dataset.kind
+  const idx = Number(slot.dataset.index)
+  if (!kind) return
+  game.forgeSlotClick(kind, idx)
 })
 
 document.querySelectorAll('#hotbar .hotSlot').forEach((el) => {
@@ -131,6 +190,8 @@ $('#btnPerfToggle').addEventListener('click', () => game.togglePerf())
 $('#btnControlsBack').addEventListener('click', () => game.closeControls())
 $('#btnInvClose').addEventListener('click', () => game.closeInventory())
 $('#btnCraftClose').addEventListener('click', () => game.closeCrafting())
+$('#btnForgeClose').addEventListener('click', () => game.closeForge())
+$('#btnForgeCollect').addEventListener('click', () => game.collectAllForgeOutput())
 
 // Start at main menu
 ui.showMenu()

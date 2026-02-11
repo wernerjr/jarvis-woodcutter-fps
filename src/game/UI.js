@@ -1,5 +1,5 @@
 export class UI {
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -41,20 +41,27 @@ export class UI {
 
   showHUD() {
     document.body.classList.remove('state-menu')
+    document.body.classList.remove('forge-open')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
+    this.els.inventoryEl.classList.add('hidden')
+    this.els.craftingEl.classList.add('hidden')
+    this.els.forgeEl.classList.add('hidden')
     this.els.hudEl.classList.remove('hidden')
   }
 
   showControls() {
+    document.body.classList.remove('forge-open')
     this.els.controlsEl.classList.remove('hidden')
     this.els.inventoryEl.classList.add('hidden')
+    this.els.forgeEl.classList.add('hidden')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
   }
 
   showInventory() {
+    document.body.classList.remove('forge-open')
     document.body.classList.add('inventory-open')
     this.els.inventoryEl.classList.remove('hidden')
     this.els.craftingEl.classList.add('hidden')
@@ -69,6 +76,23 @@ export class UI {
     this.els.inventoryEl.classList.add('hidden')
   }
 
+  showForge() {
+    document.body.classList.add('forge-open')
+    document.body.classList.remove('inventory-open')
+    this.els.forgeEl.classList.remove('hidden')
+    this.els.inventoryEl.classList.add('hidden')
+    this.els.craftingEl.classList.add('hidden')
+    this.els.controlsEl.classList.add('hidden')
+    this.els.menuEl.classList.add('hidden')
+    this.els.pauseEl.classList.add('hidden')
+    this.els.hudEl.classList.remove('hidden')
+  }
+
+  hideForge() {
+    document.body.classList.remove('forge-open')
+    this.els.forgeEl.classList.add('hidden')
+  }
+
   showCrafting() {
     this.els.craftingEl.classList.remove('hidden')
     this.els.inventoryEl.classList.add('hidden')
@@ -80,6 +104,33 @@ export class UI {
 
   hideCrafting() {
     this.els.craftingEl.classList.add('hidden')
+  }
+
+  renderForge(forge, getItem) {
+    const mk = (kind, root, slots) => {
+      root.innerHTML = ''
+      for (let i = 0; i < slots.length; i++) {
+        const s = slots[i]
+        const el = document.createElement('div')
+        el.className = 'forgeSlot' + (s ? '' : ' empty')
+        el.draggable = !!s
+        el.dataset.kind = kind
+        el.dataset.index = String(i)
+
+        if (!s) {
+          el.innerHTML = `<div class="line1"><div class="ico">+</div><div class="qty">vazio</div></div><div class="muted small">&nbsp;</div>`
+        } else {
+          const it = getItem(s.id)
+          el.innerHTML = `<div class="line1"><div class="ico">${it?.icon ?? ''}</div><div class="qty">${s.qty}</div></div><div class="muted small">${it?.name ?? s.id}</div>`
+        }
+
+        root.appendChild(el)
+      }
+    }
+
+    mk('fuel', this.els.forgeFuelEl, forge.fuel)
+    mk('in', this.els.forgeInEl, forge.input)
+    mk('out', this.els.forgeOutEl, forge.output)
   }
 
   /** @param {(null|{id:string, qty:number})[]} slots @param {(id:string)=>{name:string, icon:string}} getItem */
