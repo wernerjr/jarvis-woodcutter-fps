@@ -50,10 +50,26 @@ export class Player {
     this._swingT = 0
     this._handT = 0
     this._torchT = 0
-    const { pivot, model } = this._makeAxe()
-    this._axePivot = pivot
-    this._axeModel = model
-    this.camera.add(this._axePivot)
+    // Tool models in view
+    this._toolPivot = new THREE.Group()
+    this._toolPivot.position.set(0.22, -0.22, -0.38)
+    this._toolPivot.rotation.set(-0.35, 0.10, -0.20)
+    this.camera.add(this._toolPivot)
+
+    // Back-compat: swing animation code rotates _axePivot.
+    this._axePivot = this._toolPivot
+
+    this._toolModels = {
+      axe_stone: this._makeStoneAxe(),
+      axe_metal: this._makeMetalAxe(),
+      pickaxe_stone: this._makeStonePickaxe(),
+      pickaxe_metal: this._makeMetalPickaxe(),
+    }
+
+    for (const m of Object.values(this._toolModels)) {
+      m.visible = false
+      this._toolPivot.add(m)
+    }
 
     this._hand = this._makeHand()
     this.camera.add(this._hand)
@@ -268,52 +284,151 @@ export class Player {
     this._applyTransforms()
   }
 
-  _makeAxe() {
-    // Pivot is placed near the robot "hand"; the model is offset so the grip sits at the pivot.
-    const pivot = new THREE.Group()
+  _makeStoneAxe() {
     const model = new THREE.Group()
 
-    // handle
-    const handleGeo = new THREE.CylinderGeometry(0.03, 0.04, 0.75, 8)
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0x3e2a18, roughness: 1 })
+    const handleGeo = new THREE.CylinderGeometry(0.03, 0.045, 0.78, 8)
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x3e2a18, roughness: 1.0 })
     const handle = new THREE.Mesh(handleGeo, handleMat)
     handle.rotation.z = 0.12
+    handle.position.set(0, 0.34, 0)
 
-    // head + blade
-    const headGeo = new THREE.BoxGeometry(0.18, 0.12, 0.08)
-    const headMat = new THREE.MeshStandardMaterial({ color: 0x9aa4ad, roughness: 0.35, metalness: 0.8 })
+    // Stone head: chunky + matte
+    const headGeo = new THREE.BoxGeometry(0.22, 0.14, 0.10)
+    const headMat = new THREE.MeshStandardMaterial({ color: 0x6f7378, roughness: 1.0, metalness: 0.0 })
     const head = new THREE.Mesh(headGeo, headMat)
+    head.position.set(0.10, 0.68, 0)
 
-    const bladeGeo = new THREE.BoxGeometry(0.06, 0.14, 0.24)
-    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xcbd2d8, roughness: 0.25, metalness: 1.0 })
+    const lashGeo = new THREE.BoxGeometry(0.10, 0.06, 0.16)
+    const lashMat = new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 1.0 })
+    const lash = new THREE.Mesh(lashGeo, lashMat)
+    lash.position.set(0.02, 0.66, 0)
+
+    // Edge: a slightly different stone tint
+    const edgeGeo = new THREE.BoxGeometry(0.06, 0.12, 0.26)
+    const edgeMat = new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.95, metalness: 0.0 })
+    const edge = new THREE.Mesh(edgeGeo, edgeMat)
+    edge.position.set(0.16, 0.68, 0)
+
+    model.add(handle)
+    model.add(head)
+    model.add(edge)
+    model.add(lash)
+
+    model.position.set(0.0, -0.12, -0.02)
+    model.rotation.set(-0.35, 0.55, 0.10)
+    return model
+  }
+
+  _makeMetalAxe() {
+    const model = new THREE.Group()
+
+    const handleGeo = new THREE.CylinderGeometry(0.028, 0.042, 0.80, 8)
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x3a2416, roughness: 1.0 })
+    const handle = new THREE.Mesh(handleGeo, handleMat)
+    handle.rotation.z = 0.10
+    handle.position.set(0, 0.34, 0)
+
+    // Metal head: slimmer + shinier
+    const headGeo = new THREE.BoxGeometry(0.20, 0.11, 0.07)
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xbfc7cf, roughness: 0.25, metalness: 1.0 })
+    const head = new THREE.Mesh(headGeo, headMat)
+    head.position.set(0.10, 0.68, 0)
+
+    const bladeGeo = new THREE.BoxGeometry(0.05, 0.14, 0.30)
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xe3e8ee, roughness: 0.18, metalness: 1.0 })
     const blade = new THREE.Mesh(bladeGeo, bladeMat)
+    blade.position.set(0.16, 0.68, 0)
 
-    // Arrange along local Y then rotate model into camera-space.
-    handle.position.set(0, 0.33, 0)
-    head.position.set(0.08, 0.67, 0)
-    blade.position.set(0.14, 0.67, 0)
+    const spikeGeo = new THREE.BoxGeometry(0.04, 0.08, 0.16)
+    const spikeMat = new THREE.MeshStandardMaterial({ color: 0xcdd5dd, roughness: 0.22, metalness: 1.0 })
+    const spike = new THREE.Mesh(spikeGeo, spikeMat)
+    spike.position.set(0.05, 0.68, 0.13)
 
     model.add(handle)
     model.add(head)
     model.add(blade)
+    model.add(spike)
 
-    // Move model so the grip/base is at pivot origin.
     model.position.set(0.0, -0.12, -0.02)
-
-    // Place pivot in view.
-    pivot.position.set(0.22, -0.22, -0.38)
-    pivot.rotation.set(-0.35, 0.10, -0.20)
-
-    // Rotate model so it reads like an axe held forward.
     model.rotation.set(-0.35, 0.55, 0.10)
-
-    pivot.add(model)
-    return { pivot, model }
+    return model
   }
 
-  setTool(toolId) {
+  _makeStonePickaxe() {
+    const model = new THREE.Group()
+
+    const handleGeo = new THREE.CylinderGeometry(0.03, 0.045, 0.86, 8)
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x3e2a18, roughness: 1.0 })
+    const handle = new THREE.Mesh(handleGeo, handleMat)
+    handle.position.set(0, 0.34, 0)
+    handle.rotation.z = 0.08
+
+    const headGeo = new THREE.BoxGeometry(0.52, 0.10, 0.10)
+    const headMat = new THREE.MeshStandardMaterial({ color: 0x6f7378, roughness: 1.0, metalness: 0.0 })
+    const head = new THREE.Mesh(headGeo, headMat)
+    head.position.set(0.05, 0.68, 0)
+
+    const tipGeo = new THREE.BoxGeometry(0.16, 0.08, 0.18)
+    const tipMat = new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.95, metalness: 0.0 })
+    const tipL = new THREE.Mesh(tipGeo, tipMat)
+    const tipR = new THREE.Mesh(tipGeo, tipMat)
+    tipL.position.set(-0.22, 0.68, 0)
+    tipR.position.set(0.32, 0.68, 0)
+    tipL.rotation.y = 0.55
+    tipR.rotation.y = -0.55
+
+    model.add(handle)
+    model.add(head)
+    model.add(tipL)
+    model.add(tipR)
+
+    model.position.set(0.0, -0.12, -0.02)
+    model.rotation.set(-0.28, 0.40, 0.12)
+    return model
+  }
+
+  _makeMetalPickaxe() {
+    const model = new THREE.Group()
+
+    const handleGeo = new THREE.CylinderGeometry(0.028, 0.042, 0.88, 8)
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x3a2416, roughness: 1.0 })
+    const handle = new THREE.Mesh(handleGeo, handleMat)
+    handle.position.set(0, 0.34, 0)
+    handle.rotation.z = 0.06
+
+    const headGeo = new THREE.BoxGeometry(0.56, 0.08, 0.08)
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xd7dee6, roughness: 0.22, metalness: 1.0 })
+    const head = new THREE.Mesh(headGeo, headMat)
+    head.position.set(0.05, 0.69, 0)
+
+    const tipGeo = new THREE.BoxGeometry(0.18, 0.06, 0.20)
+    const tipMat = new THREE.MeshStandardMaterial({ color: 0xf0f4f8, roughness: 0.16, metalness: 1.0 })
+    const tipL = new THREE.Mesh(tipGeo, tipMat)
+    const tipR = new THREE.Mesh(tipGeo, tipMat)
+    tipL.position.set(-0.24, 0.69, 0)
+    tipR.position.set(0.34, 0.69, 0)
+    tipL.rotation.y = 0.62
+    tipR.rotation.y = -0.62
+
+    model.add(handle)
+    model.add(head)
+    model.add(tipL)
+    model.add(tipR)
+
+    model.position.set(0.0, -0.12, -0.02)
+    model.rotation.set(-0.28, 0.40, 0.12)
+    return model
+  }
+
+  setTool(toolId, toolItemId = null) {
     // Show models based on tool.
-    if (this._axePivot) this._axePivot.visible = toolId === 'axe' || toolId === 'pickaxe'
+    if (this._toolPivot) this._toolPivot.visible = toolId === 'axe' || toolId === 'pickaxe'
+
+    for (const [id, m] of Object.entries(this._toolModels || {})) {
+      m.visible = !!toolItemId && id === toolItemId
+    }
+
     if (this._hand) this._hand.visible = toolId === 'hand'
     if (this._torch) this._torch.visible = toolId === 'torch'
     if (this._torchFlame) this._torchFlame.visible = toolId === 'torch'

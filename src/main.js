@@ -18,6 +18,8 @@ const ui = new UI({
   forgeInEl: document.querySelector('#forgeIn'),
   forgeOutEl: document.querySelector('#forgeOut'),
   forgeInvGridEl: document.querySelector('#forgeInvGrid'),
+  forgeTableEl: document.querySelector('#forgeTable'),
+  forgeTableListEl: document.querySelector('#forgeTableList'),
   craftingEl: document.querySelector('#crafting'),
   craftListEl: document.querySelector('#craftList'),
   clockEl: document.querySelector('#clock'),
@@ -221,6 +223,8 @@ $('#btnCraftClose').addEventListener('click', () => game.closeCrafting())
 $('#btnForgeClose').addEventListener('click', () => game.closeForge())
 $('#btnForgeCollect').addEventListener('click', () => game.collectAllForgeOutput())
 $('#btnForgeStart').addEventListener('click', () => game.toggleForgeEnabled())
+
+$('#btnForgeTableClose').addEventListener('click', () => game.closeForgeTable())
 
 // Start at main menu
 ui.showMenu()

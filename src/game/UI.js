@@ -1,5 +1,17 @@
 export class UI {
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
+  _toolLine(s) {
+    const dur = s?.meta?.dur
+    const maxDur = s?.meta?.maxDur
+    const dmg = s?.meta?.dmg
+    const durStr = typeof dur === 'number' && typeof maxDur === 'number' ? `${dur}/${maxDur}` : null
+    const dmgStr = typeof dmg === 'number' ? `${dmg}` : null
+    if (durStr && dmgStr) return `Dur: ${durStr} • Dmg: ${dmgStr}`
+    if (durStr) return `Dur: ${durStr}`
+    if (dmgStr) return `Dmg: ${dmgStr}`
+    return `Dur: ${dur ?? '-'}`
+  }
+
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -48,6 +60,7 @@ export class UI {
     this.els.inventoryEl.classList.add('hidden')
     this.els.craftingEl.classList.add('hidden')
     this.els.forgeEl.classList.add('hidden')
+    this.els.forgeTableEl.classList.add('hidden')
     this.els.hudEl.classList.remove('hidden')
   }
 
@@ -96,6 +109,22 @@ export class UI {
     this.els.forgeEl.classList.add('hidden')
   }
 
+  showForgeTable() {
+    document.body.classList.remove('forge-open')
+    this.els.forgeTableEl.classList.remove('hidden')
+    this.els.forgeEl.classList.add('hidden')
+    this.els.inventoryEl.classList.add('hidden')
+    this.els.craftingEl.classList.add('hidden')
+    this.els.controlsEl.classList.add('hidden')
+    this.els.menuEl.classList.add('hidden')
+    this.els.pauseEl.classList.add('hidden')
+    this.els.hudEl.classList.remove('hidden')
+  }
+
+  hideForgeTable() {
+    this.els.forgeTableEl.classList.add('hidden')
+  }
+
   showCrafting() {
     this.els.craftingEl.classList.remove('hidden')
     this.els.inventoryEl.classList.add('hidden')
@@ -121,7 +150,8 @@ export class UI {
       if (s) {
         const item = getItem(s.id)
         cell.draggable = true
-        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${item.stackable ? `${s.qty} / 100` : `Dur: ${s.meta?.dur ?? '-'} `}</div>`
+        const extra = item.stackable ? `${s.qty} / 100` : this._toolLine(s)
+        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${extra}</div>`
       } else {
         cell.innerHTML = ''
       }
@@ -210,8 +240,8 @@ export class UI {
   }
 
   /** @param {(null|{id:string, qty:number})[]} slots @param {(id:string)=>{name:string, icon:string}} getItem */
-  renderCrafting(recipes, invCount, getItem, onCraft) {
-    const root = this.els.craftListEl
+  renderCrafting(recipes, invCount, getItem, onCraft, rootOverride = null) {
+    const root = rootOverride || this.els.craftListEl
     root.innerHTML = ''
 
     for (const r of recipes) {
@@ -240,6 +270,10 @@ export class UI {
     }
   }
 
+  renderForgeTable(recipes, invCount, getItem, onCraft) {
+    this.renderCrafting(recipes, invCount, getItem, onCraft, this.els.forgeTableListEl)
+  }
+
   renderInventory(slots, getItem) {
     const grid = this.els.invGridEl
     grid.innerHTML = ''
@@ -252,7 +286,8 @@ export class UI {
       if (s) {
         const item = getItem(s.id)
         cell.draggable = true
-        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${item.stackable ? `${s.qty} / 100` : `Dur: ${s.meta?.dur ?? '-'} `}</div>`
+        const extra = item.stackable ? `${s.qty} / 100` : this._toolLine(s)
+        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${extra}</div>`
       } else {
         cell.innerHTML = ''
       }

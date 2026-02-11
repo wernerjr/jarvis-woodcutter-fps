@@ -6,6 +6,7 @@ import { TreeManager } from './TreeManager.js'
 import { RockManager } from './RockManager.js'
 import { CampfireManager } from './CampfireManager.js'
 import { ForgeManager } from './ForgeManager.js'
+import { ForgeTableManager } from './ForgeTableManager.js'
 import { MineManager } from './MineManager.js'
 import { OreManager } from './OreManager.js'
 import { Sfx } from './Sfx.js'
@@ -15,9 +16,10 @@ import { ITEMS, ItemId } from './items.js'
 import { TimeSystem } from './TimeSystem.js'
 import { Perf } from './Perf.js'
 import { DamageNumbers } from './DamageNumbers.js'
-import { RECIPES, DURABILITY } from './recipes.js'
+import { RECIPES, DURABILITY, FORGE_TABLE_RECIPES, TOOL_STATS } from './recipes.js'
 import { CampfireGhost } from './CampfireGhost.js'
 import { ForgeGhost } from './ForgeGhost.js'
+import { ForgeTableGhost } from './ForgeTableGhost.js'
 import { raycastGround } from './raycastGround.js'
 
 export class Game {
@@ -56,6 +58,7 @@ export class Game {
     this.rocks = new RockManager({ scene: this.scene })
     this.fires = new CampfireManager({ scene: this.scene })
     this.forges = new ForgeManager({ scene: this.scene })
+    this.forgeTables = new ForgeTableManager({ scene: this.scene })
     this.mine = new MineManager({ scene: this.scene })
     this.ores = new OreManager({ scene: this.scene })
 
@@ -77,14 +80,18 @@ export class Game {
 
     this._placingCampfire = false
     this._placingForge = false
+    this._placingForgeTable = false
 
     this._activeForgeId = null
+    this._activeForgeTableId = null
 
     this._ghost = new CampfireGhost()
     this._forgeGhost = new ForgeGhost()
+    this._forgeTableGhost = new ForgeTableGhost()
 
     this.scene.add(this._ghost.mesh)
     this.scene.add(this._forgeGhost.mesh)
+    this.scene.add(this._forgeTableGhost.mesh)
 
     this._ghostX = 0
     this._ghostZ = 0
@@ -98,7 +105,7 @@ export class Game {
     this.score = 0
     this._running = false
 
-    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'forge'|'controls-menu'|'controls-pause'} */
+    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'forge'|'forgeTable'|'controls-menu'|'controls-pause'} */
     this.state = 'menu'
 
     this._onResize = () => this._resize()
@@ -110,7 +117,7 @@ export class Game {
     this.hotbar = Array.from({ length: 10 }, (_, i) => (i === 0 ? { id: 'hand', qty: 1 } : null))
     this.hotbarActive = 0
 
-    this.tool = 'axe'
+    this.tool = 'hand'
 
     this._actionHeld = false
     this._actionCooldown = 0
@@ -269,8 +276,15 @@ export class Game {
       return
     }
 
-    // ESC does not close "modals" (inventory/crafting/forge/controls). Use buttons.
-    if (this.state === 'inventory' || this.state === 'crafting' || this.state === 'forge' || this.state === 'controls-menu' || this.state === 'controls-pause') {
+    // ESC does not close "modals" (inventory/crafting/forge/forgeTable/controls). Use buttons.
+    if (
+      this.state === 'inventory' ||
+      this.state === 'crafting' ||
+      this.state === 'forge' ||
+      this.state === 'forgeTable' ||
+      this.state === 'controls-menu' ||
+      this.state === 'controls-pause'
+    ) {
       return
     }
   }
@@ -289,6 +303,11 @@ export class Game {
       if (this.tool === 'forge' && this.hotbarActive !== 0 && !this._inMine) {
         this._placingForge = true
         this._forgeGhost.setVisible(true)
+        return
+      }
+      if (this.tool === 'forgeTable' && this.hotbarActive !== 0 && !this._inMine) {
+        this._placingForgeTable = true
+        this._forgeTableGhost.setVisible(true)
         return
       }
     }
@@ -317,6 +336,13 @@ export class Game {
       if (this._ghostValid) this._placeForgeAtGhost()
       return
     }
+
+    if (e.button === 0 && this._placingForgeTable) {
+      this._placingForgeTable = false
+      this._forgeTableGhost.setVisible(false)
+      if (this._ghostValid) this._placeForgeTableAtGhost()
+      return
+    }
   }
 
   _tryMine() {
@@ -334,14 +360,15 @@ export class Game {
 
     const slot = this.hotbar[this.hotbarActive]
     const meta = slot?.meta
-    if (!slot || slot.id !== ItemId.PICKAXE || !meta || meta.dur <= 0) {
+    const isPick = slot?.id === ItemId.PICKAXE_STONE || slot?.id === ItemId.PICKAXE_METAL
+    if (!slot || !isPick || !meta || meta.dur <= 0) {
       this.ui.toast('Sua picareta quebrou.', 1100)
       this.hotbar[this.hotbarActive] = null
-      this._cleanupHotbarBroken(ItemId.PICKAXE, this.hotbarActive)
+      if (slot?.id) this._cleanupHotbarBroken(slot.id, this.hotbarActive)
       return
     }
 
-    const dmg = this.pickaxeDamage
+    const dmg = Number(meta?.dmg ?? this.pickaxeDamage)
     const r = this.ores.damage(hit.oreId, dmg)
     if (!r) return
 
@@ -350,7 +377,7 @@ export class Game {
     if (meta.dur <= 0) {
       this.ui.toast('Picareta quebrou!', 1200)
       this.hotbar[this.hotbarActive] = null
-      this._cleanupHotbarBroken(ItemId.PICKAXE, this.hotbarActive)
+      this._cleanupHotbarBroken(slot.id, this.hotbarActive)
     }
 
     const p = hit.point
@@ -390,14 +417,15 @@ export class Game {
     // Durability: consume 1 per valid hit that deals damage (equipped axe).
     const axeSlot = this.hotbar[this.hotbarActive]
     const meta = axeSlot?.meta
-    if (!axeSlot || axeSlot.id !== ItemId.AXE || !meta || meta.dur <= 0) {
+    const isAxe = axeSlot?.id === ItemId.AXE_STONE || axeSlot?.id === ItemId.AXE_METAL
+    if (!axeSlot || !isAxe || !meta || meta.dur <= 0) {
       this.ui.toast('Seu machado quebrou.', 1100)
       this.hotbar[this.hotbarActive] = null
-      this._cleanupHotbarBroken(ItemId.AXE, this.hotbarActive)
+      if (axeSlot?.id) this._cleanupHotbarBroken(axeSlot.id, this.hotbarActive)
       return
     }
 
-    const dmg = this.axeDamage
+    const dmg = Number(meta?.dmg ?? this.axeDamage)
     const dmgResult = this.trees.damage(hit.treeId, dmg, this.player.position)
     if (!dmgResult) return
 
@@ -406,7 +434,7 @@ export class Game {
     if (meta.dur <= 0) {
       this.ui.toast('Machado quebrou!', 1200)
       this.hotbar[this.hotbarActive] = null
-      this._cleanupHotbarBroken(ItemId.AXE, this.hotbarActive)
+      this._cleanupHotbarBroken(axeSlot.id, this.hotbarActive)
     }
 
     // Floating damage number near impact point.
@@ -452,8 +480,12 @@ export class Game {
     this.ui.setScore(0)
     this.inventory.clear()
 
-    // Start with one axe equipped in hotbar slot 2.
-    this.hotbar[1] = { id: ItemId.AXE, qty: 1, meta: { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX } }
+    // Start with one stone axe equipped in hotbar slot 2.
+    this.hotbar[1] = {
+      id: ItemId.AXE_STONE,
+      qty: 1,
+      meta: { tool: 'axe', tier: 'stone', dmg: TOOL_STATS.axe_stone.dmg, dur: TOOL_STATS.axe_stone.maxDur, maxDur: TOOL_STATS.axe_stone.maxDur },
+    }
 
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
@@ -519,7 +551,11 @@ export class Game {
     this.inventory.clear()
 
     this.hotbar = Array.from({ length: 10 }, (_, i) => (i === 0 ? { id: 'hand', qty: 1 } : null))
-    this.hotbar[1] = { id: ItemId.AXE, qty: 1, meta: { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX } }
+    this.hotbar[1] = {
+      id: ItemId.AXE_STONE,
+      qty: 1,
+      meta: { tool: 'axe', tier: 'stone', dmg: TOOL_STATS.axe_stone.dmg, dur: TOOL_STATS.axe_stone.maxDur, maxDur: TOOL_STATS.axe_stone.maxDur },
+    }
     this.hotbarActive = 0
 
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
@@ -542,7 +578,11 @@ export class Game {
     this.inventory.clear()
 
     this.hotbar = Array.from({ length: 10 }, (_, i) => (i === 0 ? { id: 'hand', qty: 1 } : null))
-    this.hotbar[1] = { id: ItemId.AXE, qty: 1, meta: { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX } }
+    this.hotbar[1] = {
+      id: ItemId.AXE_STONE,
+      qty: 1,
+      meta: { tool: 'axe', tier: 'stone', dmg: TOOL_STATS.axe_stone.dmg, dur: TOOL_STATS.axe_stone.maxDur, maxDur: TOOL_STATS.axe_stone.maxDur },
+    }
     this.hotbarActive = 0
 
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
@@ -607,6 +647,51 @@ export class Game {
     this.ui.showForge()
     this.ui.renderForgeInventory(this.inventory.slots, (id) => ITEMS[id])
     this.ui.renderForge(f, (id) => ITEMS[id], { secondsPerIngot: this.forges.secondsPerIngot })
+  }
+
+  openForgeTable(forgeTableId) {
+    if (this.state !== 'playing') return
+    const t = this.forgeTables.get(forgeTableId)
+    if (!t) return
+
+    this.state = 'forgeTable'
+    this._activeForgeTableId = forgeTableId
+
+    this.player.setLocked(false)
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+
+    this.ui.showForgeTable()
+    this.ui.renderForgeTable(FORGE_TABLE_RECIPES, (id) => this.inventory.count(id), (id) => ITEMS[id], (rid) => this.craftForgeTable(rid))
+  }
+
+  async closeForgeTable() {
+    if (this.state !== 'forgeTable') return
+    this._activeForgeTableId = null
+    await this.returnToGameMode()
+  }
+
+  craftForgeTable(recipeId) {
+    const r = FORGE_TABLE_RECIPES.find((x) => x.id === recipeId)
+    if (!r) return
+
+    const can = r.cost.every((c) => this.inventory.count(c.id) >= c.qty)
+    if (!can) {
+      this.ui.toast('Faltam recursos.', 900)
+      return
+    }
+
+    for (const c of r.cost) this.inventory.remove(c.id, c.qty)
+
+    const overflow = this.inventory.add(r.output.id, r.output.qty, r.output.meta)
+    if (overflow) {
+      this.ui.toast('Inventário cheio: item descartado.', 1200)
+    } else {
+      this.ui.toast(`Forjado: ${r.name}`, 1000)
+    }
+
+    if (this.state === 'forgeTable') {
+      this.ui.renderForgeTable(FORGE_TABLE_RECIPES, (id) => this.inventory.count(id), (id) => ITEMS[id], (rid) => this.craftForgeTable(rid))
+    }
   }
 
   openCrafting() {
@@ -895,10 +980,29 @@ export class Game {
     return ITEMS[id]
   }
 
+  _describeToolMeta(meta) {
+    if (!meta) return ''
+    const dur = typeof meta.dur === 'number' && typeof meta.maxDur === 'number' ? `${meta.dur}/${meta.maxDur}` : null
+    const dmg = typeof meta.dmg === 'number' ? meta.dmg : null
+    if (dur && dmg != null) return `Dur: ${dur} • Dmg: ${dmg}`
+    if (dur) return `Dur: ${dur}`
+    if (dmg != null) return `Dmg: ${dmg}`
+    return ''
+  }
+
   setTool(tool) {
     this.tool = tool
-    const modelTool = tool === 'campfire' || tool === 'forge' ? 'hand' : tool
-    this.player.setTool(modelTool)
+
+    // Determine which in-hand model to show.
+    const s = this.hotbar[this.hotbarActive]
+    const toolItemId = s?.id
+
+    const modelTool = tool === 'campfire' || tool === 'forge' || tool === 'forgeTable' ? 'hand' : tool
+    const modelItem = modelTool === 'axe' ? (toolItemId === ItemId.AXE_METAL ? 'axe_metal' : 'axe_stone')
+      : modelTool === 'pickaxe' ? (toolItemId === ItemId.PICKAXE_METAL ? 'pickaxe_metal' : 'pickaxe_stone')
+        : null
+
+    this.player.setTool(modelTool, modelItem)
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
   }
 
@@ -918,26 +1022,29 @@ export class Game {
     }
 
     // Tool resolution
-    if (s.id === ItemId.AXE) this.setTool('axe')
-    else if (s.id === ItemId.PICKAXE) this.setTool('pickaxe')
+    if (s.id === ItemId.AXE_STONE || s.id === ItemId.AXE_METAL) this.setTool('axe')
+    else if (s.id === ItemId.PICKAXE_STONE || s.id === ItemId.PICKAXE_METAL) this.setTool('pickaxe')
     else if (s.id === ItemId.TORCH) this.setTool('torch')
     else if (s.id === ItemId.CAMPFIRE) this.setTool('campfire')
     else if (s.id === ItemId.FORGE) this.setTool('forge')
+    else if (s.id === ItemId.FORGE_TABLE) this.setTool('forgeTable')
     else this.setTool('hand')
 
     if (this.state === 'playing') {
       const msg =
         this.tool === 'axe'
-          ? 'Machado equipado.'
+          ? (this.hotbar[idx]?.id === ItemId.AXE_METAL ? 'Machado de metal equipado.' : 'Machado de pedra equipado.')
           : this.tool === 'pickaxe'
-            ? 'Picareta equipada.'
+            ? (this.hotbar[idx]?.id === ItemId.PICKAXE_METAL ? 'Picareta de metal equipada.' : 'Picareta de pedra equipada.')
             : this.tool === 'torch'
               ? 'Tocha equipada.'
               : this.tool === 'campfire'
                 ? 'Fogueira selecionada.'
                 : this.tool === 'forge'
                   ? 'Forja selecionada.'
-                  : 'Mão equipada.'
+                  : this.tool === 'forgeTable'
+                    ? 'Mesa de forja selecionada.'
+                    : 'Mão equipada.'
       this.ui.toast(msg, 900)
     }
   }
@@ -1048,6 +1155,16 @@ export class Game {
     }
   }
 
+  // ----------------- tool helpers -----------------
+
+  _isAxeId(id) {
+    return id === ItemId.AXE_STONE || id === ItemId.AXE_METAL
+  }
+
+  _isPickaxeId(id) {
+    return id === ItemId.PICKAXE_STONE || id === ItemId.PICKAXE_METAL
+  }
+
   _updateCampfireGhost() {
     const p = raycastGround(this.camera)
     if (!p) {
@@ -1103,6 +1220,52 @@ export class Game {
 
   _getNearestForge(pos, radius) {
     return this.forges.getNearest(pos, radius)
+  }
+
+  _updateForgeTableGhost() {
+    const p = raycastGround(this.camera)
+    if (!p) {
+      this._ghostValid = false
+      this._forgeTableGhost.setValid(false)
+      return
+    }
+
+    const x = Math.round(p.x * 10) / 10
+    const z = Math.round(p.z * 10) / 10
+    this._ghostX = x
+    this._ghostZ = z
+
+    const dx = x - this.player.position.x
+    const dz = z - this.player.position.z
+    const d = Math.hypot(dx, dz)
+
+    const nearFire = this.fires.getNearest({ x, z }, 1.8)
+    const nearForge = this._getNearestForge({ x, z }, 2.0)
+    const nearTable = this.forgeTables.getColliders().some((c) => Math.hypot(c.x - x, c.z - z) < 2.2)
+
+    const ok = d >= 1.4 && !nearFire && !nearForge && !nearTable
+    this._ghostValid = ok
+    this._forgeTableGhost.setValid(ok)
+    this._forgeTableGhost.mesh.position.set(x, 0, z)
+  }
+
+  _placeForgeTableAtGhost() {
+    const slot = this.hotbar[this.hotbarActive]
+    if (!slot || slot.id !== ItemId.FORGE_TABLE) return
+
+    this.forgeTables.place({ x: this._ghostX, z: this._ghostZ })
+
+    // Consume current hotbar stack
+    slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
+    if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+
+    // Unlock metal recipes in UI sense (station gating).
+    this._hasForgeTableBuilt = true
+
+    this.ui.toast('Mesa de forja colocada.', 900)
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+
+    if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
   }
 
   _placeForgeAtGhost() {
@@ -1205,8 +1368,14 @@ export class Game {
       return
     }
 
-    // Forge interaction
+    // Forge / Forge Table interactions
     if (!this._inMine) {
+      const ftHit = this.forgeTables.raycastFromCamera(this.camera)
+      if (ftHit && ftHit.distance <= 2.8) {
+        this.openForgeTable(ftHit.forgeTableId)
+        return
+      }
+
       const fHit = this.forges.raycastFromCamera(this.camera)
       if (fHit && fHit.distance <= 2.6) {
         this.openForge(fHit.forgeId)
@@ -1255,12 +1424,16 @@ export class Game {
     if (simDt > 0 && this._placingForge) {
       this._updateForgeGhost()
     }
+    if (simDt > 0 && this._placingForgeTable) {
+      this._updateForgeTableGhost()
+    }
 
     const colliders = this.state === 'playing'
       ? this.trees
           .getTrunkColliders()
           .concat(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
           .concat(this._inMine ? [] : this.forges.getColliders())
+          .concat(this._inMine ? [] : this.forgeTables.getColliders())
       : []
 
     this.player.update(simDt, colliders)
@@ -1325,7 +1498,15 @@ export class Game {
         this._tryInteract()
         this._actionCooldown = 0.22
       } else if (this.tool === 'axe' || this.tool === 'pickaxe') {
-        if (!this.player.isSwinging()) {
+        // Require correct item id in active slot.
+        const s = this.hotbar[this.hotbarActive]
+        if (this.tool === 'axe' && !this._isAxeId(s?.id)) {
+          this.ui.toast('Equipe um machado.', 900)
+          this._actionCooldown = 0.25
+        } else if (this.tool === 'pickaxe' && !this._isPickaxeId(s?.id)) {
+          this.ui.toast('Equipe uma picareta.', 900)
+          this._actionCooldown = 0.25
+        } else if (!this.player.isSwinging()) {
           this.player.swing()
           this.sfx.swing()
           this._actionCooldown = this.player.getSwingDuration()

@@ -2,16 +2,26 @@ import { ItemId } from './items.js'
 
 export const RecipeId = {
   TORCH: 'torch',
-  AXE: 'axe',
+  AXE_STONE: 'axe_stone',
   CAMPFIRE: 'campfire',
-  PICKAXE: 'pickaxe',
+  PICKAXE_STONE: 'pickaxe_stone',
   FORGE: 'forge',
+  FORGE_TABLE: 'forge_table',
 }
 
 export const DURABILITY = {
-  AXE_MAX: 60,
-  PICKAXE_MAX: 80,
+  AXE_STONE_MAX: 100,
+  AXE_METAL_MAX: 280,
+  PICKAXE_STONE_MAX: 120,
+  PICKAXE_METAL_MAX: 300,
   TORCH_MAX: 180, // seconds
+}
+
+export const TOOL_STATS = {
+  axe_stone: { dmg: 12, maxDur: DURABILITY.AXE_STONE_MAX },
+  axe_metal: { dmg: 18, maxDur: DURABILITY.AXE_METAL_MAX },
+  pickaxe_stone: { dmg: 10, maxDur: DURABILITY.PICKAXE_STONE_MAX },
+  pickaxe_metal: { dmg: 15, maxDur: DURABILITY.PICKAXE_METAL_MAX },
 }
 
 export const RECIPES = [
@@ -25,9 +35,13 @@ export const RECIPES = [
     ],
   },
   {
-    id: RecipeId.AXE,
-    name: 'Machado',
-    output: { id: ItemId.AXE, qty: 1, meta: { dur: DURABILITY.AXE_MAX, maxDur: DURABILITY.AXE_MAX } },
+    id: RecipeId.AXE_STONE,
+    name: 'Machado de Pedra',
+    output: {
+      id: ItemId.AXE_STONE,
+      qty: 1,
+      meta: { tool: 'axe', tier: 'stone', dmg: TOOL_STATS.axe_stone.dmg, dur: TOOL_STATS.axe_stone.maxDur, maxDur: TOOL_STATS.axe_stone.maxDur },
+    },
     cost: [
       { id: ItemId.STICK, qty: 6 },
       { id: ItemId.STONE, qty: 3 },
@@ -43,9 +57,19 @@ export const RECIPES = [
     ],
   },
   {
-    id: RecipeId.PICKAXE,
-    name: 'Picareta',
-    output: { id: ItemId.PICKAXE, qty: 1, meta: { dur: DURABILITY.PICKAXE_MAX, maxDur: DURABILITY.PICKAXE_MAX } },
+    id: RecipeId.PICKAXE_STONE,
+    name: 'Picareta de Pedra',
+    output: {
+      id: ItemId.PICKAXE_STONE,
+      qty: 1,
+      meta: {
+        tool: 'pickaxe',
+        tier: 'stone',
+        dmg: TOOL_STATS.pickaxe_stone.dmg,
+        dur: TOOL_STATS.pickaxe_stone.maxDur,
+        maxDur: TOOL_STATS.pickaxe_stone.maxDur,
+      },
+    },
     cost: [
       { id: ItemId.STICK, qty: 4 },
       { id: ItemId.STONE, qty: 6 },
@@ -53,7 +77,7 @@ export const RECIPES = [
   },
   {
     id: RecipeId.FORGE,
-    name: 'Forja',
+    name: 'Forja (Fornalha)',
     output: { id: ItemId.FORGE, qty: 1 },
     // pedras + troncos: base pesada com alimentação a lenha
     cost: [
@@ -61,4 +85,50 @@ export const RECIPES = [
       { id: ItemId.LOG, qty: 3 },
     ],
   },
+  {
+    id: RecipeId.FORGE_TABLE,
+    name: 'Mesa de Forja',
+    output: { id: ItemId.FORGE_TABLE, qty: 1 },
+    cost: [
+      { id: ItemId.STONE, qty: 10 },
+      { id: ItemId.LOG, qty: 4 },
+      { id: ItemId.IRON_INGOT, qty: 4 },
+    ],
+  },
 ]
+
+export const FORGE_TABLE_RECIPES = [
+  {
+    id: 'axe_metal',
+    name: 'Machado de Metal',
+    output: {
+      id: ItemId.AXE_METAL,
+      qty: 1,
+      meta: { tool: 'axe', tier: 'metal', dmg: TOOL_STATS.axe_metal.dmg, dur: TOOL_STATS.axe_metal.maxDur, maxDur: TOOL_STATS.axe_metal.maxDur },
+    },
+    cost: [
+      { id: ItemId.IRON_INGOT, qty: 3 },
+      { id: ItemId.STICK, qty: 4 },
+    ],
+  },
+  {
+    id: 'pickaxe_metal',
+    name: 'Picareta de Metal',
+    output: {
+      id: ItemId.PICKAXE_METAL,
+      qty: 1,
+      meta: {
+        tool: 'pickaxe',
+        tier: 'metal',
+        dmg: TOOL_STATS.pickaxe_metal.dmg,
+        dur: TOOL_STATS.pickaxe_metal.maxDur,
+        maxDur: TOOL_STATS.pickaxe_metal.maxDur,
+      },
+    },
+    cost: [
+      { id: ItemId.IRON_INGOT, qty: 4 },
+      { id: ItemId.STICK, qty: 4 },
+    ],
+  },
+]
+

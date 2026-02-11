@@ -6,11 +6,14 @@ export const ItemId = {
   IRON_ORE: 'iron_ore',
   IRON_INGOT: 'iron_ingot',
 
-  AXE: 'axe',
-  PICKAXE: 'pickaxe',
+  AXE_STONE: 'axe_stone',
+  AXE_METAL: 'axe_metal',
+  PICKAXE_STONE: 'pickaxe_stone',
+  PICKAXE_METAL: 'pickaxe_metal',
   TORCH: 'torch',
   CAMPFIRE: 'campfire',
   FORGE: 'forge',
+  FORGE_TABLE: 'forge_table',
 }
 
 export const ITEMS = {
@@ -21,9 +24,12 @@ export const ITEMS = {
   [ItemId.IRON_ORE]: { id: ItemId.IRON_ORE, name: 'Minério de Ferro', icon: '🔩', stackable: true },
   [ItemId.IRON_INGOT]: { id: ItemId.IRON_INGOT, name: 'Barra de Ferro', icon: '🧱', stackable: true },
 
-  [ItemId.AXE]: { id: ItemId.AXE, name: 'Machado', icon: '🪓', stackable: false },
-  [ItemId.PICKAXE]: { id: ItemId.PICKAXE, name: 'Picareta', icon: '⛏️', stackable: false },
+  [ItemId.AXE_STONE]: { id: ItemId.AXE_STONE, name: 'Machado de Pedra', icon: '🪓🪨', stackable: false },
+  [ItemId.AXE_METAL]: { id: ItemId.AXE_METAL, name: 'Machado de Metal', icon: '🪓⚙️', stackable: false },
+  [ItemId.PICKAXE_STONE]: { id: ItemId.PICKAXE_STONE, name: 'Picareta de Pedra', icon: '⛏️🪨', stackable: false },
+  [ItemId.PICKAXE_METAL]: { id: ItemId.PICKAXE_METAL, name: 'Picareta de Metal', icon: '⛏️⚙️', stackable: false },
   [ItemId.TORCH]: { id: ItemId.TORCH, name: 'Tocha', icon: '🔥', stackable: false },
   [ItemId.CAMPFIRE]: { id: ItemId.CAMPFIRE, name: 'Fogueira', icon: '🪵', stackable: false },
-  [ItemId.FORGE]: { id: ItemId.FORGE, name: 'Forja', icon: '⚒️', stackable: false },
+  [ItemId.FORGE]: { id: ItemId.FORGE, name: 'Forja (Fornalha)', icon: '⚒️', stackable: false },
+  [ItemId.FORGE_TABLE]: { id: ItemId.FORGE_TABLE, name: 'Mesa de Forja', icon: '🧰', stackable: false },
 }
