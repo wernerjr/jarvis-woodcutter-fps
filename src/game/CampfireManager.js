@@ -68,7 +68,7 @@ export class CampfireManager {
     const mesh = makeCampfireMesh()
     mesh.position.set(pos.x, 0, pos.z)
 
-    const light = new THREE.PointLight(0xffa24a, 0.0, 16, 1.2)
+    const light = new THREE.PointLight(0xffa24a, 0.0, 20, 1.15)
     light.position.set(0, 0.65, 0)
     mesh.add(light)
 
@@ -107,12 +107,12 @@ export class CampfireManager {
       // Fade in last 30s
       const fade = f.ttl <= 30 ? Math.max(0, f.ttl / 30) : 1
 
-      // gentle flicker (reuse torch main scale to keep ~3x brightness)
+      // gentle flicker (campfire stays stronger than torch)
       const flick = 0.9 + 0.1 * Math.sin(t * 7.3) + 0.05 * Math.sin(t * 12.7)
-      const I = this._torchMain * 3.0 * flick * fade
+      const I = this._torchMain * 3.6 * flick * fade
 
       f.light.intensity = I
-      f.light.distance = 16
+      f.light.distance = 20
 
       if (ember?.material) ember.material.emissiveIntensity = (0.45 + 0.35 * flick) * fade
       if (flame?.material) {
@@ -155,7 +155,7 @@ export class CampfireManager {
     if (!f) return false
     f.lit = !!lit
     if (f.lit) f.ttl = 180
-    f.light.intensity = f.lit ? this._torchMain * 3.0 : 0.0
+    f.light.intensity = f.lit ? this._torchMain * 3.6 : 0.0
     const ember = f.mesh.userData.ember
     const flame = f.mesh.userData.flame
     if (ember?.material) ember.material.emissiveIntensity = f.lit ? 0.8 : 0.0

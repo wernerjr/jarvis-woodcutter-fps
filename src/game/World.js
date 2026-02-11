@@ -232,10 +232,11 @@ export class World {
     this._sun.intensity = 0.15 + day * 1.25
     this._sun.color.setHex(0xfff1d6)
 
-    this._moon.intensity = 0.05 + night * 0.35
+    this._moon.intensity = 0.09 + night * 0.42
     this._moon.color.setHex(0x9bbcff)
 
-    this._amb.intensity = 0.10 + day * 0.55
+    // Slightly brighter nights (still clearly darker than day)
+    this._amb.intensity = 0.18 + day * 0.52
     this._amb.color.setHex(day > 0.5 ? 0x5d7a5d : 0x2a3a52)
 
     // Sky + fog blending
@@ -243,8 +244,8 @@ export class World {
     const skyDayBottom = new THREE.Color(0xbfe7ff)
     const skyDuskTop = new THREE.Color(0x2b3a7a)
     const skyDuskBottom = new THREE.Color(0xffb07a)
-    const skyNightTop = new THREE.Color(0x070b18)
-    const skyNightBottom = new THREE.Color(0x0b1626)
+    const skyNightTop = new THREE.Color(0x0a1022)
+    const skyNightBottom = new THREE.Color(0x101f33)
 
     const dusk = 1 - Math.abs(day * 2 - 1) // peak at transitions
 
@@ -280,7 +281,7 @@ export class World {
     // Fog density slightly higher at night
     const fogColor = bottom.clone().lerp(top, 0.65).multiplyScalar(0.75)
     this.scene.fog.color.copy(fogColor)
-    this.scene.fog.density = 0.020 + night * 0.010
+    this.scene.fog.density = 0.018 + night * 0.008
 
     // Keep sky centered on camera
     if (this._sky) this._sky.position.copy(camera.position)

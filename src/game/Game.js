@@ -1295,10 +1295,12 @@ export class Game {
     const flicker = 0.90 + 0.10 * Math.sin(performance.now() * 0.018) + 0.05 * Math.sin(performance.now() * 0.041)
 
     // Torch baseline brightness signal (used for campfire target = 3x).
-    const torchMain = (1.6 + night * 3.0) * flicker
+    // Torch baseline brightness signal (used for campfire/forge scaling).
+    // Doubled torch brightness.
+    const torchMain = (3.2 + night * 6.0) * flicker
 
     const targetSpot = torchOn ? torchMain : 0.0
-    const targetPoint = torchOn ? torchMain * 0.55 : 0.0
+    const targetPoint = torchOn ? torchMain * 0.65 : 0.0
 
     this.torchSpot.intensity += (targetSpot - this.torchSpot.intensity) * (simDt > 0 ? 0.25 : 0.0)
     this.torchPoint.intensity += (targetPoint - this.torchPoint.intensity) * (simDt > 0 ? 0.25 : 0.0)
