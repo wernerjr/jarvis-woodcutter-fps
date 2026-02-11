@@ -7,7 +7,9 @@ export class MineManager {
 
     // World placement
     this.center = new THREE.Vector3(58, 0, -18)
-    this.entrance = new THREE.Vector3(50, 0, -18)
+
+    // Entrance moved slightly outward so the timber frame sits "outside" the mountain.
+    this.entrance = new THREE.Vector3(47.4, 0, -18)
 
     /** @type {{x:number,z:number,r:number}[]} */
     this._colliders = []
@@ -25,7 +27,6 @@ export class MineManager {
 
     // Tunables
     this._tunnelRadius = 2.9
-    this._tunnelLen = 26
   }
 
   init() {
@@ -40,6 +41,10 @@ export class MineManager {
     // --- Mountain (low-poly, deformed cone) ---
     const mount = this._makeMountainMesh()
     this._group.add(mount)
+
+    // --- Trail (forest -> entrance) ---
+    const trail = this._makeTrail()
+    this._group.add(trail)
 
     // --- Entrance (classic timber frame) ---
     const entrance = this._makeEntrance()
@@ -64,8 +69,9 @@ export class MineManager {
     // --- Collision (XZ circles) ---
     this._colliders = []
 
-    // Mountain perimeter with opening at entrance
-    this._addMountainRingColliders()
+    // Mountain perimeter + inner ring (prevents "corner cutting" through the mesh)
+    this._addMountainRingColliders({ ringR: 13.8, cR: 2.25, n: 26 })
+    this._addMountainRingColliders({ ringR: 10.8, cR: 2.05, n: 22, openingScale: 0.78 })
 
     // Timber frame collision (posts)
     this._colliders.push({ x: this.entrance.x + 0.4, z: this.entrance.z + 2.0, r: 0.55 })
@@ -161,21 +167,25 @@ export class MineManager {
     const postGeo = new THREE.BoxGeometry(0.5, 4.2, 0.5)
     const beamGeo = new THREE.BoxGeometry(4.8, 0.55, 0.55)
 
+    // Slightly forward (outside) on X so it isn't engulfed by the mountain mesh.
+    const ex = this.entrance.x
+    const ez = this.entrance.z
+
     const left = new THREE.Mesh(postGeo, woodMat)
     const right = new THREE.Mesh(postGeo, woodMat)
-    left.position.set(this.entrance.x, 2.1, this.entrance.z + 2.1)
-    right.position.set(this.entrance.x, 2.1, this.entrance.z - 2.1)
+    left.position.set(ex, 2.1, ez + 2.1)
+    right.position.set(ex, 2.1, ez - 2.1)
 
     // Top beam
     const top = new THREE.Mesh(beamGeo, woodMat)
-    top.position.set(this.entrance.x, 4.05, this.entrance.z)
+    top.position.set(ex, 4.05, ez)
 
     // Diagonal braces
     const braceGeo = new THREE.BoxGeometry(0.4, 3.0, 0.4)
     const b1 = new THREE.Mesh(braceGeo, darkWoodMat)
     const b2 = new THREE.Mesh(braceGeo, darkWoodMat)
-    b1.position.set(this.entrance.x + 0.35, 2.45, this.entrance.z + 1.4)
-    b2.position.set(this.entrance.x + 0.35, 2.45, this.entrance.z - 1.4)
+    b1.position.set(ex + 0.35, 2.45, ez + 1.4)
+    b2.position.set(ex + 0.35, 2.45, ez - 1.4)
     b1.rotation.z = Math.PI / 4
     b2.rotation.z = -Math.PI / 4
 
@@ -183,16 +193,16 @@ export class MineManager {
     const plankGeo = new THREE.BoxGeometry(4.6, 0.18, 0.5)
     for (let i = 0; i < 3; i++) {
       const p = new THREE.Mesh(plankGeo, darkWoodMat)
-      p.position.set(this.entrance.x + 0.15, 3.4 + i * 0.28, this.entrance.z)
+      p.position.set(ex + 0.15, 3.4 + i * 0.28, ez)
       p.rotation.y = 0.06 * (i - 1)
       g.add(p)
     }
 
-    // Rock cut (mouth shadow)
+    // Rock cut (mouth shadow) pushed into the mountain slightly
     const holeGeo = new THREE.BoxGeometry(3.8, 3.3, 4.7)
     const holeMat = new THREE.MeshStandardMaterial({ color: 0x07070a, roughness: 1.0 })
     const hole = new THREE.Mesh(holeGeo, holeMat)
-    hole.position.set(this.entrance.x + 0.9, 1.75, this.entrance.z)
+    hole.position.set(ex + 1.35, 1.75, ez)
 
     g.add(left)
     g.add(right)
@@ -206,11 +216,11 @@ export class MineManager {
 
   _makeTunnel() {
     // Curve with 2 noticeable bends.
-    const p0 = new THREE.Vector3(this.entrance.x + 0.8, 1.8, this.entrance.z)
-    const p1 = new THREE.Vector3(this.entrance.x + 6.0, 1.9, this.entrance.z + 1.0)
-    const p2 = new THREE.Vector3(this.entrance.x + 12.0, 2.0, this.entrance.z + 6.0)
-    const p3 = new THREE.Vector3(this.entrance.x + 18.5, 2.1, this.entrance.z + 2.5)
-    const p4 = new THREE.Vector3(this.entrance.x + 24.0, 2.15, this.entrance.z - 2.0)
+    const p0 = new THREE.Vector3(this.entrance.x + 0.9, 1.8, this.entrance.z)
+    const p1 = new THREE.Vector3(this.entrance.x + 6.2, 1.9, this.entrance.z + 1.2)
+    const p2 = new THREE.Vector3(this.entrance.x + 12.2, 2.0, this.entrance.z + 6.4)
+    const p3 = new THREE.Vector3(this.entrance.x + 18.8, 2.1, this.entrance.z + 2.8)
+    const p4 = new THREE.Vector3(this.entrance.x + 24.4, 2.15, this.entrance.z - 2.1)
 
     const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3, p4])
     curve.curveType = 'catmullrom'
@@ -251,7 +261,7 @@ export class MineManager {
     const dirtMat = new THREE.MeshStandardMaterial({ color: 0x1b1a16, roughness: 1.0 })
     const dirt = new THREE.Mesh(dirtGeo, dirtMat)
     dirt.rotation.x = -Math.PI / 2
-    dirt.position.set(this.entrance.x + 1.2, 0.012, this.entrance.z)
+    dirt.position.set(this.entrance.x + 1.4, 0.012, this.entrance.z)
 
     // A few stones at the mouth
     const stoneGeo = new THREE.DodecahedronGeometry(0.35, 0)
@@ -259,7 +269,7 @@ export class MineManager {
     for (let i = 0; i < 7; i++) {
       const s = new THREE.Mesh(stoneGeo, stoneMat)
       s.position.set(
-        this.entrance.x + 0.4 + Math.random() * 4.0,
+        this.entrance.x + 0.6 + Math.random() * 4.0,
         0.18,
         this.entrance.z + (Math.random() - 0.5) * 5.4
       )
@@ -327,18 +337,113 @@ export class MineManager {
     this._lights.add(fill)
   }
 
-  _addMountainRingColliders() {
+  _makeTrail() {
+    // Path from the forest edge to the mine entrance, curving around the mountain.
+    const start = new THREE.Vector3(28, 0, -6)
+    const mid1 = new THREE.Vector3(40, 0, -10)
+    const mid2 = new THREE.Vector3(46, 0, -28)
+    const mid3 = new THREE.Vector3(50, 0, -24)
+    const end = new THREE.Vector3(this.entrance.x - 0.4, 0, this.entrance.z)
+
+    const curve = new THREE.CatmullRomCurve3([start, mid1, mid2, mid3, end])
+    curve.tension = 0.45
+
+    const samples = 64
+    const width = 4.2
+
+    const pts = []
+    for (let i = 0; i <= samples; i++) pts.push(curve.getPoint(i / samples))
+
+    // Build a simple strip (2 verts per point).
+    const verts = []
+    const uvs = []
+    const indices = []
+
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i]
+
+      const prev = pts[Math.max(0, i - 1)]
+      const next = pts[Math.min(pts.length - 1, i + 1)]
+      const dir = next.clone().sub(prev)
+      dir.y = 0
+      if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0)
+      dir.normalize()
+
+      const n = new THREE.Vector3(-dir.z, 0, dir.x)
+
+      const edge = width * 0.5
+      const y = 0.011
+
+      const l = p.clone().addScaledVector(n, edge)
+      const r = p.clone().addScaledVector(n, -edge)
+
+      // soften edges by lowering slightly
+      verts.push(l.x, y, l.z)
+      verts.push(r.x, y, r.z)
+
+      const v = i / (pts.length - 1)
+      uvs.push(0, v)
+      uvs.push(1, v)
+
+      if (i < pts.length - 1) {
+        const a = i * 2
+        const b = i * 2 + 1
+        const c = i * 2 + 2
+        const d = i * 2 + 3
+        indices.push(a, c, b)
+        indices.push(c, d, b)
+      }
+    }
+
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+    geo.setIndex(indices)
+    geo.computeVertexNormals()
+
+    // Vertex-color noise (cheap variation)
+    const colors = new Float32Array((pts.length * 2) * 3)
+    for (let i = 0; i < colors.length; i += 3) {
+      const n = 0.72 + Math.random() * 0.28
+      colors[i + 0] = 0.36 * n
+      colors[i + 1] = 0.24 * n
+      colors[i + 2] = 0.16 * n
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+
+    const mat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 1.0,
+      metalness: 0.0,
+    })
+
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.name = 'MudTrail'
+
+    // Feather edges visually by adding a slightly wider, transparent overlay
+    const geo2 = geo.clone()
+    const mat2 = new THREE.MeshStandardMaterial({ color: 0x2b1c12, roughness: 1.0, transparent: true, opacity: 0.22 })
+    const overlay = new THREE.Mesh(geo2, mat2)
+    overlay.position.y = 0.003
+    overlay.scale.set(1.08, 1, 1.08)
+
+    const g = new THREE.Group()
+    g.add(mesh)
+    g.add(overlay)
+    return g
+  }
+
+  _addMountainRingColliders({ ringR, cR, n, openingScale = 1.0 }) {
     const cx = this.center.x
     const cz = this.center.z
-    const ringR = 13.5
-    const cR = 2.2
-    const n = 22
+
+    const entranceDir = Math.atan2(this.entrance.z - cz, this.entrance.x - cx)
+    const openHalf = 0.52 * openingScale
 
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2
-      // Entrance faces west (pi). Keep a wider opening now.
-      const da = Math.abs(this._wrapAngle(a - Math.PI))
-      if (da < 0.52) continue
+      const da = Math.abs(this._wrapAngle(a - entranceDir))
+      if (da < openHalf) continue
       this._colliders.push({ x: cx + Math.cos(a) * ringR, z: cz + Math.sin(a) * ringR, r: cR })
     }
   }
