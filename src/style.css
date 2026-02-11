@@ -103,15 +103,14 @@ body.state-menu #hud{display:none;}
 
 /* Forge UI */
 body.forge-open #forge.overlay{display:block;}
-body.forge-open #inventory.overlay{display:block;}
-body.forge-open #forge.overlay .card{max-width:720px;}
-body.forge-open #inventory.overlay .card{max-width:420px;}
+body.forge-open #inventory.overlay{display:none;}
 
-/* place them side-by-side */
-body.forge-open #forge.overlay{justify-content:flex-end;}
-body.forge-open #inventory.overlay{justify-content:flex-start;}
-body.forge-open #forge.overlay .card{margin-right:14px;}
-body.forge-open #inventory.overlay .card{margin-left:14px;}
+.forgePanel{max-width:1060px}
+.forgeHeader{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.forgeSplit{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px}
+.forgeLeft,.forgeRight{padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(0,0,0,.14)}
+.forgeIconRow{font-size:38px;opacity:.9;margin:2px 0 10px}
+.forgeInvGrid{margin-top:10px}
 
 .forgeGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:10px 0 12px}
 .forgeTitle{font-weight:700;margin-bottom:6px}

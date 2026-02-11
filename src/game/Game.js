@@ -603,8 +603,8 @@ export class Game {
     this.player.setLocked(false)
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
 
-    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     this.ui.showForge()
+    this.ui.renderForgeInventory(this.inventory.slots, (id) => ITEMS[id])
     this.ui.renderForge(f, (id) => ITEMS[id])
   }
 
@@ -1006,11 +1006,16 @@ export class Game {
 
     // Re-render if inventory/forge open.
     if (this.state === 'inventory' || this.state === 'forge') {
-      this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
-      if (this.state === 'forge' && this._activeForgeId) {
-        const f = this.forges.get(this._activeForgeId)
-        if (f) this.ui.renderForge(f, (id) => ITEMS[id])
+      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+
+      if (this.state === 'forge') {
+        this.ui.renderForgeInventory(this.inventory.slots, (id) => ITEMS[id])
+        if (this._activeForgeId) {
+          const f = this.forges.get(this._activeForgeId)
+          if (f) this.ui.renderForge(f, (id) => ITEMS[id])
+        }
       }
+
       this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
     } else {
       this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)

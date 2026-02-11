@@ -17,6 +17,7 @@ const ui = new UI({
   forgeFuelEl: document.querySelector('#forgeFuel'),
   forgeInEl: document.querySelector('#forgeIn'),
   forgeOutEl: document.querySelector('#forgeOut'),
+  forgeInvGridEl: document.querySelector('#forgeInvGrid'),
   craftingEl: document.querySelector('#crafting'),
   craftListEl: document.querySelector('#craftList'),
   clockEl: document.querySelector('#clock'),
@@ -48,7 +49,7 @@ document.querySelector('#invGrid').addEventListener('contextmenu', (e) => {
 // Drag: inventory <-> hotbar (only when inventory is open)
 const invGrid = document.querySelector('#invGrid')
 invGrid.addEventListener('dragstart', (e) => {
-  if (!document.body.classList.contains('inventory-open') && !document.body.classList.contains('forge-open')) return
+  if (!document.body.classList.contains('inventory-open')) return
   const slot = e.target?.closest?.('.invSlot')
   if (!slot) return
   const idx = Number(slot.dataset.index)
@@ -57,12 +58,12 @@ invGrid.addEventListener('dragstart', (e) => {
 })
 
 invGrid.addEventListener('dragover', (e) => {
-  if (!document.body.classList.contains('inventory-open') && !document.body.classList.contains('forge-open')) return
+  if (!document.body.classList.contains('inventory-open')) return
   e.preventDefault()
 })
 
 invGrid.addEventListener('drop', (e) => {
-  if (!document.body.classList.contains('inventory-open') && !document.body.classList.contains('forge-open')) return
+  if (!document.body.classList.contains('inventory-open')) return
   const data = e.dataTransfer?.getData('application/json')
   if (!data) return
   let payload
@@ -80,8 +81,37 @@ invGrid.addEventListener('drop', (e) => {
   game.moveItem(payload, { to: 'inv', idx: toIdx })
 })
 
-// Click inventory while forge open: quick-transfer to forge
-invGrid.addEventListener('click', (e) => {
+// Drag/drop + click: embedded forge inventory <-> forge slots
+const forgeRoot = document.querySelector('#forge')
+
+const forgeInvGrid = document.querySelector('#forgeInvGrid')
+forgeInvGrid?.addEventListener('dragstart', (e) => {
+  if (!document.body.classList.contains('forge-open')) return
+  const slot = e.target?.closest?.('.invSlot')
+  if (!slot) return
+  const idx = Number(slot.dataset.index)
+  if (Number.isNaN(idx)) return
+  e.dataTransfer?.setData('application/json', JSON.stringify({ from: 'inv', idx }))
+})
+forgeInvGrid?.addEventListener('dragover', (e) => {
+  if (!document.body.classList.contains('forge-open')) return
+  e.preventDefault()
+})
+forgeInvGrid?.addEventListener('drop', (e) => {
+  if (!document.body.classList.contains('forge-open')) return
+  const data = e.dataTransfer?.getData('application/json')
+  if (!data) return
+  let payload
+  try { payload = JSON.parse(data) } catch { return }
+
+  const toSlot = e.target?.closest?.('.invSlot')
+  if (!toSlot) return
+  const toIdx = Number(toSlot.dataset.index)
+  if (Number.isNaN(toIdx)) return
+
+  game.moveItem(payload, { to: 'inv', idx: toIdx })
+})
+forgeInvGrid?.addEventListener('click', (e) => {
   if (!document.body.classList.contains('forge-open')) return
   const slot = e.target?.closest?.('.invSlot')
   if (!slot) return
@@ -90,8 +120,6 @@ invGrid.addEventListener('click', (e) => {
   game.forgeQuickAddFromInventory(idx)
 })
 
-// Drag/drop: inventory <-> forge slots
-const forgeRoot = document.querySelector('#forge')
 forgeRoot?.addEventListener('dragstart', (e) => {
   if (!document.body.classList.contains('forge-open')) return
   const slot = e.target?.closest?.('.forgeSlot')

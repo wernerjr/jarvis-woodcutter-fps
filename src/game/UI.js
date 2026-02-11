@@ -1,5 +1,5 @@
 export class UI {
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -80,9 +80,9 @@ export class UI {
     document.body.classList.add('forge-open')
     document.body.classList.remove('inventory-open')
 
-    // Forge UI is used together with the inventory (side-by-side).
+    // Single forge panel: embedded inventory on the left.
     this.els.forgeEl.classList.remove('hidden')
-    this.els.inventoryEl.classList.remove('hidden')
+    this.els.inventoryEl.classList.add('hidden')
 
     this.els.craftingEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
@@ -107,6 +107,27 @@ export class UI {
 
   hideCrafting() {
     this.els.craftingEl.classList.add('hidden')
+  }
+
+  renderForgeInventory(slots, getItem) {
+    const grid = this.els.forgeInvGridEl
+    grid.innerHTML = ''
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i]
+      const cell = document.createElement('div')
+      cell.className = 'invSlot' + (s ? ' draggable' : ' invEmpty')
+      cell.dataset.index = String(i)
+
+      if (s) {
+        const item = getItem(s.id)
+        cell.draggable = true
+        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${item.stackable ? `${s.qty} / 100` : `Dur: ${s.meta?.dur ?? '-'} `}</div>`
+      } else {
+        cell.innerHTML = ''
+      }
+
+      grid.appendChild(cell)
+    }
   }
 
   renderForge(forge, getItem) {
