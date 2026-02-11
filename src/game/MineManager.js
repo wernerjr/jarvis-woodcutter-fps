@@ -5,89 +5,98 @@ export class MineManager {
   constructor({ scene }) {
     this.scene = scene
 
-    // World placement
+    // Exterior placement (world)
     this.center = new THREE.Vector3(58, 0, -18)
+    this.entrance = new THREE.Vector3(47.8, 0, -18)
 
-    // Entrance moved slightly outward so the timber frame sits "outside" the mountain.
-    this.entrance = new THREE.Vector3(47.4, 0, -18)
+    // Interior placement (kept far away; accessed via portal teleport)
+    this.mineOrigin = new THREE.Vector3(-120, 0, 95)
 
     /** @type {{x:number,z:number,r:number}[]} */
-    this._colliders = []
+    this._worldColliders = []
+    /** @type {{x:number,z:number,r:number}[]} */
+    this._mineColliders = []
 
-    this._group = new THREE.Group()
-    this._group.name = 'Mine'
+    this._worldGroup = new THREE.Group()
+    this._worldGroup.name = 'MineWorld'
+
+    this._mineGroup = new THREE.Group()
+    this._mineGroup.name = 'MineInterior'
 
     this._lights = new THREE.Group()
     this._lights.name = 'MineLights'
 
-    this._amb = new THREE.AmbientLight(0x2a2a36, 0.22)
+    this._amb = new THREE.AmbientLight(0x242432, 0.20)
 
     /** @type {THREE.CatmullRomCurve3|null} */
     this._curve = null
 
-    // Tunables
     this._tunnelRadius = 2.9
+
+    // Portal triggers (XZ)
+    this.portalEnter = { x: this.entrance.x - 0.6, z: this.entrance.z, r: 1.35 }
+    this.portalExit = { x: this.mineOrigin.x + 1.4, z: this.mineOrigin.z, r: 1.35 }
+
+    // Teleport targets
+    this.spawnMine = new THREE.Vector3(this.mineOrigin.x + 2.2, 1.65, this.mineOrigin.z)
+    this.spawnWorld = new THREE.Vector3(this.entrance.x - 2.6, 1.65, this.entrance.z)
   }
 
   init() {
     // Clear previous
-    this._group.removeFromParent()
+    this._worldGroup.removeFromParent()
+    this._mineGroup.removeFromParent()
     this._lights.removeFromParent()
-    this._group = new THREE.Group()
-    this._group.name = 'Mine'
+
+    this._worldGroup = new THREE.Group()
+    this._worldGroup.name = 'MineWorld'
+
+    this._mineGroup = new THREE.Group()
+    this._mineGroup.name = 'MineInterior'
+
     this._lights = new THREE.Group()
     this._lights.name = 'MineLights'
 
-    // --- Mountain (low-poly, deformed cone) ---
-    const mount = this._makeMountainMesh()
-    this._group.add(mount)
+    // --- Exterior: mountain + entrance + trail ---
+    this._worldGroup.add(this._makeMountainMesh())
+    this._worldGroup.add(this._makeTrail())
+    this._worldGroup.add(this._makeEntrance())
+    this._worldGroup.add(this._makeMouthGround())
 
-    // --- Trail (forest -> entrance) ---
-    const trail = this._makeTrail()
-    this._group.add(trail)
-
-    // --- Entrance (classic timber frame) ---
-    const entrance = this._makeEntrance()
-    this._group.add(entrance)
-
-    // --- Curved tunnel interior ---
+    // --- Interior: curved tunnel + supports + lamps ---
     const { tunnelMesh, curve } = this._makeTunnel()
     this._curve = curve
-    this._group.add(tunnelMesh)
-
-    // Entrance cut / dirt patch
-    const mouth = this._makeMouthGround()
-    this._group.add(mouth)
-
-    // Interior supports + lights
+    this._mineGroup.add(tunnelMesh)
     this._makeSupportsAndLamps(curve)
 
-    this.scene.add(this._group)
+    this.scene.add(this._worldGroup)
+    this.scene.add(this._mineGroup)
     this.scene.add(this._lights)
     this.scene.add(this._amb)
 
-    // --- Collision (XZ circles) ---
-    this._colliders = []
+    // --- Collision ---
+    this._buildWorldColliders()
+    this._buildMineColliders(curve)
 
-    // Mountain perimeter + inner ring (prevents "corner cutting" through the mesh)
-    this._addMountainRingColliders({ ringR: 13.8, cR: 2.25, n: 26 })
-    this._addMountainRingColliders({ ringR: 10.8, cR: 2.05, n: 22, openingScale: 0.78 })
-
-    // Timber frame collision (posts)
-    this._colliders.push({ x: this.entrance.x + 0.4, z: this.entrance.z + 2.0, r: 0.55 })
-    this._colliders.push({ x: this.entrance.x + 0.4, z: this.entrance.z - 2.0, r: 0.55 })
-
-    // Curved tunnel walls (sample along curve)
-    this._addTunnelWallColliders(curve)
+    // Portal triggers updated (in case entrance moved)
+    this.portalEnter = { x: this.entrance.x - 0.6, z: this.entrance.z, r: 1.35 }
+    this.portalExit = { x: this.mineOrigin.x + 1.4, z: this.mineOrigin.z, r: 1.35 }
+    this.spawnMine = new THREE.Vector3(this.mineOrigin.x + 2.2, 1.65, this.mineOrigin.z)
+    this.spawnWorld = new THREE.Vector3(this.entrance.x - 2.6, 1.65, this.entrance.z)
   }
 
   /** @returns {{x:number,z:number,r:number}[]} */
-  getColliders() {
-    return this._colliders
+  getWorldColliders() {
+    return this._worldColliders
+  }
+
+  /** @returns {{x:number,z:number,r:number}[]} */
+  getMineColliders() {
+    return this._mineColliders
   }
 
   getOreSpawnPoints() {
-    // Spawn on alternating sides of the tunnel, deeper inside.
+    // Spawn on alternating sides of the interior tunnel.
     const pts = []
     const c = this._curve
     if (!c) return pts
@@ -106,11 +115,14 @@ export class MineManager {
     return pts
   }
 
-  // ----------------- build helpers -----------------
+  // ----------------- Exterior (world) -----------------
 
   _makeMountainMesh() {
-    // Base cone, then vertex jitter for silhouette.
-    const geo = new THREE.ConeGeometry(16, 14, 10, 4)
+    // Controlled "mountain mound" built from a deformed plane (heightmap-ish).
+    const size = 44
+    const seg = 24
+    const geo = new THREE.PlaneGeometry(size, size, seg, seg)
+    geo.rotateX(-Math.PI / 2)
 
     const pos = geo.attributes.position
     const v = new THREE.Vector3()
@@ -118,22 +130,26 @@ export class MineManager {
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i)
 
-      // Convert cone local coords: y in [-7..7]
-      const h01 = (v.y + 7) / 14
-      const r = Math.sqrt(v.x * v.x + v.z * v.z)
-      const r01 = Math.min(1, r / 16)
+      const x = v.x
+      const z = v.z
+      const r = Math.sqrt(x * x + z * z)
+      const r01 = Math.min(1, r / (size * 0.5))
 
-      // deterministic-ish noise from position
-      const n = Math.sin(v.x * 0.55 + v.z * 0.62) * 0.5 + Math.sin(v.x * 1.2 - v.z * 0.9) * 0.5
+      // radial falloff (peak at center)
+      let h = (1 - r01)
+      h = Math.max(0, h)
+      h = Math.pow(h, 1.35)
 
-      // bigger variation near mid/top, less at base
-      const amp = (0.15 + 0.55 * h01) * (1 - 0.35 * r01)
+      // layered cheap noise
+      const n1 = Math.sin(x * 0.18 + z * 0.22)
+      const n2 = Math.sin(x * 0.42 - z * 0.33)
+      const n3 = Math.sin(x * 0.75 + z * 0.64)
+      const noise = (n1 * 0.55 + n2 * 0.30 + n3 * 0.15)
 
-      v.x += n * amp * 1.2
-      v.z += Math.cos(v.x * 0.7 + v.z * 0.45) * amp * 0.9
+      const ridge = Math.sin((x + z) * 0.10) * 0.6
 
-      // add ridges (low poly feel)
-      v.y += Math.sin((v.x + v.z) * 0.35) * amp * 0.9
+      const height = h * (12.5 + 3.2 * noise + 1.8 * ridge)
+      v.y = height
 
       pos.setXYZ(i, v.x, v.y, v.z)
     }
@@ -147,27 +163,24 @@ export class MineManager {
     })
 
     const m = new THREE.Mesh(geo, mat)
-
-    // Place: shift so base touches ground
-    m.position.set(this.center.x, 7.0, this.center.z)
-    m.scale.set(1.25, 1.0, 1.05)
+    m.position.set(this.center.x, 0, this.center.z)
     m.rotation.y = 0.35
+    m.name = 'Mountain'
 
     return m
   }
 
   _makeEntrance() {
+    // Classic timber frame sits in front of the slope (never inside the mound).
     const g = new THREE.Group()
     g.name = 'MineEntrance'
 
     const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e1d, roughness: 1.0, metalness: 0.0 })
     const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x382114, roughness: 1.0, metalness: 0.0 })
 
-    // Posts
     const postGeo = new THREE.BoxGeometry(0.5, 4.2, 0.5)
     const beamGeo = new THREE.BoxGeometry(4.8, 0.55, 0.55)
 
-    // Slightly forward (outside) on X so it isn't engulfed by the mountain mesh.
     const ex = this.entrance.x
     const ez = this.entrance.z
 
@@ -176,11 +189,9 @@ export class MineManager {
     left.position.set(ex, 2.1, ez + 2.1)
     right.position.set(ex, 2.1, ez - 2.1)
 
-    // Top beam
     const top = new THREE.Mesh(beamGeo, woodMat)
     top.position.set(ex, 4.05, ez)
 
-    // Diagonal braces
     const braceGeo = new THREE.BoxGeometry(0.4, 3.0, 0.4)
     const b1 = new THREE.Mesh(braceGeo, darkWoodMat)
     const b2 = new THREE.Mesh(braceGeo, darkWoodMat)
@@ -189,7 +200,6 @@ export class MineManager {
     b1.rotation.z = Math.PI / 4
     b2.rotation.z = -Math.PI / 4
 
-    // Planks above opening (detail)
     const plankGeo = new THREE.BoxGeometry(4.6, 0.18, 0.5)
     for (let i = 0; i < 3; i++) {
       const p = new THREE.Mesh(plankGeo, darkWoodMat)
@@ -198,11 +208,11 @@ export class MineManager {
       g.add(p)
     }
 
-    // Rock cut (mouth shadow) pushed into the mountain slightly
+    // dark mouth block (visual shadow), placed behind the frame
     const holeGeo = new THREE.BoxGeometry(3.8, 3.3, 4.7)
     const holeMat = new THREE.MeshStandardMaterial({ color: 0x07070a, roughness: 1.0 })
     const hole = new THREE.Mesh(holeGeo, holeMat)
-    hole.position.set(ex + 1.35, 1.75, ez)
+    hole.position.set(ex + 1.55, 1.75, ez)
 
     g.add(left)
     g.add(right)
@@ -214,46 +224,6 @@ export class MineManager {
     return g
   }
 
-  _makeTunnel() {
-    // Curve with 2 noticeable bends.
-    const p0 = new THREE.Vector3(this.entrance.x + 0.9, 1.8, this.entrance.z)
-    const p1 = new THREE.Vector3(this.entrance.x + 6.2, 1.9, this.entrance.z + 1.2)
-    const p2 = new THREE.Vector3(this.entrance.x + 12.2, 2.0, this.entrance.z + 6.4)
-    const p3 = new THREE.Vector3(this.entrance.x + 18.8, 2.1, this.entrance.z + 2.8)
-    const p4 = new THREE.Vector3(this.entrance.x + 24.4, 2.15, this.entrance.z - 2.1)
-
-    const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3, p4])
-    curve.curveType = 'catmullrom'
-    curve.tension = 0.35
-
-    const tubularSegments = 70
-    const radialSegments = 10
-    const geo = new THREE.TubeGeometry(curve, tubularSegments, this._tunnelRadius, radialSegments, false)
-
-    // Slight vertex noise to break perfect tube (keep cheap)
-    const pos = geo.attributes.position
-    const v = new THREE.Vector3()
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i)
-      const n = Math.sin(v.x * 0.9 + v.z * 1.1) * 0.12 + Math.sin(v.x * 2.1 - v.z * 1.7) * 0.06
-      v.y += n
-      pos.setXYZ(i, v.x, v.y, v.z)
-    }
-    geo.computeVertexNormals()
-
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x131318,
-      roughness: 1.0,
-      metalness: 0.0,
-      side: THREE.BackSide,
-    })
-
-    const tunnel = new THREE.Mesh(geo, mat)
-    tunnel.name = 'MineTunnel'
-
-    return { tunnelMesh: tunnel, curve }
-  }
-
   _makeMouthGround() {
     const g = new THREE.Group()
 
@@ -263,16 +233,11 @@ export class MineManager {
     dirt.rotation.x = -Math.PI / 2
     dirt.position.set(this.entrance.x + 1.4, 0.012, this.entrance.z)
 
-    // A few stones at the mouth
     const stoneGeo = new THREE.DodecahedronGeometry(0.35, 0)
     const stoneMat = new THREE.MeshStandardMaterial({ color: 0x2b2b33, roughness: 1.0 })
     for (let i = 0; i < 7; i++) {
       const s = new THREE.Mesh(stoneGeo, stoneMat)
-      s.position.set(
-        this.entrance.x + 0.6 + Math.random() * 4.0,
-        0.18,
-        this.entrance.z + (Math.random() - 0.5) * 5.4
-      )
+      s.position.set(this.entrance.x + 0.6 + Math.random() * 4.0, 0.18, this.entrance.z + (Math.random() - 0.5) * 5.4)
       s.scale.setScalar(0.7 + Math.random() * 1.2)
       s.rotation.set(Math.random(), Math.random(), Math.random())
       g.add(s)
@@ -282,79 +247,55 @@ export class MineManager {
     return g
   }
 
-  _makeSupportsAndLamps(curve) {
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e1d, roughness: 1.0 })
-    const postGeo = new THREE.BoxGeometry(0.35, 3.2, 0.35)
-    const beamGeo = new THREE.BoxGeometry(this._tunnelRadius * 2.0 - 0.4, 0.32, 0.32)
-
-    const lampGeo = new THREE.SphereGeometry(0.12, 8, 6)
-    const lampMat = new THREE.MeshStandardMaterial({
-      color: 0xffd79a,
-      emissive: 0xffa34a,
-      emissiveIntensity: 1.2,
-      roughness: 0.4,
-    })
-
-    // repeat every ~4.5m
-    const steps = 6
-    for (let i = 0; i < steps; i++) {
-      const t = 0.18 + (i / (steps - 1)) * 0.76
-      const p = curve.getPoint(t)
-      const tan = curve.getTangent(t)
-      const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize()
-
-      const frame = new THREE.Group()
-      frame.position.set(p.x, 0, p.z)
-
-      const left = new THREE.Mesh(postGeo, woodMat)
-      const right = new THREE.Mesh(postGeo, woodMat)
-      left.position.set(n.x * (this._tunnelRadius - 0.55), 1.6, n.z * (this._tunnelRadius - 0.55))
-      right.position.set(n.x * -(this._tunnelRadius - 0.55), 1.6, n.z * -(this._tunnelRadius - 0.55))
-
-      const top = new THREE.Mesh(beamGeo, woodMat)
-      top.position.set(0, 3.05, 0)
-      top.rotation.y = Math.atan2(tan.x, tan.z)
-
-      frame.add(left)
-      frame.add(right)
-      frame.add(top)
-      this._group.add(frame)
-
-      // Lamp on one side
-      const lamp = new THREE.Mesh(lampGeo, lampMat)
-      lamp.position.set(p.x + n.x * 1.1, 2.45, p.z + n.z * 1.1)
-      this._group.add(lamp)
-
-      const light = new THREE.PointLight(0xffb06a, 0.95, 16, 1.6)
-      light.position.set(lamp.position.x, lamp.position.y, lamp.position.z)
-      this._lights.add(light)
-    }
-
-    // A deeper fill light to avoid harsh dark at the end
-    const end = curve.getPoint(0.98)
-    const fill = new THREE.PointLight(0xffb88a, 0.55, 18, 1.4)
-    fill.position.set(end.x, 2.6, end.z)
-    this._lights.add(fill)
-  }
-
   _makeTrail() {
-    // Path from the forest edge to the mine entrance, curving around the mountain.
+    // Path from the forest edge to the mine entrance.
+    // Anti-intersection rule: any point inside the mountain safe radius is pushed outward.
     const start = new THREE.Vector3(28, 0, -6)
     const mid1 = new THREE.Vector3(40, 0, -10)
-    const mid2 = new THREE.Vector3(46, 0, -28)
-    const mid3 = new THREE.Vector3(50, 0, -24)
+    const mid2 = new THREE.Vector3(44, 0, -30)
+    const mid3 = new THREE.Vector3(52, 0, -26)
     const end = new THREE.Vector3(this.entrance.x - 0.4, 0, this.entrance.z)
 
-    const curve = new THREE.CatmullRomCurve3([start, mid1, mid2, mid3, end])
-    curve.tension = 0.45
+    const raw = [start, mid1, mid2, mid3, end]
+    const safeR = 14.8
 
-    const samples = 64
+    const adjusted = raw.map((p) => {
+      const v = p.clone()
+      const dx = v.x - this.center.x
+      const dz = v.z - this.center.z
+      const d = Math.sqrt(dx * dx + dz * dz)
+      if (d < safeR) {
+        const k = (safeR + 1.2) / Math.max(0.0001, d)
+        v.x = this.center.x + dx * k
+        v.z = this.center.z + dz * k
+      }
+      return v
+    })
+
+    const curve = new THREE.CatmullRomCurve3(adjusted)
+    curve.tension = 0.48
+
+    const samples = 68
     const width = 4.2
 
     const pts = []
-    for (let i = 0; i <= samples; i++) pts.push(curve.getPoint(i / samples))
+    for (let i = 0; i <= samples; i++) {
+      const p = curve.getPoint(i / samples)
 
-    // Build a simple strip (2 verts per point).
+      // second pass: ensure no sample point enters the mountain
+      const dx = p.x - this.center.x
+      const dz = p.z - this.center.z
+      const d = Math.sqrt(dx * dx + dz * dz)
+      if (d < safeR) {
+        const k = (safeR + 0.9) / Math.max(0.0001, d)
+        p.x = this.center.x + dx * k
+        p.z = this.center.z + dz * k
+      }
+
+      pts.push(p)
+    }
+
+    // Build a strip (2 verts per point).
     const verts = []
     const uvs = []
     const indices = []
@@ -370,20 +311,18 @@ export class MineManager {
       dir.normalize()
 
       const n = new THREE.Vector3(-dir.z, 0, dir.x)
-
       const edge = width * 0.5
       const y = 0.011
 
       const l = p.clone().addScaledVector(n, edge)
       const r = p.clone().addScaledVector(n, -edge)
 
-      // soften edges by lowering slightly
       verts.push(l.x, y, l.z)
       verts.push(r.x, y, r.z)
 
-      const v = i / (pts.length - 1)
-      uvs.push(0, v)
-      uvs.push(1, v)
+      const vv = i / (pts.length - 1)
+      uvs.push(0, vv)
+      uvs.push(1, vv)
 
       if (i < pts.length - 1) {
         const a = i * 2
@@ -411,16 +350,10 @@ export class MineManager {
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 
-    const mat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 1.0,
-      metalness: 0.0,
-    })
-
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0, metalness: 0.0 })
     const mesh = new THREE.Mesh(geo, mat)
     mesh.name = 'MudTrail'
 
-    // Feather edges visually by adding a slightly wider, transparent overlay
     const geo2 = geo.clone()
     const mat2 = new THREE.MeshStandardMaterial({ color: 0x2b1c12, roughness: 1.0, transparent: true, opacity: 0.22 })
     const overlay = new THREE.Mesh(geo2, mat2)
@@ -433,22 +366,144 @@ export class MineManager {
     return g
   }
 
-  _addMountainRingColliders({ ringR, cR, n, openingScale = 1.0 }) {
+  _buildWorldColliders() {
+    this._worldColliders = []
+
+    // Solid collision via multiple rings + interior "fill" points.
+    // The entrance opening is small and aligned to the entrance direction.
     const cx = this.center.x
     const cz = this.center.z
-
     const entranceDir = Math.atan2(this.entrance.z - cz, this.entrance.x - cx)
-    const openHalf = 0.52 * openingScale
 
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2
-      const da = Math.abs(this._wrapAngle(a - entranceDir))
-      if (da < openHalf) continue
-      this._colliders.push({ x: cx + Math.cos(a) * ringR, z: cz + Math.sin(a) * ringR, r: cR })
+    const addRing = (ringR, cR, n, openHalf) => {
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2
+        const da = Math.abs(this._wrapAngle(a - entranceDir))
+        if (da < openHalf) continue
+        this._worldColliders.push({ x: cx + Math.cos(a) * ringR, z: cz + Math.sin(a) * ringR, r: cR })
+      }
+    }
+
+    addRing(15.2, 2.35, 30, 0.55)
+    addRing(12.2, 2.25, 26, 0.48)
+    addRing(9.4, 2.05, 22, 0.40)
+
+    // Fill (prevent any gap between rings)
+    const fill = [
+      { x: cx + 5.0, z: cz + 5.0 },
+      { x: cx + 6.5, z: cz - 4.0 },
+      { x: cx - 4.5, z: cz + 6.0 },
+      { x: cx - 5.5, z: cz - 5.5 },
+      { x: cx + 0.0, z: cz + 7.0 },
+      { x: cx + 0.0, z: cz - 7.0 },
+    ]
+    for (const p of fill) this._worldColliders.push({ x: p.x, z: p.z, r: 2.25 })
+
+    // Timber posts block sides.
+    this._worldColliders.push({ x: this.entrance.x + 0.4, z: this.entrance.z + 2.0, r: 0.55 })
+    this._worldColliders.push({ x: this.entrance.x + 0.4, z: this.entrance.z - 2.0, r: 0.55 })
+
+    // A short "mouth" corridor outside (helps guide into portal)
+    for (let k = 0; k < 5; k++) {
+      this._worldColliders.push({ x: this.entrance.x + 1.2 + k * 0.9, z: this.entrance.z + 3.0, r: 0.75 })
+      this._worldColliders.push({ x: this.entrance.x + 1.2 + k * 0.9, z: this.entrance.z - 3.0, r: 0.75 })
     }
   }
 
-  _addTunnelWallColliders(curve) {
+  // ----------------- Interior (mine) -----------------
+
+  _makeTunnel() {
+    // Curve with 2 noticeable bends, placed at mineOrigin.
+    const o = this.mineOrigin
+
+    const p0 = new THREE.Vector3(o.x + 1.0, 1.8, o.z)
+    const p1 = new THREE.Vector3(o.x + 6.0, 1.9, o.z + 1.2)
+    const p2 = new THREE.Vector3(o.x + 12.0, 2.0, o.z + 6.6)
+    const p3 = new THREE.Vector3(o.x + 18.7, 2.1, o.z + 3.0)
+    const p4 = new THREE.Vector3(o.x + 24.2, 2.15, o.z - 2.2)
+
+    const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3, p4])
+    curve.curveType = 'catmullrom'
+    curve.tension = 0.35
+
+    const tubularSegments = 70
+    const radialSegments = 10
+    const geo = new THREE.TubeGeometry(curve, tubularSegments, this._tunnelRadius, radialSegments, false)
+
+    // Slight vertex noise to break perfect tube
+    const pos = geo.attributes.position
+    const v = new THREE.Vector3()
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i)
+      const n = Math.sin(v.x * 0.9 + v.z * 1.1) * 0.12 + Math.sin(v.x * 2.1 - v.z * 1.7) * 0.06
+      v.y += n
+      pos.setXYZ(i, v.x, v.y, v.z)
+    }
+    geo.computeVertexNormals()
+
+    const mat = new THREE.MeshStandardMaterial({ color: 0x131318, roughness: 1.0, metalness: 0.0, side: THREE.BackSide })
+    const tunnel = new THREE.Mesh(geo, mat)
+    tunnel.name = 'MineTunnel'
+
+    return { tunnelMesh: tunnel, curve }
+  }
+
+  _makeSupportsAndLamps(curve) {
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e1d, roughness: 1.0 })
+    const postGeo = new THREE.BoxGeometry(0.35, 3.2, 0.35)
+    const beamGeo = new THREE.BoxGeometry(this._tunnelRadius * 2.0 - 0.4, 0.32, 0.32)
+
+    const lampGeo = new THREE.SphereGeometry(0.12, 8, 6)
+    const lampMat = new THREE.MeshStandardMaterial({
+      color: 0xffd79a,
+      emissive: 0xffa34a,
+      emissiveIntensity: 1.2,
+      roughness: 0.4,
+    })
+
+    const steps = 6
+    for (let i = 0; i < steps; i++) {
+      const t = 0.18 + (i / (steps - 1)) * 0.76
+      const p = curve.getPoint(t)
+      const tan = curve.getTangent(t)
+      const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize()
+
+      const frame = new THREE.Group()
+      frame.position.set(p.x, 0, p.z)
+
+      const left = new THREE.Mesh(postGeo, woodMat)
+      const right = new THREE.Mesh(postGeo, woodMat)
+      left.position.set(n.x * (this._tunnelRadius - 0.55), 1.6, n.z * (this._tunnelRadius - 0.55))
+      right.position.set(n.x * -(this._tunnelRadius - 0.55), 1.6, n.z * -(this._tunnelRadius - 0.55))
+
+      const top = new THREE.Mesh(beamGeo, woodMat)
+      top.position.set(0, 3.05, 0)
+      top.rotation.y = Math.atan2(tan.x, tan.z)
+
+      frame.add(left)
+      frame.add(right)
+      frame.add(top)
+      this._mineGroup.add(frame)
+
+      const lamp = new THREE.Mesh(lampGeo, lampMat)
+      lamp.position.set(p.x + n.x * 1.1, 2.45, p.z + n.z * 1.1)
+      this._mineGroup.add(lamp)
+
+      const light = new THREE.PointLight(0xffb06a, 0.95, 16, 1.6)
+      light.position.set(lamp.position.x, lamp.position.y, lamp.position.z)
+      this._lights.add(light)
+    }
+
+    const end = curve.getPoint(0.98)
+    const fill = new THREE.PointLight(0xffb88a, 0.55, 18, 1.4)
+    fill.position.set(end.x, 2.6, end.z)
+    this._lights.add(fill)
+  }
+
+  _buildMineColliders(curve) {
+    this._mineColliders = []
+
+    // Curved tunnel walls
     const samples = 18
     const wallR = 0.85
     for (let i = 0; i <= samples; i++) {
@@ -458,13 +513,17 @@ export class MineManager {
       const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize()
 
       const off = this._tunnelRadius - 0.35
-      this._colliders.push({ x: p.x + n.x * off, z: p.z + n.z * off, r: wallR })
-      this._colliders.push({ x: p.x - n.x * off, z: p.z - n.z * off, r: wallR })
+      this._mineColliders.push({ x: p.x + n.x * off, z: p.z + n.z * off, r: wallR })
+      this._mineColliders.push({ x: p.x - n.x * off, z: p.z - n.z * off, r: wallR })
     }
 
     // End cap
     const end = curve.getPoint(1)
-    this._colliders.push({ x: end.x, z: end.z, r: 2.0 })
+    this._mineColliders.push({ x: end.x, z: end.z, r: 2.0 })
+
+    // Entry "posts" inside mine (avoid clipping near portal)
+    this._mineColliders.push({ x: this.mineOrigin.x + 1.0, z: this.mineOrigin.z + 2.4, r: 0.8 })
+    this._mineColliders.push({ x: this.mineOrigin.x + 1.0, z: this.mineOrigin.z - 2.4, r: 0.8 })
   }
 
   _wrapAngle(a) {

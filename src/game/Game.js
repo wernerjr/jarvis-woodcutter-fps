@@ -55,6 +55,10 @@ export class Game {
     this.fires = new CampfireManager({ scene: this.scene })
     this.mine = new MineManager({ scene: this.scene })
     this.ores = new OreManager({ scene: this.scene })
+
+    this._inMine = false
+    this._fadeEl = null
+    this._fade = { active: false, t: 0, dur: 0.22, phase: 'in' }
     this.sfx = new Sfx()
 
     this.pickaxeDamage = 10
@@ -130,6 +134,8 @@ export class Game {
 
     this.mine.init()
     this.ores.init({ points: this.mine.getOreSpawnPoints() })
+
+    this._ensureFadeOverlay()
 
     // Swing impacts trigger hit detection in a narrow window.
     this.player.onImpact(() => {
@@ -662,6 +668,81 @@ export class Game {
     this._attemptRelock()
   }
 
+  _ensureFadeOverlay() {
+    if (this._fadeEl) return
+    const el = document.createElement('div')
+    el.id = 'mineFade'
+    el.style.position = 'fixed'
+    el.style.left = '0'
+    el.style.top = '0'
+    el.style.right = '0'
+    el.style.bottom = '0'
+    el.style.background = '#000'
+    el.style.opacity = '0'
+    el.style.pointerEvents = 'none'
+    el.style.transition = 'opacity 120ms linear'
+    el.style.zIndex = '9999'
+    document.body.appendChild(el)
+    this._fadeEl = el
+  }
+
+  _startFadeTeleport(toMine) {
+    if (this._fade.active) return
+    this._fade.active = true
+    this._fade.t = 0
+    this._fade.phase = 'out'
+    this._fade.toMine = !!toMine
+
+    if (this._fadeEl) this._fadeEl.style.opacity = '1'
+  }
+
+  _updateMinePortal(dt) {
+    // Update fade state if active
+    if (this._fade.active) {
+      this._fade.t += dt
+
+      if (this._fade.phase === 'out' && this._fade.t >= this._fade.dur) {
+        // Teleport at full black
+        this._fade.phase = 'in'
+        this._fade.t = 0
+
+        if (this._fade.toMine) {
+          this._inMine = true
+          this.player.position.copy(this.mine.spawnMine)
+          this.player.velocity.set(0, 0, 0)
+        } else {
+          this._inMine = false
+          this.player.position.copy(this.mine.spawnWorld)
+          this.player.velocity.set(0, 0, 0)
+        }
+      }
+
+      if (this._fade.phase === 'in' && this._fade.t >= this._fade.dur) {
+        this._fade.active = false
+        this._fade.t = 0
+        if (this._fadeEl) this._fadeEl.style.opacity = '0'
+      }
+
+      return
+    }
+
+    // Only trigger when not already fading.
+    const p = this.player.position
+    if (!this._inMine) {
+      const dx = p.x - this.mine.portalEnter.x
+      const dz = p.z - this.mine.portalEnter.z
+      if (dx * dx + dz * dz <= this.mine.portalEnter.r * this.mine.portalEnter.r) {
+        this._startFadeTeleport(true)
+      }
+    } else {
+      const dx = p.x - this.mine.portalExit.x
+      const dz = p.z - this.mine.portalExit.z
+      if (dx * dx + dz * dz <= this.mine.portalExit.r * this.mine.portalExit.r) {
+        this._startFadeTeleport(false)
+      }
+    }
+  }
+
   _getHotbarItemDef(id) {
     if (id === 'hand') return { icon: '✋', stackable: false }
     return ITEMS[id]
@@ -922,7 +1003,9 @@ export class Game {
       this._updateCampfireGhost()
     }
 
-    const colliders = this.state === 'playing' ? this.trees.getTrunkColliders().concat(this.mine.getColliders()) : []
+    const colliders = this.state === 'playing'
+      ? this.trees.getTrunkColliders().concat(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
+      : []
 
     this.player.update(simDt, colliders)
 
@@ -1000,6 +1083,9 @@ export class Game {
 
     // Time freezes when not playing (we pass simDt).
     this.time.update(simDt)
+
+    // Portal transitions (outside -> mine, mine -> outside)
+    if (simDt > 0 && this.state === 'playing') this._updateMinePortal(simDt)
 
     this.world.update(simDt, { camera: this.camera, player: this.player, time: this.time })
     this.trees.update(simDt)
