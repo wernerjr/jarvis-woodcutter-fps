@@ -109,6 +109,7 @@ export class MineManager {
     this._curves = curves
     for (const m of tunnelMeshes) this._mineGroup.add(m)
     this._makeSupportsAndLamps(curves)
+    this._mineGroup.add(this._makeBranchOpenings(curves))
     this._mineGroup.add(this._makeEntranceBackdrop())
     this._mineGroup.add(this._makeMineEndCap(curves[0]))
     this._mineGroup.add(this._makeMineEndRubble(curves[0]))
@@ -720,35 +721,11 @@ export class MineManager {
       return tunnel
     }
 
-    const makeJunctionSleeve = (curve, name) => {
-      // Visual-only sleeve to hide texture seams at the branch mouth.
-      // Keep it short and away from the main corridor so it doesn't "close" the branch entrance.
-      const t = 0.18
-      const p = curve.getPoint(t)
-      const tan = curve.getTangent(t).normalize()
-
-      const len = 0.75
-      const r = this._tunnelRadius * 0.78
-      const geo = new THREE.CylinderGeometry(r, r, len, 4, 1, true)
-      // Align the 4 sides with the tunnel ring orientation BEFORE aligning to tangent.
-      geo.rotateY(this._tunnelRingAngle)
-      // Align cylinder Y axis to tangent.
-      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan)
-      geo.applyQuaternion(q)
-
-      const sleeve = new THREE.Mesh(geo, mat)
-      sleeve.name = name
-      sleeve.position.set(p.x, p.y, p.z)
-      return sleeve
-    }
-
     return {
       tunnelMeshes: [
         makeTube(main, 'MineTunnelMain'),
         // Taper the branch start so it doesn't create a "lombada"/bump inside the main corridor.
         makeTube(a, 'MineTunnelBranchA', { taperStart: 0.30, taperMin: 0.10 }),
-        // Sleeve hides the visual seam/texture break at the branch mouth.
-        makeJunctionSleeve(a, 'MineTunnelBranchSleeve'),
       ],
       curves,
     }
@@ -917,6 +894,85 @@ export class MineManager {
     // Entry "posts" inside mine (avoid clipping near portal)
     this._mineColliders.push({ x: this.mineOrigin.x + 1.0, z: this.mineOrigin.z + 2.4, r: 0.8 })
     this._mineColliders.push({ x: this.mineOrigin.x + 1.0, z: this.mineOrigin.z - 2.4, r: 0.8 })
+  }
+
+  /** @param {THREE.CatmullRomCurve3[]} curves */
+  _makeBranchOpenings(curves) {
+    // Simple readable junction: carve a rectangular "opening" on the branch side,
+    // and on the opposite wall remove the texture by covering with a dark patch.
+    const g = new THREE.Group()
+    g.name = 'MineBranchOpenings'
+
+    if (!curves || curves.length < 2) return g
+
+    const main = curves[0]
+    const branch = curves[1]
+
+    const b0 = branch.getPoint(0)
+    let bestT = 0.38
+    let bestD2 = Infinity
+    const samples = 90
+    for (let i = 0; i <= samples; i++) {
+      const t = i / samples
+      const p = main.getPoint(t)
+      const dx = p.x - b0.x
+      const dz = p.z - b0.z
+      const d2 = dx * dx + dz * dz
+      if (d2 < bestD2) {
+        bestD2 = d2
+        bestT = t
+      }
+    }
+
+    const pJ = main.getPoint(bestT)
+    const tan = main.getTangent(bestT).normalize()
+    const side = this._getTunnelSideVec(tan) // aligned with rectangular rings
+
+    // Determine which side the branch is on.
+    const bTan = branch.getTangent(0).normalize()
+    const sgn = Math.sign(bTan.dot(side)) || 1
+
+    // Rect opening dimensions (portal-like readability).
+    const w = 4.6
+    const h = 4.0
+
+    const patchMat = new THREE.MeshStandardMaterial({
+      color: 0x07070b,
+      roughness: 1.0,
+      metalness: 0.0,
+      emissive: 0x050509,
+      emissiveIntensity: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+
+    const mkPatch = (sideSign) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), patchMat)
+
+      // Place on the wall, slightly towards the tunnel center to avoid z-fighting.
+      const wallOff = this._tunnelRadius * 0.88
+      const inward = new THREE.Vector3().copy(side).multiplyScalar(-sideSign)
+
+      m.position.set(
+        pJ.x + side.x * wallOff * sideSign + inward.x * 0.10,
+        // Center vertically near eye-height band.
+        (pJ.y - this._tunnelRadius + 0.15) + 1.65,
+        pJ.z + side.z * wallOff * sideSign + inward.z * 0.10
+      )
+
+      // Face towards tunnel center.
+      const target = new THREE.Vector3(m.position.x + inward.x, m.position.y, m.position.z + inward.z)
+      m.lookAt(target)
+
+      return m
+    }
+
+    // Branch side: "opening" (dark rectangle)
+    g.add(mkPatch(sgn))
+    // Opposite wall: remove texture (dark rectangle)
+    g.add(mkPatch(-sgn))
+
+    return g
   }
 
   _makeEntranceBackdrop() {
