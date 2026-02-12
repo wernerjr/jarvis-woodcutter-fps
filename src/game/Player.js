@@ -17,7 +17,8 @@ export class Player {
     this.camera.position.set(0, 0, 0)
 
     this.eyeHeight = 1.65
-    this.position = new THREE.Vector3(0, this.eyeHeight, 6)
+    this.groundY = 0
+    this.position = new THREE.Vector3(0, this.groundY + this.eyeHeight, 6)
     this.velocity = new THREE.Vector3()
 
     this.gravity = -18
@@ -151,7 +152,8 @@ export class Player {
   }
 
   reset() {
-    this.position.set(0, this.eyeHeight, 6)
+    this.groundY = 0
+    this.position.set(0, this.groundY + this.eyeHeight, 6)
     this.velocity.set(0, 0, 0)
     this._vy = 0
     this._onGround = true
@@ -176,8 +178,10 @@ export class Player {
   /**
    * @param {number} dt
    * @param {{x:number,z:number,r:number}[]} colliders
+   * @param {number} [groundY]
    */
-  update(dt, colliders = []) {
+  update(dt, colliders = [], groundY = this.groundY) {
+    this.groundY = groundY
     // Correct FPS convention: W forward, S backward.
     // (Three.js camera faces -Z; we map forward to -Z.)
     const forward = Number(this._keys.has('KeyS')) - Number(this._keys.has('KeyW'))
@@ -209,8 +213,9 @@ export class Player {
     this._vy += this.gravity * dt
     next.y = this.position.y + this._vy * dt
 
-    if (next.y <= this.eyeHeight) {
-      next.y = this.eyeHeight
+    const minY = this.groundY + this.eyeHeight
+    if (next.y <= minY) {
+      next.y = minY
       this._vy = 0
       this._onGround = true
     } else {

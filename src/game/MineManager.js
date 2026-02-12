@@ -55,6 +55,7 @@ export class MineManager {
     this.portalExit = { x: this.mineOrigin.x + 1.4, z: this.mineOrigin.z, r: 1.35 }
 
     // Teleport targets
+    // spawnMine is updated in init() after tunnels are built (depends on floor height).
     this.spawnMine = new THREE.Vector3(this.mineOrigin.x + 2.2, 1.65, this.mineOrigin.z)
     this.spawnWorld = new THREE.Vector3(this.entrance.x - 2.6, 1.65, this.entrance.z)
 
@@ -123,7 +124,12 @@ export class MineManager {
     // Portal triggers updated (in case entrance moved)
     this.portalEnter = { x: this.entrance.x - 0.6, z: this.entrance.z, r: 1.35 }
     this.portalExit = { x: this.mineOrigin.x + 1.4, z: this.mineOrigin.z, r: 1.35 }
-    this.spawnMine = new THREE.Vector3(this.mineOrigin.x + 2.2, 1.65, this.mineOrigin.z)
+
+    // Spawn inside the mine should respect the tunnel floor height.
+    const spawnMineXZ = { x: this.mineOrigin.x + 2.2, z: this.mineOrigin.z }
+    const floorY = this.getFloorYAt(spawnMineXZ.x, spawnMineXZ.z)
+    this.spawnMine = new THREE.Vector3(spawnMineXZ.x, floorY + 1.65, spawnMineXZ.z)
+
     this.spawnWorld = new THREE.Vector3(this.entrance.x - 2.6, 1.65, this.entrance.z)
   }
 
@@ -135,6 +141,42 @@ export class MineManager {
   /** @returns {{x:number,z:number,r:number}[]} */
   getMineColliders() {
     return this._mineColliders
+  }
+
+  /**
+   * Approx mine floor height at a given XZ (used for player grounding in descending tunnels).
+   * @param {number} x
+   * @param {number} z
+   */
+  getFloorYAt(x, z) {
+    const curves = this._curves
+    if (!curves || !curves.length) return 0
+
+    let best = null
+    let bestD2 = Infinity
+
+    const tmp = new THREE.Vector3()
+    for (const c of curves) {
+      const samples = 60
+      for (let i = 0; i <= samples; i++) {
+        const t = i / samples
+        const p = c.getPoint(t)
+        const dx = p.x - x
+        const dz = p.z - z
+        const d2 = dx * dx + dz * dz
+        if (d2 < bestD2) {
+          bestD2 = d2
+          best = p
+          tmp.copy(p)
+        }
+      }
+    }
+
+    if (!best) return 0
+
+    // Curve is centerline; floor is near bottom of tube.
+    const floor = best.y - this._tunnelRadius + 0.15
+    return floor
   }
 
   getOreSpawnPoints() {
