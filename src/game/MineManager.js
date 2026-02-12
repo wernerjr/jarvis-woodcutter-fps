@@ -654,17 +654,26 @@ export class MineManager {
       color: 0x131318,
       roughness: 1.0,
       metalness: 0.0,
-      side: THREE.BackSide,
+      side: THREE.DoubleSide,
     })
 
-    // Use simple rectangular corridor volumes (no tube twist). Build it in segments so it follows curves.
+    // Use simple rectangular corridor surfaces (no end-caps), segmented to follow curves.
+    // This avoids the "walls in the middle" caused by overlapping BoxGeometry end faces.
     const makeBoxTunnel = (curve, name, w = 4.6, h = 4.0) => {
       const g = new THREE.Group()
       g.name = name
 
+      const halfW = w * 0.5
+      const halfH = h * 0.5
+
       // Segment length tuned for smooth curves without gaps.
-      const segs = 14
-      const overlap = 0.35
+      const segs = 18
+
+      const up = new THREE.Vector3(0, 1, 0)
+      const center = new THREE.Vector3()
+      const dir = new THREE.Vector3()
+      const right = new THREE.Vector3()
+      const q = new THREE.Quaternion()
 
       for (let i = 0; i < segs; i++) {
         const t0 = i / segs
@@ -673,25 +682,46 @@ export class MineManager {
         const p0 = curve.getPoint(t0)
         const p1 = curve.getPoint(t1)
 
-        const dir = new THREE.Vector3().subVectors(p1, p0)
+        dir.subVectors(p1, p0)
         const len = dir.length()
         if (len < 0.001) continue
         dir.normalize()
 
-        const segLen = len + overlap
-        const geo = new THREE.BoxGeometry(w, h, segLen, 1, 1, 1)
-        const m = new THREE.Mesh(geo, mat)
+        center.set((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5, (p0.z + p1.z) * 0.5)
 
-        // Align box local +Z to segment direction.
-        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir)
-        m.quaternion.copy(q)
+        right.crossVectors(up, dir)
+        if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
+        right.normalize()
 
-        // Center at mid-point of the segment.
-        // IMPORTANT: curve points represent corridor centerline; BoxGeometry is centered at mesh position.
-        // So Y must be the centerline Y (no +h/2), otherwise the tunnel floats above the floor logic.
-        m.position.set((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5, (p0.z + p1.z) * 0.5)
+        // Build an orientation where local Z = dir and local X = right.
+        const basisZ = dir.clone()
+        const basisX = right.clone()
+        const basisY = new THREE.Vector3().crossVectors(basisZ, basisX).normalize()
+        const m4 = new THREE.Matrix4().makeBasis(basisX, basisY, basisZ)
+        q.setFromRotationMatrix(m4)
 
-        g.add(m)
+        // Walls (planes), no end caps.
+        const wallGeo = new THREE.PlaneGeometry(len, h)
+        const floorGeo = new THREE.PlaneGeometry(w, len)
+
+        const mk = (geo, posLocal, rotX = 0) => {
+          const m = new THREE.Mesh(geo, mat)
+          m.position.copy(center)
+          m.quaternion.copy(q)
+          if (rotX) m.rotateX(rotX)
+          m.position.addScaledVector(basisX, posLocal.x)
+          m.position.addScaledVector(basisY, posLocal.y)
+          m.position.addScaledVector(basisZ, posLocal.z)
+          return m
+        }
+
+        // Left/right walls (local X offsets)
+        g.add(mk(wallGeo, { x: +halfW, y: 0, z: 0 }))
+        g.add(mk(wallGeo, { x: -halfW, y: 0, z: 0 }, Math.PI))
+
+        // Floor/ceiling (rotate plane so its normal points inward)
+        g.add(mk(floorGeo, { x: 0, y: -halfH, z: 0 }, -Math.PI / 2))
+        g.add(mk(floorGeo, { x: 0, y: +halfH, z: 0 }, Math.PI / 2))
       }
 
       return g
