@@ -193,8 +193,8 @@ export class MineManager {
     // Align local +X (portal depth axis) towards the forest.
     const yaw = Math.atan2(toForest.z, toForest.x)
 
-    // Push portal slightly outward so wood aligns with the mountain face.
-    g.position.set(this.entrance.x + toForest.x * 0.28, 0, this.entrance.z + toForest.z * 0.28)
+    // Push portal outward (towards torches) so the wood sits clearly on the outer face.
+    g.position.set(this.entrance.x + toForest.x * 0.55, 0, this.entrance.z + toForest.z * 0.55)
     g.rotation.y = yaw
 
     // Carved dark opening (visual depth)
@@ -259,8 +259,9 @@ export class MineManager {
     const torchR = makeTorch()
 
     // Portal local coords: +X points outward (towards forest), so place torches slightly in front.
-    torchL.position.set(0.45, 0.0, 2.05)
-    torchR.position.set(0.45, 0.0, -2.05)
+    // Place torches halfway up the posts.
+    torchL.position.set(0.45, 1.25, 2.05)
+    torchR.position.set(0.45, 1.25, -2.05)
 
     g.add(left)
     g.add(right)
