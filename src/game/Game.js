@@ -1151,6 +1151,15 @@ export class Game {
     const f = this._activeForgeId ? this.forges.get(this._activeForgeId) : null
     if (!f) return
 
+    // Always allow turning OFF (even if resources were removed).
+    if (f.enabled) {
+      f.enabled = false
+      this.ui.toast('Forja desligada.', 900)
+      this._postMoveUpdate()
+      return
+    }
+
+    // Turning ON requires resources.
     const hasFuel = (f.fuel || []).some((s) => s && s.qty > 0)
     const hasOre = (f.input || []).some((s) => s && s.qty > 0)
 
@@ -1159,8 +1168,8 @@ export class Game {
       return
     }
 
-    f.enabled = !f.enabled
-    this.ui.toast(f.enabled ? 'Forja ligada.' : 'Forja desligada.', 900)
+    f.enabled = true
+    this.ui.toast('Forja ligada.', 900)
     this._postMoveUpdate()
   }
 

@@ -8,6 +8,8 @@
 - Saída: barras de ferro
 - Regras:
   - Precisa clicar em **Iniciar fundição** (estado `enabled`).
+  - **Desligar** é sempre permitido (mesmo se você remover minério/combustível depois).
+  - Ligar requer combustível + minério.
   - Processa enquanto houver combustível + minério + espaço.
   - UI atualiza em tempo real (status por tick + slots via flag `dirty`).
   - VFX: fogo e fumaça apenas quando processamento está ativo.
