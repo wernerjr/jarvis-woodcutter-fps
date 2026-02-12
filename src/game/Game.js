@@ -5,6 +5,7 @@ import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
 import { RockManager } from './RockManager.js'
 import { GrassManager } from './GrassManager.js'
+import { RiverManager } from './RiverManager.js'
 import { CampfireManager } from './CampfireManager.js'
 import { ForgeManager } from './ForgeManager.js'
 import { ForgeTableManager } from './ForgeTableManager.js'
@@ -42,6 +43,7 @@ export class Game {
     this.world = new World({ scene: this.scene })
     this.player = new Player({ camera: this.camera, domElement: canvas })
     this.grass = new GrassManager({ scene: this.scene })
+    this.river = new RiverManager({ scene: this.scene })
 
     // Torch lights (attached to camera): spot for ground/forward + point for local fill.
     this.torchPoint = new THREE.PointLight(0xffa24a, 0.0, 18, 1.2)
@@ -169,6 +171,7 @@ export class Game {
     this.ores.init({ points: this.mine.getOreSpawnPoints() })
 
     this.grass.init({ seed: 909, radius: 92 })
+    this.river.init({ radius: 96, width: 8, segments: 240 })
 
     this._ensureFadeOverlay()
 
@@ -1696,6 +1699,7 @@ export class Game {
           .concat(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
           .concat(this._inMine ? [] : this.forges.getColliders())
           .concat(this._inMine ? [] : this.forgeTables.getColliders())
+          .concat(this._inMine ? [] : this.river.getColliders())
       : []
 
     this.player.update(simDt, colliders)
@@ -1798,6 +1802,7 @@ export class Game {
     this.forges.update(forgeDt)
     this.ores.update(simDt)
     this.grass.update(simDt, this.player.position)
+    this.river.update(dt)
 
     // Live forge UI updates while forge UI is open.
     if (this.state === 'forge' && this._activeForgeId) {

@@ -63,6 +63,7 @@ docker compose up -d --build
 - [Inventário/hotbar](docs/systems-inventory.md)
 - [Forja & Mesa de Forja](docs/systems-forge.md)
 - [VFX de fogo (tocha/fogueira)](docs/vfx-fire.md)
+- [Limite do mapa (rio)](docs/environment-river.md)
 
 ## Para IAs / copilots
 Veja **AGENTS.md** (contratos internos, mapa de sistemas e exemplos de tarefas).
