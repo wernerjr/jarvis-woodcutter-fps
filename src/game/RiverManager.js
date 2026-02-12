@@ -67,7 +67,8 @@ export class RiverManager {
       const l = tmpN.clone().multiplyScalar(hw)
       const r = tmpN.clone().multiplyScalar(-hw)
 
-      const y = -0.03
+      // Slightly above ground to avoid z-fighting / being buried by terrain.
+      const y = 0.02
 
       // left
       let o = i * 2 * 3
@@ -105,13 +106,14 @@ export class RiverManager {
     geo.computeVertexNormals()
 
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x1b3b5a,
-      roughness: 0.35,
+      // Brighter water to read as a clear boundary.
+      color: 0x225d87,
+      roughness: 0.28,
       metalness: 0.0,
       transparent: true,
-      opacity: 0.88,
-      emissive: 0x0a1e2b,
-      emissiveIntensity: 0.55,
+      opacity: 0.92,
+      emissive: 0x0b2a3b,
+      emissiveIntensity: 0.75,
       side: THREE.DoubleSide,
     })
 

@@ -4,6 +4,7 @@ O perímetro do mapa é delimitado por um **rio** (visual) + **colisores** (barr
 
 ## Implementação
 - Visual + colisores: `src/game/RiverManager.js`
+  - Altura Y do rio: ~`0.02` (ligeiramente acima do chão para não ficar enterrado)
 - Integração:
   - `Game.start()` inicializa: `this.river.init({ radius, width, segments })`
   - `Game._loop()` adiciona `this.river.getColliders()` na lista de colisores quando fora da mina.
