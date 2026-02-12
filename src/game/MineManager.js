@@ -10,9 +10,10 @@ export class MineManager {
     this.center = new THREE.Vector3(58, 0, -18)
 
     // Rect mountain dimensions (must match _makeMountainMesh/_buildWorldColliders)
+    // Height is tuned so the player can climb it via jumping/slope.
     this._mountW = 30 // Z span
     this._mountD = 22 // X span (depth)
-    this._mountH = 16
+    this._mountH = 7.0
 
     // Entrance: centered on the face that looks towards the forest.
     // (Final values are computed in init() after we know face direction.)
@@ -89,8 +90,9 @@ export class MineManager {
       this.center.z + toForest.z * (halfD + 0.02)
     )
 
-    // --- Exterior: rectangular mountain + simple portal (no trail) ---
+    // --- Exterior: carved rectangle mound + simple portal (no trail) ---
     this._worldGroup.add(this._makeMountainMesh())
+    this._worldGroup.add(this._makeSideRocks())
     this._worldGroup.add(this._makeEntrance())
     this._worldGroup.add(this._makeMouthGround())
 
@@ -151,30 +153,87 @@ export class MineManager {
 
   // ----------------- Exterior (world) -----------------
 
-  _makeMountainMesh() {
-    // Rectangular mountain block: big face towards the forest (origin).
-    // Keep it simple and coherent with the portal.
+  /** @param {number} x @param {number} z @returns {number} ground height (y) */
+  getWorldHeight(x, z) {
+    // Heightfield matches the mound used in _makeMountainMesh().
     const w = this._mountW
     const d = this._mountD
-    const h = this._mountH
+    const H = this._mountH
 
-    const geo = new THREE.BoxGeometry(d, h, w, 1, 1, 1)
+    // Transform world -> mountain local (inverse yaw)
+    const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
+    if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
+    toForest.normalize()
+    const yaw = Math.atan2(-toForest.z, toForest.x)
+
+    const dx = x - this.center.x
+    const dz = z - this.center.z
+    const c = Math.cos(-yaw)
+    const s = Math.sin(-yaw)
+    const lx = dx * c - dz * s
+    const lz = dx * s + dz * c
+
+    const ux = Math.abs(lx) / d
+    const uz = Math.abs(lz) / w
+    if (ux >= 1 || uz >= 1) return 0
+
+    const p = 2.8
+    const q = 1.55
+    const k = Math.pow(ux, p) + Math.pow(uz, p)
+    const t = Math.max(0, 1 - k)
+    return H * Math.pow(t, q)
+  }
+
+  _makeMountainMesh() {
+    // Carved rectangle -> mountain-like mound (heightfield) with no clutter in front of the portal.
+    const w = this._mountW
+    const d = this._mountD
+    const H = this._mountH
+
+    const segX = 44
+    const segZ = 44
+    const geo = new THREE.PlaneGeometry(d * 2.0, w * 2.0, segX, segZ)
+    geo.rotateX(-Math.PI / 2)
+
+    const pos = geo.attributes.position
+    const v = new THREE.Vector3()
+
+    const p = 2.8 // superellipse power (squarer footprint)
+    const q = 1.55 // mound curve
+
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i)
+
+      const ux = Math.abs(v.x) / d
+      const uz = Math.abs(v.z) / w
+      if (ux >= 1 || uz >= 1) {
+        v.y = 0
+        pos.setXYZ(i, v.x, v.y, v.z)
+        continue
+      }
+
+      const k = Math.pow(ux, p) + Math.pow(uz, p)
+      const t = Math.max(0, 1 - k)
+      v.y = H * Math.pow(t, q)
+
+      pos.setXYZ(i, v.x, v.y, v.z)
+    }
+
+    geo.computeVertexNormals()
+
     const mat = new THREE.MeshStandardMaterial({
       color: 0x2a2b2a,
       roughness: 1.0,
       metalness: 0.0,
+      flatShading: true,
     })
 
     const m = new THREE.Mesh(geo, mat)
-    // Sit on ground (box centered): lift by h/2.
-    m.position.set(this.center.x, h * 0.5, this.center.z)
+    m.position.set(this.center.x, 0, this.center.z)
 
-    // Orient so the large face looks towards the forest.
     const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
     if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
     toForest.normalize()
-    // Align local +X (box depth axis) towards the forest.
-    // RotationY maps +X to (cos(yaw), -sin(yaw)) in XZ.
     m.rotation.y = Math.atan2(-toForest.z, toForest.x)
 
     m.name = 'Mountain'
@@ -269,6 +328,48 @@ export class MineManager {
     g.add(top)
     g.add(torchL)
     g.add(torchR)
+
+    return g
+  }
+
+  _makeSideRocks() {
+    // Add rock clusters on the sides (not in front of the portal).
+    const g = new THREE.Group()
+    g.name = 'MineSideRocks'
+
+    const rockGeo = new THREE.DodecahedronGeometry(0.9, 0)
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x232328, roughness: 1.0, flatShading: true })
+
+    const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
+    if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
+    toForest.normalize()
+    const right = new THREE.Vector3(-toForest.z, 0, toForest.x)
+
+    // Place rocks along side bands.
+    const sideCount = 18
+    for (let i = 0; i < sideCount; i++) {
+      const side = i % 2 === 0 ? 1 : -1
+      const along = -0.85 + Math.random() * 1.7
+
+      const lx = (this._mountD * 0.55) * along
+      const lz = side * (this._mountW * 0.92)
+
+      const wx = this.center.x + toForest.x * lx + right.x * lz
+      const wz = this.center.z + toForest.z * lx + right.z * lz
+
+      // Avoid clutter in front of the portal (opening zone)
+      const dx = wx - this.entrance.x
+      const dz = wz - this.entrance.z
+      if (Math.hypot(dx, dz) < 7.0) continue
+
+      const y = this.getWorldHeight(wx, wz)
+
+      const r = new THREE.Mesh(rockGeo, rockMat)
+      r.position.set(wx, y + 0.25, wz)
+      r.scale.setScalar(0.9 + Math.random() * 1.6)
+      r.rotation.set(Math.random(), Math.random(), Math.random())
+      g.add(r)
+    }
 
     return g
   }
