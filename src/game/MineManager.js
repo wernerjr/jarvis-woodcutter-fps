@@ -174,10 +174,12 @@ export class MineManager {
       const dxE = x - ex
       const dzE = z - ez
       const dE = Math.sqrt(dxE * dxE + dzE * dzE)
-      const carveR = 7.5
+      const carveR = 10.5
       const carve = dE < carveR ? (1 - dE / carveR) : 0
 
-      const height = h * (20.0 + 5.0 * noise + 2.8 * ridge) - carve * 5.5
+      // Carve more aggressively so the wall/portal reads as cutting into the mountain,
+      // while the mountain still continues above it.
+      const height = h * (20.0 + 5.0 * noise + 2.8 * ridge) - carve * 9.5
       v.y = Math.max(0, height)
 
       pos.setXYZ(i, v.x, v.y, v.z)
@@ -218,8 +220,9 @@ export class MineManager {
 
     // Rock wall (paredão) behind the portal, so it feels attached to the mountain.
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x242428, roughness: 1.0, metalness: 0.0 })
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(10.5, 9.0, 3.6), rockMat)
-    wall.position.set(1.6, 4.0, 0)
+    // Wall is slightly taller than the portal, and centered.
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(9.8, 6.2, 4.8), rockMat)
+    wall.position.set(1.2, 3.4, 0)
     g.add(wall)
 
     // Carved dark opening (just visual depth)
@@ -229,8 +232,8 @@ export class MineManager {
       emissive: 0x050509,
       emissiveIntensity: 0.35,
     })
-    const mouth = new THREE.Mesh(new THREE.BoxGeometry(4.2, 4.0, 2.4), mouthMat)
-    mouth.position.set(0.6, 2.0, 0)
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(4.2, 4.0, 2.6), mouthMat)
+    mouth.position.set(0.1, 2.05, 0)
     g.add(mouth)
 
     // 3 wood pieces portal
@@ -242,9 +245,9 @@ export class MineManager {
     const right = new THREE.Mesh(postGeo, woodMat)
     const top = new THREE.Mesh(beamGeo, woodMat)
 
-    left.position.set(-0.2, 2.3, 2.05)
-    right.position.set(-0.2, 2.3, -2.05)
-    top.position.set(-0.2, 4.65, 0)
+    left.position.set(0.0, 2.3, 2.05)
+    right.position.set(0.0, 2.3, -2.05)
+    top.position.set(0.0, 4.65, 0)
 
     g.add(left)
     g.add(right)
