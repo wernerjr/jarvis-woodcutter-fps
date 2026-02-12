@@ -94,8 +94,6 @@ export class GrassManager {
 
     // Areas to keep clear (paths/buildings/resources): list of circles.
     const clear = [
-      // river ring (keep waterbed clean)
-      { x: 0, z: 0, r: 94 },
       // spawn/start area
       { x: 0, z: 6, r: 9 },
       // around main forest center (keep sightlines)
