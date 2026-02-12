@@ -110,7 +110,6 @@ export class MineManager {
     this._curves = curves
     for (const m of tunnelMeshes) this._mineGroup.add(m)
     this._makeSupportsAndLamps(curves)
-    this._mineGroup.add(this._makeBranchOpenings(curves))
     this._mineGroup.add(this._makeEntranceBackdrop())
     this._mineGroup.add(this._makeMineEndCap(curves[0]))
     this._mineGroup.add(this._makeMineEndRubble(curves[0]))
@@ -206,7 +205,7 @@ export class MineManager {
     const addFromCurve = (c, baseCount, t0, t1) => {
       // Target height band: mid-mine (based on main curve), so veins stay in the player's view.
       const mainMid = curves[0]?.getPoint(0.52) ?? new THREE.Vector3(0, 0, 0)
-      const midFloorY = mainMid.y - this._tunnelRadius + 0.15
+      const midFloorY = mainMid.y - this._tunnelHalfH + 0.05
       const midY = midFloorY + 1.65 * 0.98
 
       for (let i = 0; i < baseCount; i++) {
@@ -234,9 +233,8 @@ export class MineManager {
       }
     }
 
-    // Main path + branch pocket.
-    addFromCurve(curves[0], 12, 0.14, 0.92)
-    if (curves[1]) addFromCurve(curves[1], 8, 0.24, 0.9)
+    // Main path only (branch removed).
+    addFromCurve(curves[0], 15, 0.12, 0.94)
 
     return pts
   }
@@ -618,7 +616,7 @@ export class MineManager {
   // ----------------- Interior (mine) -----------------
 
   _makeTunnels() {
-    // Rebuilt mine: one main path (smooth slight descent) + one short branch pocket.
+    // Rebuilt mine: single main path on level 0 (no descent), with a few gentle curves.
     const o = this.mineOrigin
 
     const mkCurve = (pts, tension = 0.22) => {
@@ -629,28 +627,22 @@ export class MineManager {
       return c
     }
 
-    // Main: gentle monotonic descent (avoid early up/down bump).
+    // Keep floor at y=0. With half-height=2.0 and floor formula (y - halfH + 0.05),
+    // centerline y=1.95 makes floor≈0.
+    const y0 = 1.95
+
+    // Main: level 0, with gentle curves.
     const main = mkCurve([
-      new THREE.Vector3(o.x + 1.0, 1.80, o.z),
-      // Extra control point to keep the start smooth and slightly descending.
-      new THREE.Vector3(o.x + 3.8, 1.72, o.z + 0.25),
-      new THREE.Vector3(o.x + 7.5, 1.55, o.z + 1.2),
-      new THREE.Vector3(o.x + 15.5, 1.05, o.z + 6.4),
-      new THREE.Vector3(o.x + 25.0, 0.25, o.z + 3.1),
-      new THREE.Vector3(o.x + 34.0, -0.55, o.z - 3.0),
-      new THREE.Vector3(o.x + 44.0, -1.35, o.z - 0.6),
-      new THREE.Vector3(o.x + 56.0, -2.10, o.z + 5.2),
-    ], 0.16)
+      new THREE.Vector3(o.x + 1.0, y0, o.z),
+      new THREE.Vector3(o.x + 9.0, y0, o.z + 2.2),
+      new THREE.Vector3(o.x + 18.0, y0, o.z + 8.2),
+      new THREE.Vector3(o.x + 30.0, y0, o.z + 3.4),
+      new THREE.Vector3(o.x + 42.0, y0, o.z - 4.8),
+      new THREE.Vector3(o.x + 56.0, y0, o.z - 1.6),
+      new THREE.Vector3(o.x + 68.0, y0, o.z + 6.0),
+    ], 0.22)
 
-    // Branch: short side pocket (readable), no crossing.
-    const a = mkCurve([
-      new THREE.Vector3(o.x + 22.5, 0.45, o.z + 4.2),
-      new THREE.Vector3(o.x + 28.5, -0.10, o.z + 10.2),
-      new THREE.Vector3(o.x + 36.5, -0.85, o.z + 11.5),
-      new THREE.Vector3(o.x + 40.5, -1.15, o.z + 7.8),
-    ])
-
-    const curves = [main, a]
+    const curves = [main]
 
     const mat = new THREE.MeshStandardMaterial({
       color: 0x131318,
@@ -683,10 +675,7 @@ export class MineManager {
     }
 
     return {
-      tunnelMeshes: [
-        makeBoxTunnel(main, 'MineTunnelMain'),
-        makeBoxTunnel(a, 'MineTunnelBranchA'),
-      ],
+      tunnelMeshes: [makeBoxTunnel(main, 'MineTunnelMain')],
       curves,
     }
   }
@@ -753,9 +742,7 @@ export class MineManager {
     }
 
     // Main tunnel: more lights.
-    placeOnCurve(curves[0], 11, 0.08, 0.96, 1.0)
-    // Branch: fewer.
-    if (curves[1]) placeOnCurve(curves[1], 5, 0.22, 0.92, 0.85)
+    placeOnCurve(curves[0], 12, 0.08, 0.96, 1.0)
 
     // Fill at the end of the main path
     const end = curves[0].getPoint(0.98)
@@ -806,134 +793,19 @@ export class MineManager {
       }
     }
 
-    // Keep the branch entrance open by skipping the blocking side on the main tunnel near the junction.
-    let mainOpts = null
-    if (curves[1]) {
-      // Find junction t on main by nearest XZ to branch start.
-      const b0 = curves[1].getPoint(0)
-      let bestT = 0.38
-      let bestD2 = Infinity
-      const samples = 80
-      for (let i = 0; i <= samples; i++) {
-        const t = i / samples
-        const p = curves[0].getPoint(t)
-        const dx = p.x - b0.x
-        const dz = p.z - b0.z
-        const d2 = dx * dx + dz * dz
-        if (d2 < bestD2) {
-          bestD2 = d2
-          bestT = t
-        }
-      }
+    // Single path now: no junction opening logic needed.
+    addWalls(curves[0], 26)
 
-      const mainTan = curves[0].getTangent(bestT).normalize()
-      const mainSide = this._getTunnelSideVec(mainTan)
-      const bTan = curves[1].getTangent(0).normalize()
-      const s = Math.sign(bTan.dot(mainSide)) || 1
-
-      // Wider window: make sure the branch is both visible and enterable.
-      mainOpts = { t0: bestT - 0.14, t1: bestT + 0.14, skipSide: s }
-    }
-
-    addWalls(curves[0], 26, 0, 1, mainOpts)
-    // Skip the first portion of branch so junction doesn't get blocked by wall-colliders.
-    if (curves[1]) addWalls(curves[1], 18, 0.18, 1)
-
-    // Caps to prevent walking off ends.
+    // Cap to prevent walking off end.
     const endMain = curves[0].getPoint(1)
     this._mineColliders.push({ x: endMain.x, z: endMain.z, r: 2.2 })
-    if (curves[1]) {
-      const endA = curves[1].getPoint(1)
-      this._mineColliders.push({ x: endA.x, z: endA.z, r: 2.0 })
-    }
-    if (curves[2]) {
-      const endB = curves[2].getPoint(1)
-      this._mineColliders.push({ x: endB.x, z: endB.z, r: 2.0 })
-    }
 
     // Entry "posts" inside mine (avoid clipping near portal)
     this._mineColliders.push({ x: this.mineOrigin.x + 1.0, z: this.mineOrigin.z + 2.4, r: 0.8 })
     this._mineColliders.push({ x: this.mineOrigin.x + 1.0, z: this.mineOrigin.z - 2.4, r: 0.8 })
   }
 
-  /** @param {THREE.CatmullRomCurve3[]} curves */
-  _makeBranchOpenings(curves) {
-    // Simple readable junction: carve a rectangular "opening" on the branch side,
-    // and on the opposite wall remove the texture by covering with a dark patch.
-    const g = new THREE.Group()
-    g.name = 'MineBranchOpenings'
-
-    if (!curves || curves.length < 2) return g
-
-    const main = curves[0]
-    const branch = curves[1]
-
-    const b0 = branch.getPoint(0)
-    let bestT = 0.38
-    let bestD2 = Infinity
-    const samples = 90
-    for (let i = 0; i <= samples; i++) {
-      const t = i / samples
-      const p = main.getPoint(t)
-      const dx = p.x - b0.x
-      const dz = p.z - b0.z
-      const d2 = dx * dx + dz * dz
-      if (d2 < bestD2) {
-        bestD2 = d2
-        bestT = t
-      }
-    }
-
-    const pJ = main.getPoint(bestT)
-    const tan = main.getTangent(bestT).normalize()
-    const side = this._getTunnelSideVec(tan) // aligned with rectangular rings
-
-    // Determine which side the branch is on.
-    const bTan = branch.getTangent(0).normalize()
-    const sgn = Math.sign(bTan.dot(side)) || 1
-
-    // Rect opening dimensions (portal-like readability).
-    const w = 4.6
-    const h = 4.0
-
-    const patchMat = new THREE.MeshStandardMaterial({
-      color: 0x07070b,
-      roughness: 1.0,
-      metalness: 0.0,
-      emissive: 0x050509,
-      emissiveIntensity: 0.35,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    })
-
-    const mkPatch = (sideSign) => {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), patchMat)
-
-      // Place on the wall, slightly towards the tunnel center to avoid z-fighting.
-      const wallOff = this._tunnelRadius * 0.88
-      const inward = new THREE.Vector3().copy(side).multiplyScalar(-sideSign)
-
-      m.position.set(
-        pJ.x + side.x * wallOff * sideSign + inward.x * 0.10,
-        // Center vertically near eye-height band.
-        (pJ.y - this._tunnelRadius + 0.15) + 1.65,
-        pJ.z + side.z * wallOff * sideSign + inward.z * 0.10
-      )
-
-      // Face towards tunnel center.
-      const target = new THREE.Vector3(m.position.x + inward.x, m.position.y, m.position.z + inward.z)
-      m.lookAt(target)
-
-      return m
-    }
-
-    // Branch side: "opening" (dark rectangle)
-    g.add(mkPatch(sgn))
-    // Opposite wall: remove texture (dark rectangle)
-    g.add(mkPatch(-sgn))
-
-    return g
-  }
+  // Branch-opening dressing removed (no bifurcation in the simplified mine).
 
   _makeEntranceBackdrop() {
     // A blurred "forest" card seen from inside the mine when looking at the entrance.
