@@ -859,22 +859,34 @@ export class MineManager {
   /** @param {THREE.CatmullRomCurve3} curve */
   _makeMineEndCap(curve) {
     // Solid cap so the end reads "closed" (no exit).
+    // Use DoubleSide and face it towards the player to avoid accidental backface culling.
     const g = new THREE.Group()
     g.name = 'MineEndCap'
 
     const end = curve.getPoint(1)
-    const tan = curve.getTangent(1).normalize()
+    const tanFwd = curve.getTangent(1).normalize()
+    const tanToPlayer = tanFwd.clone().multiplyScalar(-1)
 
-    const mat = new THREE.MeshStandardMaterial({ color: 0x14141a, roughness: 1.0, metalness: 0.0 })
-    const cap = new THREE.Mesh(new THREE.CircleGeometry(this._tunnelRadius * 1.05, 10), mat)
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x14141a,
+      roughness: 1.0,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+    })
 
-    // Place slightly past the end so it doesn't intersect the last ring.
-    cap.position.set(end.x + tan.x * 0.22, end.y, end.z + tan.z * 0.22)
+    const geo = new THREE.CircleGeometry(this._tunnelRadius * 1.12, 12)
 
-    // Align circle normal to the tunnel direction.
-    cap.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tan)
+    // Two very close caps (prevents tiny gaps on some angles)
+    const mk = (off) => {
+      const cap = new THREE.Mesh(geo, mat)
+      cap.position.set(end.x + tanFwd.x * off, end.y, end.z + tanFwd.z * off)
+      cap.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tanToPlayer)
+      return cap
+    }
 
-    g.add(cap)
+    g.add(mk(0.10))
+    g.add(mk(0.16))
+
     return g
   }
 
