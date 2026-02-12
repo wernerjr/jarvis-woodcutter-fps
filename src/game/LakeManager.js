@@ -94,28 +94,65 @@ export class LakeManager {
     // We convert the local 2D points (x,z) into world space and add 2 bands + midpoints.
     this._colliders = []
 
-    const addBands = (wx, wz) => {
-      const outward = new THREE.Vector3(wx - this.center.x, 0, wz - this.center.z)
-      if (outward.lengthSq() < 1e-6) outward.set(1, 0, 0)
-      outward.normalize()
+    // Offset colliders using a local edge normal (not just radial-from-center),
+    // otherwise concave/serpentine parts won't match the shoreline.
+    const addBands = (wx, wz, nx, nz) => {
+      // (nx,nz) should point outward from the shoreline.
+      const d2 = nx * nx + nz * nz
+      if (d2 < 1e-8) {
+        nx = 1
+        nz = 0
+      } else {
+        const inv = 1 / Math.sqrt(d2)
+        nx *= inv
+        nz *= inv
+      }
+
       for (const b of this.colliderBands) {
-        this._colliders.push({ x: wx + outward.x * b.off, z: wz + outward.z * b.off, r: b.r })
+        this._colliders.push({ x: wx + nx * b.off, z: wz + nz * b.off, r: b.r })
       }
     }
 
     // pts2 includes a duplicated closing point; use n points for iteration.
     for (let i = 0; i < n; i++) {
+      const pPrev = pts2[(i - 1 + n) % n]
       const p = pts2[i]
-      const pn = pts2[(i + 1) % n]
+      const pNext = pts2[(i + 1) % n]
+
+      // Vertex normal from prev->next tangent.
+      const tx = pNext.x - pPrev.x
+      const tz = pNext.y - pPrev.y
+      // Perp (t.z, -t.x) gives a stable outward candidate for CCW polygons.
+      let nx = tz
+      let nz = -tx
+
+      // Ensure it points outward (away from lake center at 0,0 in local space).
+      const dot = nx * p.x + nz * p.y
+      if (dot < 0) {
+        nx = -nx
+        nz = -nz
+      }
 
       const wx = this.center.x + p.x
       const wz = this.center.z + p.y
-      addBands(wx, wz)
+      addBands(wx, wz, nx, nz)
 
-      // Midpoint
-      const mx = this.center.x + (p.x + pn.x) * 0.5
-      const mz = this.center.z + (p.y + pn.y) * 0.5
-      addBands(mx, mz)
+      // Midpoint normal from edge p->pNext (better fit on tight curves).
+      const ex = pNext.x - p.x
+      const ez = pNext.y - p.y
+      let mnx = ez
+      let mnz = -ex
+      const mxLocal = (p.x + pNext.x) * 0.5
+      const mzLocal = (p.y + pNext.y) * 0.5
+      const mdot = mnx * mxLocal + mnz * mzLocal
+      if (mdot < 0) {
+        mnx = -mnx
+        mnz = -mnz
+      }
+
+      const mx = this.center.x + mxLocal
+      const mz = this.center.z + mzLocal
+      addBands(mx, mz, mnx, mnz)
     }
   }
 
@@ -131,8 +168,9 @@ export class LakeManager {
 
     this._t += dt
     const m = /** @type {THREE.MeshStandardMaterial} */ (this._mesh.material)
-    const s = 0.5 + 0.5 * Math.sin(this._t * 0.55)
-    m.emissiveIntensity = 0.50 + s * 0.18
+    // Match river shimmer exactly for consistent color read.
+    const s = 0.5 + 0.5 * Math.sin(this._t * 0.6)
+    m.emissiveIntensity = 0.48 + s * 0.18
     m.opacity = 0.84 + s * 0.06
   }
 }
