@@ -64,6 +64,7 @@ docker compose up -d --build
 - [Forja & Mesa de Forja](docs/systems-forge.md)
 - [VFX de fogo (tocha/fogueira)](docs/vfx-fire.md)
 - [Limite do mapa (rio)](docs/environment-river.md)
+- [Lago (fechamento do rio)](docs/environment-lake.md)
 
 ## Para IAs / copilots
 Veja **AGENTS.md** (contratos internos, mapa de sistemas e exemplos de tarefas).

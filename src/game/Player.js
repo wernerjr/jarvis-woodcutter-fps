@@ -531,8 +531,8 @@ export class Player {
 
   _resolveCollisions(nextPos, colliders) {
     // Simple stable circle-vs-circle push-out in XZ.
-    // Iterate a couple times to handle multiple overlaps.
-    for (let iter = 0; iter < 2; iter++) {
+    // Iterate a few times to handle multiple overlaps (prevents "diagonal squeezing" through dense collider fields).
+    for (let iter = 0; iter < 6; iter++) {
       let any = false
       for (const c of colliders) {
         const dx = nextPos.x - c.x

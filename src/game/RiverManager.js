@@ -85,13 +85,34 @@ export class RiverManager {
       pos[o + 4] = y
       pos[o + 5] = p.z + r.z
 
-      // Colliders along inner edge (block leaving map)
-      if (i % 2 === 0) {
-        // inner side is toward center => use "right" here because tmpN is left; choose inward by checking dot.
-        // Approx inward vector is -p (towards origin).
-        const inward = new THREE.Vector3(-p.x, 0, -p.z).normalize()
-        const inwardOffset = inward.multiplyScalar(hw * 0.35)
-        this._colliders.push({ x: p.x + inwardOffset.x, z: p.z + inwardOffset.z, r: hw * 0.55 })
+      // Colliders along inner edge (block leaving map).
+      // Use dense coverage + midpoints + two slightly offset bands to avoid diagonal "leaks".
+      // Inward direction is towards the origin (approx center of the river loop).
+      const pushBands = (px, pz) => {
+        const inward = new THREE.Vector3(-px, 0, -pz).normalize()
+
+        // Band A: closer to the inner shoreline (stronger).
+        {
+          const off = hw * 0.15
+          this._colliders.push({ x: px + inward.x * off, z: pz + inward.z * off, r: hw * 0.62 })
+        }
+
+        // Band B: deeper, slightly smaller (fills gaps between A circles).
+        {
+          const off = hw * 0.62
+          this._colliders.push({ x: px + inward.x * off, z: pz + inward.z * off, r: hw * 0.50 })
+        }
+      }
+
+      // Point collider
+      pushBands(p.x, p.z)
+
+      // Midpoint collider between this point and next point (halves the gap).
+      if (i < segments) {
+        const pn = pts[i + 1]
+        const mx = (p.x + pn.x) * 0.5
+        const mz = (p.z + pn.z) * 0.5
+        pushBands(mx, mz)
       }
     }
 

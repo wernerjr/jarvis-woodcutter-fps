@@ -2,6 +2,8 @@
 
 O perímetro do mapa é delimitado por um **rio** (visual) + **colisores** (barreira física). A ideia é dar um limite natural e impedir o player de sair da área jogável.
 
+> Nota: existe também um **lago** em um trecho do perímetro para “fechar” a composição visual (ver `docs/environment-lake.md`).
+
 ## Implementação
 - Visual + colisores: `src/game/RiverManager.js`
   - Altura Y do rio: ~`0.02` (ligeiramente acima do chão para não ficar enterrado)
@@ -26,8 +28,12 @@ Se notar “fenda” visual no seam:
 - reduza levemente a amplitude do wobble.
 
 ## Colisão
-- Usamos uma sequência de **círculos XZ** ao longo da margem interna do rio.
-- Objetivo: não ter gaps. Se notar fuga em algum ponto:
-  - aumente `segments` ou
-  - aumente `width` ou
-  - aumente o raio do collider (`hw * 0.55`).
+- Usamos **círculos XZ** ao longo da margem interna do rio (barreira física).
+- Implementação atual (mais robusta): **cobertura densa (todo segmento)** + **midpoints entre segmentos** + **duas faixas** de colliders (offsets diferentes) para evitar “vazamentos” em diagonais.
+- Se ainda notar fuga em algum ponto:
+  - aumente `segments` (mais amostras) e/ou
+  - aumente `width` (aumenta `hw`) e/ou
+  - ajuste offsets/raios das duas faixas e/ou a geração de midpoints em `RiverManager`.
+
+## Nota sobre colisão em diagonais
+Se o player estiver “escapando” ao encostar em múltiplos colliders ao mesmo tempo (movimento diagonal), aumente as iterações do push-out em `Player._resolveCollisions()`.
