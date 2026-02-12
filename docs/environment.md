@@ -13,6 +13,8 @@ Parâmetros principais:
 ## Mina (entrada)
 A entrada da mina no mundo externo fica **na borda** (face frontal) da **montanha retangular**, virada para a floresta. O portal é propositalmente simples: **3 peças de madeira** (2 postes + 1 viga), alinhado com a face.
 
+Para manter a entrada sempre legível, existem **2 tochas infinitas** (sem durabilidade) fixadas nos postes (uma em cada lado), com luminosidade semelhante à tocha do jogador.
+
 Obs.: o caminho/trilha até a mina foi removido.
 
 Config atual (2026-02-11):

@@ -222,10 +222,51 @@ export class MineManager {
     left.position.set(0.0, 2.3, 2.05)
     right.position.set(0.0, 2.3, -2.05)
     top.position.set(0.0, 4.65, 0)
+    // Rotate 90deg so the beam spans between the two posts.
+    top.rotation.y = Math.PI / 2
+
+    // Infinite torches (always lit) on the front of each post to keep the entrance readable.
+    const makeTorch = () => {
+      const t = new THREE.Group()
+
+      const stickGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.9, 8)
+      const stickMat = new THREE.MeshStandardMaterial({ color: 0x3e2a18, roughness: 1.0 })
+      const stick = new THREE.Mesh(stickGeo, stickMat)
+      stick.position.set(0, 0.45, 0)
+
+      const flameGeo = new THREE.ConeGeometry(0.14, 0.32, 10)
+      const flameMat = new THREE.MeshStandardMaterial({
+        color: 0xffb24a,
+        emissive: 0xff6a00,
+        emissiveIntensity: 1.6,
+        transparent: true,
+        opacity: 0.92,
+      })
+      const flame = new THREE.Mesh(flameGeo, flameMat)
+      flame.position.set(0, 0.98, 0)
+
+      const light = new THREE.PointLight(0xffb06a, 1.1, 16, 1.7)
+      light.position.set(0, 1.05, 0)
+
+      t.add(stick)
+      t.add(flame)
+      t.add(light)
+      t.rotation.z = 0.08
+      return t
+    }
+
+    const torchL = makeTorch()
+    const torchR = makeTorch()
+
+    // Portal local coords: +X points outward (towards forest), so place torches slightly in front.
+    torchL.position.set(0.45, 0.0, 2.05)
+    torchR.position.set(0.45, 0.0, -2.05)
 
     g.add(left)
     g.add(right)
     g.add(top)
+    g.add(torchL)
+    g.add(torchR)
 
     return g
   }
