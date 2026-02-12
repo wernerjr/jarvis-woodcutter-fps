@@ -650,6 +650,8 @@ export class MineManager {
       // More faceted (rectangular feel).
       const radialSegments = 4
       const geo = new THREE.TubeGeometry(curve, tubularSegments, this._tunnelRadius, radialSegments, false)
+      // With radialSegments=4 the tube can look "diagonal" (diamond). Rotate to align the flat sides.
+      geo.rotateY(Math.PI / 4)
 
       // IMPORTANT: keep tunnel corridor clean. Disable vertex noise here to avoid rock-like bumps.
       // (We keep the low-poly feel via radialSegments=4.)
@@ -840,16 +842,18 @@ export class MineManager {
       depthWrite: false,
     })
 
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(4.9, 4.2), mat)
+    // Match portal opening size (approx): width ~4.6, height ~4.0
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 4.0), mat)
 
     // Place just beyond the portal opening so it doesn't interfere with movement.
-    const x = this.mineOrigin.x - 0.6
-    const y = 2.1
+    const x = this.mineOrigin.x - 0.75
+    const y = 2.0
     const z = this.mineOrigin.z
     plane.position.set(x, y, z)
 
-    // Face towards the player (down the tunnel).
-    plane.rotation.y = Math.PI
+    // Face towards the player (down the tunnel), aligned with the tunnel direction.
+    const tan = this._curves?.[0]?.getTangent(0)?.normalize?.() ?? new THREE.Vector3(1, 0, 0)
+    plane.rotation.y = Math.atan2(tan.x, tan.z) + Math.PI
 
     g.add(plane)
     return g
