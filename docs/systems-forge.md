@@ -8,8 +8,9 @@
 - Saída: barras de ferro
 - Regras:
   - Precisa clicar em **Iniciar fundição** (estado `enabled`).
-  - **Desligar** é sempre permitido (mesmo se você remover minério/combustível depois).
+  - **Desligar** é sempre permitido.
   - Ligar requer combustível + minério.
+  - **Auto-desligamento:** se a forja estiver ligada e acabar o **minério** (entrada vazia) **ou** acabar o **combustível** (burn zerado e sem itens de combustível), ela desliga automaticamente.
   - Processa enquanto houver combustível + minério + espaço.
   - UI atualiza em tempo real (status por tick + slots via flag `dirty`).
   - VFX: fogo e fumaça apenas quando processamento está ativo.

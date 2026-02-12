@@ -280,6 +280,19 @@ export class ForgeManager {
         if (this._consumeOneFuel(f)) f.dirty = true
       }
 
+      // Auto-shutdown rules:
+      // - If ore is missing while enabled, shut down immediately.
+      // - If burn is depleted and there is no fuel to consume, shut down.
+      if (f.enabled) {
+        const hasFuelItem = this._hasFuelItem(f)
+        if (!hasOre || (!hasFuelItem && f.burn <= 0.001)) {
+          f.enabled = false
+          f.dirty = true
+          // Stop VFX quickly.
+          f.vfx.activeUntil = 0
+        }
+      }
+
       // visuals + VFX
       const ember = f.mesh.userData.ember
       const firePlanes = f.mesh.userData.firePlanes || []
