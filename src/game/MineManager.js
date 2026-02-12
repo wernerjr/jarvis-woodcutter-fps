@@ -27,6 +27,7 @@ export class MineManager {
     this.entrance = new THREE.Vector3(0, 0, 0)
 
     // Interior placement (kept far away; accessed via portal teleport)
+    // Keep Y at 0 so the mine sits at map level (simpler grounding/visuals).
     this.mineOrigin = new THREE.Vector3(-120, 0, 95)
 
     /** @type {{x:number,z:number,r:number}[]} */
@@ -627,19 +628,24 @@ export class MineManager {
       return c
     }
 
-    // Keep floor at y=0. With half-height=2.0 and floor formula (y - halfH + 0.05),
+    // Force all points to be relative to mineOrigin (including Y).
+    // (Helps keep the whole mine at map level.)
+    const rel = (x, y, z) => new THREE.Vector3(o.x + x, o.y + y, o.z + z)
+
+    // Keep floor at y=0 (map level). With half-height=2.0 and floor formula (y - halfH + 0.05),
     // centerline y=1.95 makes floor≈0.
+    // If you want the whole mine lower/higher, adjust mineOrigin.y.
     const y0 = 1.95
 
     // Main: level 0, with gentle curves.
     const main = mkCurve([
-      new THREE.Vector3(o.x + 1.0, y0, o.z),
-      new THREE.Vector3(o.x + 9.0, y0, o.z + 2.2),
-      new THREE.Vector3(o.x + 18.0, y0, o.z + 8.2),
-      new THREE.Vector3(o.x + 30.0, y0, o.z + 3.4),
-      new THREE.Vector3(o.x + 42.0, y0, o.z - 4.8),
-      new THREE.Vector3(o.x + 56.0, y0, o.z - 1.6),
-      new THREE.Vector3(o.x + 68.0, y0, o.z + 6.0),
+      rel(1.0, y0, 0.0),
+      rel(9.0, y0, 2.2),
+      rel(18.0, y0, 8.2),
+      rel(30.0, y0, 3.4),
+      rel(42.0, y0, -4.8),
+      rel(56.0, y0, -1.6),
+      rel(68.0, y0, 6.0),
     ], 0.22)
 
     const curves = [main]
