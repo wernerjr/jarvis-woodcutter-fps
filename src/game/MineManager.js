@@ -230,6 +230,23 @@ export class MineManager {
       const widen = 1 + 0.18 * back * center
       v.z *= widen
 
+      // Make sides/back fall smoothly to the ground (avoid vertical wall look).
+      // Add a "skirt" that flares out near the base.
+      const y01b = Math.max(0, Math.min(1, (v.y + halfH) / H))
+      const base = Math.pow(1 - y01b, 1.25)
+
+      const edgeStart = halfW * 0.55
+      const edgeSpan = Math.max(0.001, halfW - edgeStart)
+      const edgeZ01 = Math.max(0, Math.min(1, (Math.abs(v.z) - edgeStart) / edgeSpan))
+
+      const backStart = halfD * 0.25
+      const backSpan = Math.max(0.001, halfD - backStart)
+      const back01 = Math.max(0, Math.min(1, ((-v.x) - backStart) / backSpan))
+
+      const skirt = 4.8 * base
+      if (edgeZ01 > 0.001) v.z += Math.sign(v.z || 1) * skirt * edgeZ01
+      if (back01 > 0.001) v.x -= skirt * 0.9 * back01
+
       pos.setXYZ(i, v.x, v.y, v.z)
     }
 
