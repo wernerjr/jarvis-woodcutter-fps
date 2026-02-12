@@ -31,6 +31,7 @@ Só aparece quando existe um alvo válido em alcance:
   - **Destruir**
 
 ## Implementação
-- `src/game/Game.js`: lógica de tap/hold + seleção da roda
+- Seleção da roda é **100% angular** (centro→mouse): índice = `floor(angle / (360/N))`.
+- `src/game/Game.js`: lógica de tap/hold + seleção angular da roda
 - `src/game/UI.js`: `setInteractHint`, `setWheelActions`, `setWheelActive`
 - `index.html` / `src/style.css`: overlay `#actionWheel` e estilo

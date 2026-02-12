@@ -1668,6 +1668,9 @@ export class Game {
       this.ui.setInteractHint(null)
     }
 
+    // Hard-guard: never leave wheel visuals around unless the wheel is actually open.
+    if (this.state === 'playing' && !this._wheelOpen) this.ui.hideWheel?.()
+
     // Freeze most simulation when not playing (pause/inventory/menus).
     // Forge continues processing while its UI is open.
     const simDt = this.state === 'playing' ? dt : 0

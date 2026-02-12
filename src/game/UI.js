@@ -42,14 +42,13 @@ export class UI {
     if (!actions || actions.length === 0) {
       root.classList.add('hidden')
       wheel.style.background = 'transparent'
-      wheel.style.borderColor = 'transparent'
-      wheel.style.boxShadow = 'none'
+      wheel.style.border = 'none'
       wheel.removeAttribute('data-n')
       return
     }
 
     // restore base styling (in case it was cleared)
-    wheel.style.borderColor = 'rgba(255,255,255,.12)'
+    wheel.style.border = '1px solid rgba(255,255,255,.12)'
 
     const n = actions.length
     wheel.setAttribute('data-n', String(n))
@@ -58,8 +57,8 @@ export class UI {
     // Start angle at -90deg so first segment is at the top.
     const baseA = 'rgba(0,0,0,.22)'
     const baseB = 'rgba(255,255,255,.05)'
-    const sep = 'rgba(0,0,0,.35)'
-    const eps = 0.9 // degrees for separators
+    const sep = 'rgba(0,0,0,.70)'
+    const eps = 1.8 // degrees for separators (clear borders)
 
     const step = 360 / n
     const stops = []
