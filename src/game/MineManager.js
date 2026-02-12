@@ -12,8 +12,8 @@ export class MineManager {
     // Rect mountain dimensions (must match _makeMountainMesh/_buildWorldColliders)
     this._mountW = 30 // Z span
     this._mountD = 22 // X span (depth)
-    // Slightly lower block; surrounding visuals add the "mountain" feel.
-    this._mountH = 12
+    // Core wall height (portal face). Reduced ~35% to feel less like a massive slab.
+    this._mountH = 7.8
 
     // Entrance: centered on the face that looks towards the forest.
     // (Final values are computed in init() after we know face direction.)
@@ -187,15 +187,16 @@ export class MineManager {
 
       // Base mound profile: higher towards the back, taper towards front.
       const back = Math.pow(1 - ax, 0.55)
-      const center = Math.pow(1 - az, 1.2)
+      // Side dressing falls to 0 at the edges (stronger taper to avoid a boxy silhouette).
+      const center = Math.pow(1 - az, 2.4)
 
       // Heightfield (adds above the box's base height)
       const extra = (H * 0.95) * back * center
 
       // Carve to a rocky silhouette (ridges) without spikes.
       const ridge =
-        0.22 * Math.sin((v.z + 8) * 0.55) * back +
-        0.14 * Math.sin((v.x - 3) * 0.85) * center
+        0.18 * Math.sin((v.z + 8) * 0.55) * back * center +
+        0.12 * Math.sin((v.x - 3) * 0.85) * center
 
       // Raise the top, keep bottom grounded.
       if (v.y > -halfH + 0.001) {
@@ -204,7 +205,7 @@ export class MineManager {
       }
 
       // Slightly expand width towards the back/top (bulky mountain).
-      const widen = 1 + 0.22 * back
+      const widen = 1 + 0.18 * back * center
       v.z *= widen
 
       pos.setXYZ(i, v.x, v.y, v.z)

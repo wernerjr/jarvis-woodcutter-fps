@@ -11,7 +11,7 @@ Parâmetros principais:
 - `clear[]`: círculos para limpar grama em áreas de gameplay (spawn, trilha, mina). Se você mover a entrada/trilha da mina, atualize esses pontos (ex.: novos waypoints da trilha).
 
 ## Mina (entrada)
-A entrada da mina no mundo externo fica **na borda** (face frontal) de um **paredão retangular** (face reta na entrada), virado para a floresta. Ao redor do paredão, existe "dressing" de rochas/encostas (sem nada na frente do portal) para o conjunto ler mais como montanha.
+A entrada da mina no mundo externo fica **na borda** (face frontal) de um **paredão retangular** (face reta na entrada), virado para a floresta. Ao redor do paredão, o volume é esculpido para ler como montanha, com o "dressing" caindo nas laterais até 0 (sem nada na frente do portal).
 
 O portal é propositalmente simples: **3 peças de madeira** (2 postes + 1 viga), alinhado com a face.
 
