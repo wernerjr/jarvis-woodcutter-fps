@@ -48,8 +48,9 @@ export class MineManager {
     /** @type {THREE.CatmullRomCurve3[]} */
     this._curves = []
 
-    this._tunnelRadius = 2.9
-    this._tunnelRingAngle = -Math.PI / 4 // align radialSegments=4 cross-section (avoid diamond twist)
+    this._tunnelRadius = 2.3 // half-width (≈ 4.6m wide)
+    this._tunnelHalfH = 2.0 // half-height (≈ 4.0m tall)
+    this._tunnelRingAngle = 0 // box corridors: no ring rotation needed
 
     // Portal triggers (XZ)
     this.portalEnter = { x: this.entrance.x - 0.6, z: this.entrance.z, r: 1.35 }
@@ -150,14 +151,11 @@ export class MineManager {
 
   /** @param {THREE.Vector3} tan */
   _getTunnelSideVec(tan) {
-    // Must match the per-ring rotation applied to the TubeGeometry, otherwise spawns/supports end up "inside" the wall.
+    // Box corridors: stable horizontal side vector.
     const up = new THREE.Vector3(0, 1, 0)
     const side = new THREE.Vector3().crossVectors(up, tan)
     if (side.lengthSq() < 1e-6) side.set(1, 0, 0)
     side.normalize()
-
-    const q = new THREE.Quaternion().setFromAxisAngle(tan, this._tunnelRingAngle)
-    side.applyQuaternion(q)
     return side
   }
 
@@ -193,7 +191,7 @@ export class MineManager {
     if (!best) return 0
 
     // Curve is centerline; floor is near bottom of tube.
-    const floor = best.y - this._tunnelRadius + 0.15
+    const floor = best.y - this._tunnelHalfH + 0.05
     return floor
   }
 
@@ -228,7 +226,7 @@ export class MineManager {
         const z = p.z + wallOut.z * off
 
         // Keep veins visible: place around mid-mine eye-height band, but never below floor+eyeHeight.
-        const floorY = p.y - this._tunnelRadius + 0.15
+        const floorY = p.y - this._tunnelHalfH + 0.05
         const minY = floorY + 1.65 * 0.92
         const y = Math.max(minY, midY) + (i % 2) * 0.12
 
@@ -661,74 +659,33 @@ export class MineManager {
       side: THREE.BackSide,
     })
 
-    const makeTube = (curve, name, opts = null) => {
-      const tubularSegments = 120
-      // More faceted (rectangular feel).
-      const radialSegments = 4
-      const geo = new THREE.TubeGeometry(curve, tubularSegments, this._tunnelRadius, radialSegments, false)
+    // Use simple rectangular corridor volumes (no tube twist). This keeps the mine clean and readable.
+    const makeBoxTunnel = (curve, name, w = 4.6, h = 4.0) => {
+      const p0 = curve.getPoint(0)
+      const p1 = curve.getPoint(1)
+      const dir = new THREE.Vector3().subVectors(p1, p0)
+      const len = dir.length()
+      if (len < 0.001) return new THREE.Group()
+      dir.normalize()
 
-      // With radialSegments=4 the tunnel can look like a "diamond" (rotated square).
-      // Fix by rotating each ring around the local tangent (keeps it aligned along the entire curve).
-      // Also optionally taper the radius near the start (useful for branch junctions to avoid bumps).
-      {
-        const pos = geo.attributes.position
-        const vtx = new THREE.Vector3()
-        const center = new THREE.Vector3()
-        const offset = new THREE.Vector3()
-        const q = new THREE.Quaternion()
-        const ringAngle = this._tunnelRingAngle
+      const geo = new THREE.BoxGeometry(w, h, len, 1, 1, 1)
+      const m = new THREE.Mesh(geo, mat)
+      m.name = name
 
-        const rings = tubularSegments
-        const ringVerts = radialSegments + 1
+      // Align box local +Z to the corridor direction.
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir)
+      m.quaternion.copy(q)
 
-        const taper = opts?.taperStart ?? 0
-        const taperMin = opts?.taperMin ?? 1
+      // Center between endpoints.
+      m.position.set((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5 + h * 0.5, (p0.z + p1.z) * 0.5)
 
-        const smooth = (x) => x * x * (3 - 2 * x) // smoothstep
-
-        for (let i = 0; i <= rings; i++) {
-          const t = i / rings
-          center.copy(curve.getPoint(t))
-          const tan = geo.tangents?.[i]
-          if (!tan) continue
-
-          q.setFromAxisAngle(tan, ringAngle)
-
-          let s = 1
-          if (taper > 0 && t <= taper) {
-            const k = smooth(Math.max(0, Math.min(1, t / taper)))
-            s = taperMin + (1 - taperMin) * k
-          }
-
-          for (let j = 0; j < ringVerts; j++) {
-            const idx = i * ringVerts + j
-            vtx.fromBufferAttribute(pos, idx)
-            offset.copy(vtx).sub(center)
-            offset.applyQuaternion(q)
-            offset.multiplyScalar(s)
-            vtx.copy(center).add(offset)
-            pos.setXYZ(idx, vtx.x, vtx.y, vtx.z)
-          }
-        }
-
-        // We modified geometry positions: ensure normals/bounds are rebuilt.
-        pos.needsUpdate = true
-      }
-
-      // IMPORTANT: keep tunnel corridor clean. Disable vertex noise here to avoid rock-like bumps.
-      geo.computeVertexNormals()
-      geo.computeBoundingSphere()
-
-      const tunnel = new THREE.Mesh(geo, mat)
-      tunnel.name = name
-      return tunnel
+      return m
     }
 
     return {
       tunnelMeshes: [
-        makeTube(main, 'MineTunnelMain'),
-        // Taper the branch start so it doesn't create a "lombada"/bump inside the main corridor.
-        makeTube(a, 'MineTunnelBranchA', { taperStart: 0.30, taperMin: 0.10 }),
+        makeBoxTunnel(main, 'MineTunnelMain'),
+        makeBoxTunnel(a, 'MineTunnelBranchA'),
       ],
       curves,
     }
@@ -756,8 +713,8 @@ export class MineManager {
 
         let side = this._getTunnelSideVec(tan)
 
-        const floorY = p.y - this._tunnelRadius + 0.15
-        const ceilY = p.y + this._tunnelRadius - 0.25
+        const floorY = p.y - this._tunnelHalfH + 0.05
+        const ceilY = p.y + this._tunnelHalfH - 0.05
         const height = Math.max(2.4, ceilY - floorY)
 
         // Posts (dynamic height so they always touch the floor even on descent)
