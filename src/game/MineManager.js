@@ -245,6 +245,44 @@ export class MineManager {
     return g
   }
 
+  _makeSideRocks() {
+    // Rock dressing on the sides/back. Keep the portal front clear.
+    const g = new THREE.Group()
+    g.name = 'MineSideRocks'
+
+    const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
+    if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
+    toForest.normalize()
+    const right = new THREE.Vector3(-toForest.z, 0, toForest.x)
+
+    const rockGeo = new THREE.DodecahedronGeometry(0.9, 0)
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x232328, roughness: 1.0, flatShading: true })
+
+    const count = 22
+    for (let i = 0; i < count; i++) {
+      const side = i % 2 === 0 ? 1 : -1
+      const along = -0.95 + Math.random() * 1.9
+
+      // Local coordinates around the core wall.
+      const lx = (this._mountD * 0.6) * along
+      const lz = side * (this._mountW * 0.85 + Math.random() * 3.0)
+
+      const wx = this.center.x + toForest.x * lx + right.x * lz
+      const wz = this.center.z + toForest.z * lx + right.z * lz
+
+      // Keep front of portal clear.
+      if (Math.hypot(wx - this.entrance.x, wz - this.entrance.z) < 7.5) continue
+
+      const r = new THREE.Mesh(rockGeo, rockMat)
+      r.position.set(wx, 0.25, wz)
+      r.scale.setScalar(0.8 + Math.random() * 1.8)
+      r.rotation.set(Math.random(), Math.random(), Math.random())
+      g.add(r)
+    }
+
+    return g
+  }
+
   _makeEntrance() {
     // Simple portal module: 3 woods on the large face (towards forest).
     // Keep it centered on the face.
