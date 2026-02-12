@@ -81,10 +81,12 @@ export class MineManager {
     const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
     if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
     toForest.normalize()
+    const halfD = this._mountD * 0.5
+    // Place entrance on the border of the block (slight epsilon outside to avoid z-fighting).
     this.entrance.set(
-      this.center.x + toForest.x * (this._mountD * 0.5 + 0.15),
+      this.center.x + toForest.x * (halfD + 0.02),
       0,
-      this.center.z + toForest.z * (this._mountD * 0.5 + 0.15)
+      this.center.z + toForest.z * (halfD + 0.02)
     )
 
     // --- Exterior: rectangular mountain + simple portal (no trail) ---
@@ -171,7 +173,8 @@ export class MineManager {
     const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
     if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
     toForest.normalize()
-    m.rotation.y = Math.atan2(toForest.x, toForest.z)
+    // Align local +X (box depth axis) towards the forest.
+    m.rotation.y = Math.atan2(toForest.z, toForest.x)
 
     m.name = 'Mountain'
     return m
@@ -187,7 +190,8 @@ export class MineManager {
     if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
     toForest.normalize()
 
-    const yaw = Math.atan2(toForest.x, toForest.z)
+    // Align local +X (portal depth axis) towards the forest.
+    const yaw = Math.atan2(toForest.z, toForest.x)
 
     g.position.set(this.entrance.x, 0, this.entrance.z)
     g.rotation.y = yaw
@@ -199,8 +203,10 @@ export class MineManager {
       emissive: 0x050509,
       emissiveIntensity: 0.35,
     })
-    const mouth = new THREE.Mesh(new THREE.BoxGeometry(4.4, 4.0, 2.8), mouthMat)
-    mouth.position.set(0.0, 2.05, 0)
+    // Opening volume: thin in depth (X), wide across (Z), so it doesn't sit "inside" the block.
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(1.1, 4.0, 4.6), mouthMat)
+    // Slightly inside the wall so the entrance reads carved.
+    mouth.position.set(-0.35, 2.05, 0)
     g.add(mouth)
 
     // 3 wood pieces portal
