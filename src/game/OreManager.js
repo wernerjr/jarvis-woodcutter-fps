@@ -45,6 +45,8 @@ export class OreManager {
       metalness: 0.0,
       transparent: true,
       opacity: 0.0,
+      // Critical: do not write depth, otherwise this invisible hitbox occludes the visible vein card.
+      depthWrite: false,
     })
 
     const cardGeo = new THREE.PlaneGeometry(1.05, 0.72)
