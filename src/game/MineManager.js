@@ -727,8 +727,10 @@ export class MineManager {
         this._mineGroup.add(top)
 
         // Lamp + light
+        // Lamp stays on the wall/ceiling edge (never in the middle of the path).
         const lamp = new THREE.Mesh(lampGeo, lampMat)
-        lamp.position.set(p.x + side.x * 1.05, ceilY - 0.55, p.z + side.z * 1.05)
+        const lampOff = this._tunnelRadius - 0.65
+        lamp.position.set(p.x + side.x * lampOff, ceilY - 0.55, p.z + side.z * lampOff)
         this._mineGroup.add(lamp)
 
         const light = new THREE.PointLight(0xffb06a, 0.95 * lightScale, 18, 1.6)
