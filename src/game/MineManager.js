@@ -191,7 +191,7 @@ export class MineManager {
     if (!best) return 0
 
     // Curve is centerline; floor is near bottom of tube.
-    const floor = best.y - this._tunnelHalfH + 0.05
+    const floor = best.y - this._tunnelHalfH + 0.02
     return floor
   }
 
@@ -226,7 +226,7 @@ export class MineManager {
         const z = p.z + wallOut.z * off
 
         // Keep veins visible: place around mid-mine eye-height band, but never below floor+eyeHeight.
-        const floorY = p.y - this._tunnelHalfH + 0.05
+        const floorY = p.y - this._tunnelHalfH + 0.02
         const minY = floorY + 1.65 * 0.92
         const y = Math.max(minY, midY) + (i % 2) * 0.12
 
@@ -687,7 +687,9 @@ export class MineManager {
         m.quaternion.copy(q)
 
         // Center at mid-point of the segment.
-        m.position.set((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5 + h * 0.5, (p0.z + p1.z) * 0.5)
+        // IMPORTANT: curve points represent corridor centerline; BoxGeometry is centered at mesh position.
+        // So Y must be the centerline Y (no +h/2), otherwise the tunnel floats above the floor logic.
+        m.position.set((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5, (p0.z + p1.z) * 0.5)
 
         g.add(m)
       }
@@ -723,8 +725,8 @@ export class MineManager {
 
         let side = this._getTunnelSideVec(tan)
 
-        const floorY = p.y - this._tunnelHalfH + 0.05
-        const ceilY = p.y + this._tunnelHalfH - 0.05
+        const floorY = p.y - this._tunnelHalfH + 0.02
+        const ceilY = p.y + this._tunnelHalfH - 0.02
         const height = Math.max(2.4, ceilY - floorY)
 
         // Posts (dynamic height so they always touch the floor even on descent)
