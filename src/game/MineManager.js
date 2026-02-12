@@ -650,8 +650,39 @@ export class MineManager {
       // More faceted (rectangular feel).
       const radialSegments = 4
       const geo = new THREE.TubeGeometry(curve, tubularSegments, this._tunnelRadius, radialSegments, false)
-      // With radialSegments=4 the tube can look "diagonal" (diamond). Rotate to align the flat sides.
-      geo.rotateY(Math.PI / 4)
+
+      // With radialSegments=4 the tunnel can look like a "diamond" (rotated square).
+      // Fix by rotating each ring around the local tangent (keeps it aligned along the entire curve).
+      // TubeGeometry exposes tangents/normals/binormals per segment.
+      {
+        const pos = geo.attributes.position
+        const vtx = new THREE.Vector3()
+        const center = new THREE.Vector3()
+        const offset = new THREE.Vector3()
+        const q = new THREE.Quaternion()
+        const ringAngle = -Math.PI / 4
+
+        const rings = tubularSegments
+        const ringVerts = radialSegments + 1
+
+        for (let i = 0; i <= rings; i++) {
+          const t = i / rings
+          center.copy(curve.getPoint(t))
+          const tan = geo.tangents?.[i]
+          if (!tan) continue
+
+          q.setFromAxisAngle(tan, ringAngle)
+
+          for (let j = 0; j < ringVerts; j++) {
+            const idx = i * ringVerts + j
+            vtx.fromBufferAttribute(pos, idx)
+            offset.copy(vtx).sub(center)
+            offset.applyQuaternion(q)
+            vtx.copy(center).add(offset)
+            pos.setXYZ(idx, vtx.x, vtx.y, vtx.z)
+          }
+        }
+      }
 
       // IMPORTANT: keep tunnel corridor clean. Disable vertex noise here to avoid rock-like bumps.
       // (We keep the low-poly feel via radialSegments=4.)
