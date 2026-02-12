@@ -49,6 +49,7 @@ export class MineManager {
     this._curves = []
 
     this._tunnelRadius = 2.9
+    this._tunnelRingAngle = -Math.PI / 4 // align radialSegments=4 cross-section (avoid diamond twist)
 
     // Portal triggers (XZ)
     this.portalEnter = { x: this.entrance.x - 0.6, z: this.entrance.z, r: 1.35 }
@@ -146,6 +147,19 @@ export class MineManager {
     return this._mineColliders
   }
 
+  /** @param {THREE.Vector3} tan */
+  _getTunnelSideVec(tan) {
+    // Must match the per-ring rotation applied to the TubeGeometry, otherwise spawns/supports end up "inside" the wall.
+    const up = new THREE.Vector3(0, 1, 0)
+    const side = new THREE.Vector3().crossVectors(up, tan)
+    if (side.lengthSq() < 1e-6) side.set(1, 0, 0)
+    side.normalize()
+
+    const q = new THREE.Quaternion().setFromAxisAngle(tan, this._tunnelRingAngle)
+    side.applyQuaternion(q)
+    return side
+  }
+
   /**
    * Approx mine floor height at a given XZ (used for player grounding in descending tunnels).
    * @param {number} x
@@ -202,9 +216,7 @@ export class MineManager {
         const tan = c.getTangent(t)
 
         // Side vector (roughly horizontal) even when the tunnel descends.
-        let sideVec = new THREE.Vector3().crossVectors(up, tan)
-        if (sideVec.lengthSq() < 1e-6) sideVec.set(1, 0, 0)
-        sideVec.normalize()
+        let sideVec = this._getTunnelSideVec(tan)
 
         const side = i % 2 === 0 ? 1 : -1
         const wallOut = sideVec.multiplyScalar(side)
@@ -723,9 +735,7 @@ export class MineManager {
         const p = curve.getPoint(t)
         const tan = curve.getTangent(t)
 
-        let side = new THREE.Vector3().crossVectors(up, tan)
-        if (side.lengthSq() < 1e-6) side.set(1, 0, 0)
-        side.normalize()
+        let side = this._getTunnelSideVec(tan)
 
         const floorY = p.y - this._tunnelRadius + 0.15
         const ceilY = p.y + this._tunnelRadius - 0.25
@@ -791,9 +801,7 @@ export class MineManager {
         const p = curve.getPoint(t)
         const tan = curve.getTangent(t)
 
-        let n = new THREE.Vector3().crossVectors(up, tan)
-        if (n.lengthSq() < 1e-6) n.set(1, 0, 0)
-        n.normalize()
+        let n = this._getTunnelSideVec(tan)
 
         const off = this._tunnelRadius - 0.35
 
@@ -810,9 +818,7 @@ export class MineManager {
           const t2 = tStart + ((i + 0.5) / samples) * (tEnd - tStart)
           const p2 = curve.getPoint(t2)
           const tan2 = curve.getTangent(t2)
-          let n2 = new THREE.Vector3().crossVectors(up, tan2)
-          if (n2.lengthSq() < 1e-6) n2.set(1, 0, 0)
-          n2.normalize()
+          let n2 = this._getTunnelSideVec(tan2)
 
           const inJ2 = opts && t2 >= opts.t0 && t2 <= opts.t1
           const skipPos2 = inJ2 && opts.skipSide === 1
@@ -828,10 +834,8 @@ export class MineManager {
     let mainOpts = null
     if (curves[1]) {
       const tJ = 0.38
-      const mainTan = curves[0].getTangent(tJ)
-      let mainSide = new THREE.Vector3().crossVectors(up, mainTan)
-      if (mainSide.lengthSq() < 1e-6) mainSide.set(1, 0, 0)
-      mainSide.normalize()
+      const mainTan = curves[0].getTangent(tJ).normalize()
+      let mainSide = this._getTunnelSideVec(mainTan)
 
       const bTan = curves[1].getTangent(0).normalize()
       const s = Math.sign(bTan.dot(mainSide)) || 1
