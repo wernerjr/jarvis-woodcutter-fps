@@ -133,10 +133,11 @@ export class MineManager {
   // ----------------- Exterior (world) -----------------
 
   _makeMountainMesh() {
-    // New mountain: a compact low-poly mound (icosahedron) with vertex displacement.
-    // Goal: keep silhouette readable and make the entrance feel embedded (not swallowed by a slope plane).
-    const baseR = 26
-    const geo = new THREE.IcosahedronGeometry(baseR, 2)
+    // Controlled "mountain mound" built from a deformed plane (heightmap-ish).
+    const size = 58
+    const seg = 30
+    const geo = new THREE.PlaneGeometry(size, size, seg, seg)
+    geo.rotateX(-Math.PI / 2)
 
     const pos = geo.attributes.position
     const v = new THREE.Vector3()
@@ -144,21 +145,40 @@ export class MineManager {
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i)
 
-      // Keep a flatter base and a taller top.
-      const y01 = Math.max(0, (v.y + baseR) / (2 * baseR))
-      const top = Math.pow(y01, 1.35)
+      const x = v.x
+      const z = v.z
+      const r = Math.sqrt(x * x + z * z)
+      const r01 = Math.min(1, r / (size * 0.5))
 
-      // Cheap directional noise to break perfect sphere.
-      const n =
-        Math.sin(v.x * 0.12 + v.z * 0.10) * 0.9 +
-        Math.sin(v.x * 0.28 - v.z * 0.22) * 0.5 +
-        Math.sin(v.x * 0.55 + v.y * 0.25) * 0.25
+      // radial falloff (peak at center)
+      let h = (1 - r01)
+      h = Math.max(0, h)
+      h = Math.pow(h, 1.35)
 
-      const scale = 0.86 + top * 0.55 + n * 0.05
-      v.multiplyScalar(scale)
+      // layered cheap noise
+      const n1 = Math.sin(x * 0.18 + z * 0.22)
+      const n2 = Math.sin(x * 0.42 - z * 0.33)
+      const n3 = Math.sin(x * 0.75 + z * 0.64)
+      const noise = (n1 * 0.55 + n2 * 0.30 + n3 * 0.15)
 
-      // Push bottom down a bit to sit on ground.
-      if (v.y < -baseR * 0.25) v.y = -baseR * 0.25
+      const ridge = Math.sin((x + z) * 0.10) * 0.6
+
+      // Carve a shallow notch around the entrance so the frame doesn't look "swallowed" by the slope.
+      // Compute entrance position in mountain-local coordinates (plane is centered at origin before mesh transform).
+      const exw = this.entrance.x - this.center.x
+      const ezw = this.entrance.z - this.center.z
+      const rot = -0.35
+      const ex = exw * Math.cos(rot) - ezw * Math.sin(rot)
+      const ez = exw * Math.sin(rot) + ezw * Math.cos(rot)
+
+      const dxE = x - ex
+      const dzE = z - ez
+      const dE = Math.sqrt(dxE * dxE + dzE * dzE)
+      const carveR = 7.5
+      const carve = dE < carveR ? (1 - dE / carveR) : 0
+
+      const height = h * (17.0 + 4.2 * noise + 2.4 * ridge) - carve * 5.5
+      v.y = Math.max(0, height)
 
       pos.setXYZ(i, v.x, v.y, v.z)
     }
@@ -169,11 +189,10 @@ export class MineManager {
       color: 0x2a2b2a,
       roughness: 1.0,
       metalness: 0.0,
-      flatShading: true,
     })
 
     const m = new THREE.Mesh(geo, mat)
-    m.position.set(this.center.x, baseR * 0.25, this.center.z)
+    m.position.set(this.center.x, 0, this.center.z)
     m.rotation.y = 0.35
     m.name = 'Mountain'
 
@@ -181,122 +200,136 @@ export class MineManager {
   }
 
   _makeEntrance() {
-    // Entrance is built as a small cliff-face + tunnel module oriented to the mountain center.
-    // This makes the entrance feel physically connected to the mountain.
+    // Classic timber frame sits in front of the slope (never inside the mound).
     const g = new THREE.Group()
     g.name = 'MineEntrance'
 
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x242428, roughness: 1.0, metalness: 0.0, flatShading: true })
     const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e1d, roughness: 1.0, metalness: 0.0 })
     const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x382114, roughness: 1.0, metalness: 0.0 })
+
+    const postGeo = new THREE.BoxGeometry(0.5, 4.2, 0.5)
+    const beamGeo = new THREE.BoxGeometry(4.8, 0.55, 0.55)
 
     const ex = this.entrance.x
     const ez = this.entrance.z
 
-    // Face points outwards from mountain center.
-    const faceDir = new THREE.Vector3(ex - this.center.x, 0, ez - this.center.z)
-    if (faceDir.lengthSq() < 1e-6) faceDir.set(1, 0, 0)
-    faceDir.normalize()
-    const yaw = Math.atan2(faceDir.x, faceDir.z)
-
-    g.position.set(ex, 0, ez)
-    g.rotation.y = yaw
-
-    // Cliff-face block that blends into the mountain.
-    const face = new THREE.Mesh(new THREE.BoxGeometry(7.5, 7.5, 4.2), rockMat)
-    face.position.set(1.4, 3.2, 0)
-    g.add(face)
-
-    // Dark mouth (arched-ish) + inner tunnel.
-    const mouthMat = new THREE.MeshStandardMaterial({
-      color: 0x0b0b10,
-      roughness: 1.0,
-      emissive: 0x07070c,
-      emissiveIntensity: 0.65,
-    })
-    const mouth = new THREE.Mesh(new THREE.BoxGeometry(3.9, 3.5, 3.2), mouthMat)
-    mouth.position.set(0.8, 1.85, 0)
-    g.add(mouth)
-
-    // Visible tunnel segment (inside the mountain)
-    const tunnel = new THREE.Group()
-    tunnel.position.set(0.8, 0, 0)
-    g.add(tunnel)
-
-    const innerGeo = new THREE.CylinderGeometry(1.7, 1.95, 7.2, 14, 1, true)
-    const innerMat = new THREE.MeshStandardMaterial({
-      color: 0x0c0c12,
-      roughness: 1.0,
-      side: THREE.BackSide,
-      emissive: 0x06060a,
-      emissiveIntensity: 0.35,
-    })
-    const inner = new THREE.Mesh(innerGeo, innerMat)
-    inner.rotation.z = Math.PI / 2 // length along +X local
-    inner.position.set(3.8, 1.85, 0)
-    tunnel.add(inner)
-
-    // Floor kept inside
-    const floorGeo = new THREE.PlaneGeometry(5.6, 3.0, 1, 1)
-    floorGeo.rotateX(-Math.PI / 2)
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x16120f, roughness: 1.0 })
-    const floor = new THREE.Mesh(floorGeo, floorMat)
-    floor.position.set(3.9, 0.02, 0)
-    tunnel.add(floor)
-
-    // Timber frame just at the mouth (no weird protrusions)
-    const postGeo = new THREE.BoxGeometry(0.46, 4.2, 0.46)
-    const beamGeo = new THREE.BoxGeometry(4.6, 0.52, 0.52)
-
     const left = new THREE.Mesh(postGeo, woodMat)
     const right = new THREE.Mesh(postGeo, woodMat)
-    left.position.set(-0.3, 2.1, 1.85)
-    right.position.set(-0.3, 2.1, -1.85)
-    const top = new THREE.Mesh(beamGeo, woodMat)
-    top.position.set(-0.3, 4.05, 0)
+    left.position.set(ex, 2.1, ez + 2.1)
+    right.position.set(ex, 2.1, ez - 2.1)
 
-    // Braces angled inward
-    const braceGeo = new THREE.BoxGeometry(0.35, 2.6, 0.35)
+    const top = new THREE.Mesh(beamGeo, woodMat)
+    top.position.set(ex, 4.05, ez)
+
+    const braceGeo = new THREE.BoxGeometry(0.4, 3.0, 0.4)
     const b1 = new THREE.Mesh(braceGeo, darkWoodMat)
     const b2 = new THREE.Mesh(braceGeo, darkWoodMat)
-    b1.position.set(0.15, 2.35, 1.1)
-    b2.position.set(0.15, 2.35, -1.1)
+    b1.position.set(ex + 0.35, 2.45, ez + 1.4)
+    b2.position.set(ex + 0.35, 2.45, ez - 1.4)
     b1.rotation.z = Math.PI / 4
     b2.rotation.z = -Math.PI / 4
+
+    const plankGeo = new THREE.BoxGeometry(4.6, 0.18, 0.5)
+    for (let i = 0; i < 3; i++) {
+      const p = new THREE.Mesh(plankGeo, darkWoodMat)
+      p.position.set(ex + 0.15, 3.4 + i * 0.28, ez)
+      p.rotation.y = 0.06 * (i - 1)
+      g.add(p)
+    }
+
+    // dark mouth block (visual shadow), placed behind the frame
+    const holeGeo = new THREE.BoxGeometry(3.8, 3.3, 4.7)
+    const holeMat = new THREE.MeshStandardMaterial({
+      color: 0x0a0a10,
+      roughness: 1.0,
+      emissive: 0x050509,
+      emissiveIntensity: 0.35,
+    })
+    const hole = new THREE.Mesh(holeGeo, holeMat)
+    hole.position.set(ex + 1.55, 1.75, ez)
+
+    // Short visible tunnel segment (so it feels like entering the mountain)
+    const tunnel = new THREE.Group()
+    tunnel.position.set(ex + 2.3, 0, ez)
+
+    const innerGeo = new THREE.CylinderGeometry(1.65, 1.85, 6.4, 12, 1, true)
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0x0b0b10,
+      roughness: 1.0,
+      metalness: 0.0,
+      side: THREE.BackSide,
+      emissive: 0x050509,
+      emissiveIntensity: 0.25,
+    })
+    const inner = new THREE.Mesh(innerGeo, innerMat)
+    inner.rotation.z = Math.PI / 2 // length along +X
+    inner.position.set(2.2, 1.75, 0)
+    tunnel.add(inner)
+
+    // Ground strip inside (dirt) — keep it fully inside the mouth (avoid "plank" sticking out)
+    const floorGeo = new THREE.PlaneGeometry(4.8, 2.6, 1, 1)
+    floorGeo.rotateX(-Math.PI / 2)
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x14110f, roughness: 1.0 })
+    const floor = new THREE.Mesh(floorGeo, floorMat)
+    floor.position.set(3.1, 0.015, 0)
+    tunnel.add(floor)
+
+    // Supports (a couple of frames) to give depth
+    const postGeo2 = new THREE.BoxGeometry(0.28, 2.9, 0.28)
+    const beamGeo2 = new THREE.BoxGeometry(3.4, 0.26, 0.26)
+    for (let i = 0; i < 3; i++) {
+      const fx = 1.4 + i * 2.0
+      const frame = new THREE.Group()
+      frame.position.set(fx, 0, 0)
+
+      const pl = new THREE.Mesh(postGeo2, darkWoodMat)
+      const pr = new THREE.Mesh(postGeo2, darkWoodMat)
+      pl.position.set(0, 1.45, 1.25)
+      pr.position.set(0, 1.45, -1.25)
+
+      const bt = new THREE.Mesh(beamGeo2, darkWoodMat)
+      bt.position.set(0, 2.85, 0)
+
+      frame.add(pl)
+      frame.add(pr)
+      frame.add(bt)
+      tunnel.add(frame)
+    }
+
+    // Warm lights inside so it doesn't read as a pure black void.
+    const glow = new THREE.PointLight(0xffb06a, 0.45, 12, 1.6)
+    glow.position.set(6.0, 2.0, 0)
+    tunnel.add(glow)
+
+    const sconceMat = new THREE.MeshStandardMaterial({
+      color: 0xffd0a0,
+      emissive: 0xffa34a,
+      emissiveIntensity: 1.1,
+      roughness: 0.4,
+    })
+    const sconceGeo = new THREE.SphereGeometry(0.12, 8, 6)
+
+    const s1 = new THREE.Mesh(sconceGeo, sconceMat)
+    s1.position.set(2.8, 2.1, 1.15)
+    tunnel.add(s1)
+    const l1 = new THREE.PointLight(0xffb06a, 0.55, 10, 1.7)
+    l1.position.copy(s1.position)
+    tunnel.add(l1)
+
+    const s2 = new THREE.Mesh(sconceGeo, sconceMat)
+    s2.position.set(3.4, 2.1, -1.15)
+    tunnel.add(s2)
+    const l2 = new THREE.PointLight(0xffb06a, 0.55, 10, 1.7)
+    l2.position.copy(s2.position)
+    tunnel.add(l2)
 
     g.add(left)
     g.add(right)
     g.add(top)
     g.add(b1)
     g.add(b2)
-
-    // A couple of warm lamps inside for immersion
-    const lampMat = new THREE.MeshStandardMaterial({
-      color: 0xffd0a0,
-      emissive: 0xffa34a,
-      emissiveIntensity: 1.2,
-      roughness: 0.4,
-    })
-    const lampGeo = new THREE.SphereGeometry(0.12, 8, 6)
-
-    const s1 = new THREE.Mesh(lampGeo, lampMat)
-    s1.position.set(2.3, 2.15, 1.05)
-    tunnel.add(s1)
-    const l1 = new THREE.PointLight(0xffb06a, 0.65, 12, 1.7)
-    l1.position.copy(s1.position)
-    tunnel.add(l1)
-
-    const s2 = new THREE.Mesh(lampGeo, lampMat)
-    s2.position.set(3.2, 2.15, -1.05)
-    tunnel.add(s2)
-    const l2 = new THREE.PointLight(0xffb06a, 0.65, 12, 1.7)
-    l2.position.copy(s2.position)
-    tunnel.add(l2)
-
-    // Soft fill deeper
-    const glow = new THREE.PointLight(0xffb06a, 0.35, 16, 1.6)
-    glow.position.set(6.5, 2.2, 0)
-    tunnel.add(glow)
+    g.add(hole)
+    g.add(tunnel)
 
     return g
   }
@@ -472,10 +505,10 @@ export class MineManager {
       }
     }
 
-    // Scaled to match the new mountain (icosahedron mound).
-    addRing(22.5, 2.65, 36, 0.55)
-    addRing(18.2, 2.45, 32, 0.50)
-    addRing(14.2, 2.25, 28, 0.42)
+    // Scaled up to match the larger mountain mesh.
+    addRing(19.2, 2.55, 34, 0.55)
+    addRing(15.4, 2.40, 30, 0.50)
+    addRing(11.8, 2.20, 26, 0.42)
 
     // Fill (prevent any gap between rings)
     const fill = [
@@ -488,22 +521,14 @@ export class MineManager {
     ]
     for (const p of fill) this._worldColliders.push({ x: p.x, z: p.z, r: 2.25 })
 
-    // Entrance module: block the frame sides and guide into the portal.
-    // Note: entrance faces outward from the mountain center.
-    const dir = new THREE.Vector3(this.entrance.x - cx, 0, this.entrance.z - cz)
-    if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0)
-    dir.normalize()
-    const right = new THREE.Vector3(-dir.z, 0, dir.x)
+    // Timber posts block sides.
+    this._worldColliders.push({ x: this.entrance.x + 0.4, z: this.entrance.z + 2.0, r: 0.55 })
+    this._worldColliders.push({ x: this.entrance.x + 0.4, z: this.entrance.z - 2.0, r: 0.55 })
 
-    // Side blockers near the mouth
-    this._worldColliders.push({ x: this.entrance.x + right.x * 2.1, z: this.entrance.z + right.z * 2.1, r: 0.70 })
-    this._worldColliders.push({ x: this.entrance.x - right.x * 2.1, z: this.entrance.z - right.z * 2.1, r: 0.70 })
-
-    // Short corridor rails (helps funnel player into trigger)
+    // A short "mouth" corridor outside (helps guide into portal)
     for (let k = 0; k < 5; k++) {
-      const fwd = 0.8 + k * 0.9
-      this._worldColliders.push({ x: this.entrance.x + dir.x * fwd + right.x * 3.0, z: this.entrance.z + dir.z * fwd + right.z * 3.0, r: 0.85 })
-      this._worldColliders.push({ x: this.entrance.x + dir.x * fwd - right.x * 3.0, z: this.entrance.z + dir.z * fwd - right.z * 3.0, r: 0.85 })
+      this._worldColliders.push({ x: this.entrance.x + 1.2 + k * 0.9, z: this.entrance.z + 3.0, r: 0.75 })
+      this._worldColliders.push({ x: this.entrance.x + 1.2 + k * 0.9, z: this.entrance.z - 3.0, r: 0.75 })
     }
   }
 
