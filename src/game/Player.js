@@ -315,6 +315,13 @@ export class Player {
     model.add(edge)
     model.add(lash)
 
+    // FX anchor at blade edge
+    const fxAnchor = new THREE.Object3D()
+    fxAnchor.name = 'fxAnchor'
+    fxAnchor.position.set(0.22, 0.68, 0)
+    model.add(fxAnchor)
+    model.userData.fxAnchor = fxAnchor
+
     model.position.set(0.0, -0.12, -0.02)
     model.rotation.set(-0.35, 0.55, 0.10)
     return model
@@ -350,6 +357,13 @@ export class Player {
     model.add(blade)
     model.add(spike)
 
+    // FX anchor at blade edge
+    const fxAnchor = new THREE.Object3D()
+    fxAnchor.name = 'fxAnchor'
+    fxAnchor.position.set(0.22, 0.68, 0)
+    model.add(fxAnchor)
+    model.userData.fxAnchor = fxAnchor
+
     model.position.set(0.0, -0.12, -0.02)
     model.rotation.set(-0.35, 0.55, 0.10)
     return model
@@ -383,6 +397,13 @@ export class Player {
     model.add(tipL)
     model.add(tipR)
 
+    // FX anchor at right tip
+    const fxAnchor = new THREE.Object3D()
+    fxAnchor.name = 'fxAnchor'
+    fxAnchor.position.set(0.40, 0.68, 0)
+    model.add(fxAnchor)
+    model.userData.fxAnchor = fxAnchor
+
     model.position.set(0.0, -0.12, -0.02)
     model.rotation.set(-0.28, 0.40, 0.12)
     return model
@@ -415,6 +436,13 @@ export class Player {
     model.add(head)
     model.add(tipL)
     model.add(tipR)
+
+    // FX anchor at right tip
+    const fxAnchor = new THREE.Object3D()
+    fxAnchor.name = 'fxAnchor'
+    fxAnchor.position.set(0.42, 0.69, 0)
+    model.add(fxAnchor)
+    model.userData.fxAnchor = fxAnchor
 
     model.position.set(0.0, -0.12, -0.02)
     model.rotation.set(-0.28, 0.40, 0.12)
@@ -454,9 +482,12 @@ export class Player {
     const head = new THREE.Mesh(headGeo, headMat)
     head.position.set(0.30, -0.45, -0.50)
 
-    // Flame anchor at the top of the torch head (official origin point).
-    const flameAnchor = new THREE.Object3D()
-    flameAnchor.position.set(0.30, -0.38, -0.50)
+    // FX anchor (same pattern as tools): attach to the torch stick tip.
+    const fxAnchor = new THREE.Object3D()
+    fxAnchor.name = 'fxAnchor'
+    // stick is centered; top is +len/2 (=0.275)
+    fxAnchor.position.set(0, 0.275, 0)
+    stick.add(fxAnchor)
 
     // Flame (simple emissive cone) animated in update()
     const flameGeo = new THREE.ConeGeometry(0.07, 0.18, 10)
@@ -471,11 +502,10 @@ export class Player {
     // Cone points up (+Y). The cone is centered; lift it so its base starts at the anchor.
     flame.position.set(0, 0.09, 0)
     flame.visible = false
-    flameAnchor.add(flame)
+    fxAnchor.add(flame)
 
     torch.add(stick)
     torch.add(head)
-    torch.add(flameAnchor)
     torch.rotation.set(-0.15, 0.25, 0.05)
 
     return { torch, flame }
