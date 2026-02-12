@@ -623,23 +623,26 @@ export class MineManager {
     // Rebuilt mine: one main path (smooth slight descent) + one short branch pocket.
     const o = this.mineOrigin
 
-    const mkCurve = (pts) => {
+    const mkCurve = (pts, tension = 0.22) => {
       const c = new THREE.CatmullRomCurve3(pts)
       c.curveType = 'catmullrom'
-      c.tension = 0.35
+      // Lower tension reduces overshoot (prevents small "up/down" bumps near start).
+      c.tension = tension
       return c
     }
 
-    // Main: smooth slight descent; ends a bit below ground for depth.
+    // Main: gentle monotonic descent (avoid early up/down bump).
     const main = mkCurve([
-      new THREE.Vector3(o.x + 1.0, 1.8, o.z),
+      new THREE.Vector3(o.x + 1.0, 1.80, o.z),
+      // Extra control point to keep the start smooth and slightly descending.
+      new THREE.Vector3(o.x + 3.8, 1.72, o.z + 0.25),
       new THREE.Vector3(o.x + 7.5, 1.55, o.z + 1.2),
       new THREE.Vector3(o.x + 15.5, 1.05, o.z + 6.4),
       new THREE.Vector3(o.x + 25.0, 0.25, o.z + 3.1),
       new THREE.Vector3(o.x + 34.0, -0.55, o.z - 3.0),
       new THREE.Vector3(o.x + 44.0, -1.35, o.z - 0.6),
       new THREE.Vector3(o.x + 56.0, -2.10, o.z + 5.2),
-    ])
+    ], 0.16)
 
     // Branch: short side pocket (readable), no crossing.
     const a = mkCurve([
