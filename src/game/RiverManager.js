@@ -38,12 +38,17 @@ export class RiverManager {
     // Generate a closed loop around the playable area (serpentine circle).
     const pts = []
     const R = radius
-    const amp1 = 3.6
-    const amp2 = 1.8
+    // More serpentine: multi-frequency wobble.
+    const amp1 = 6.2
+    const amp2 = 3.4
+    const amp3 = 1.8
 
     for (let i = 0; i <= segments; i++) {
       const a = (i / segments) * Math.PI * 2
-      const wob = Math.sin(a * 3) * amp1 + Math.sin(a * 7 + 1.7) * amp2
+      const wob =
+        Math.sin(a * 2.2 + 0.4) * amp1 +
+        Math.sin(a * 5.6 + 1.7) * amp2 +
+        Math.sin(a * 11.3 + 2.4) * amp3
       const rr = R + wob
       pts.push(new THREE.Vector3(Math.cos(a) * rr, 0, Math.sin(a) * rr))
     }

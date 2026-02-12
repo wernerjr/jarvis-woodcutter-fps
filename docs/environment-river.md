@@ -14,6 +14,11 @@ O perímetro do mapa é delimitado por um **rio** (visual) + **colisores** (barr
 - `width`: largura visual do rio.
 - `segments`: resolução/curvas (mais = mais suave, custo um pouco maior).
 
+## Grama (faixa de exclusão)
+A grama é limpa em uma **faixa anelar** cobrindo o leito do rio.
+- Implementação: `src/game/GrassManager.js` (`isClear`)
+- Ajuste os raios `86..104` se mudar `radius/width` do rio.
+
 ## Colisão
 - Usamos uma sequência de **círculos XZ** ao longo da margem interna do rio.
 - Objetivo: não ter gaps. Se notar fuga em algum ponto:
