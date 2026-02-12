@@ -193,7 +193,8 @@ export class MineManager {
     // Align local +X (portal depth axis) towards the forest.
     const yaw = Math.atan2(toForest.z, toForest.x)
 
-    g.position.set(this.entrance.x, 0, this.entrance.z)
+    // Push portal slightly outward so wood aligns with the mountain face.
+    g.position.set(this.entrance.x + toForest.x * 0.28, 0, this.entrance.z + toForest.z * 0.28)
     g.rotation.y = yaw
 
     // Carved dark opening (visual depth)
@@ -206,7 +207,7 @@ export class MineManager {
     // Opening volume: thin in depth (X), wide across (Z), so it doesn't sit "inside" the block.
     const mouth = new THREE.Mesh(new THREE.BoxGeometry(1.1, 4.0, 4.6), mouthMat)
     // Slightly inside the wall so the entrance reads carved.
-    mouth.position.set(-0.35, 2.05, 0)
+    mouth.position.set(-0.45, 2.05, 0)
     g.add(mouth)
 
     // 3 wood pieces portal
