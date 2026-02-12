@@ -657,7 +657,7 @@ export class MineManager {
       side: THREE.BackSide,
     })
 
-    const makeTube = (curve, name) => {
+    const makeTube = (curve, name, opts = null) => {
       const tubularSegments = 120
       // More faceted (rectangular feel).
       const radialSegments = 4
@@ -665,17 +665,22 @@ export class MineManager {
 
       // With radialSegments=4 the tunnel can look like a "diamond" (rotated square).
       // Fix by rotating each ring around the local tangent (keeps it aligned along the entire curve).
-      // TubeGeometry exposes tangents/normals/binormals per segment.
+      // Also optionally taper the radius near the start (useful for branch junctions to avoid bumps).
       {
         const pos = geo.attributes.position
         const vtx = new THREE.Vector3()
         const center = new THREE.Vector3()
         const offset = new THREE.Vector3()
         const q = new THREE.Quaternion()
-        const ringAngle = -Math.PI / 4
+        const ringAngle = this._tunnelRingAngle
 
         const rings = tubularSegments
         const ringVerts = radialSegments + 1
+
+        const taper = opts?.taperStart ?? 0
+        const taperMin = opts?.taperMin ?? 1
+
+        const smooth = (x) => x * x * (3 - 2 * x) // smoothstep
 
         for (let i = 0; i <= rings; i++) {
           const t = i / rings
@@ -685,11 +690,18 @@ export class MineManager {
 
           q.setFromAxisAngle(tan, ringAngle)
 
+          let s = 1
+          if (taper > 0 && t <= taper) {
+            const k = smooth(Math.max(0, Math.min(1, t / taper)))
+            s = taperMin + (1 - taperMin) * k
+          }
+
           for (let j = 0; j < ringVerts; j++) {
             const idx = i * ringVerts + j
             vtx.fromBufferAttribute(pos, idx)
             offset.copy(vtx).sub(center)
             offset.applyQuaternion(q)
+            offset.multiplyScalar(s)
             vtx.copy(center).add(offset)
             pos.setXYZ(idx, vtx.x, vtx.y, vtx.z)
           }
@@ -700,7 +712,6 @@ export class MineManager {
       }
 
       // IMPORTANT: keep tunnel corridor clean. Disable vertex noise here to avoid rock-like bumps.
-      // (We keep the low-poly feel via radialSegments=4.)
       geo.computeVertexNormals()
       geo.computeBoundingSphere()
 
@@ -710,7 +721,11 @@ export class MineManager {
     }
 
     return {
-      tunnelMeshes: [makeTube(main, 'MineTunnelMain'), makeTube(a, 'MineTunnelBranchA')],
+      tunnelMeshes: [
+        makeTube(main, 'MineTunnelMain'),
+        // Taper the branch start so it doesn't create a "lombada"/bump inside the main corridor.
+        makeTube(a, 'MineTunnelBranchA', { taperStart: 0.22, taperMin: 0.25 }),
+      ],
       curves,
     }
   }
@@ -833,18 +848,35 @@ export class MineManager {
     // Keep the branch entrance open by skipping the blocking side on the main tunnel near the junction.
     let mainOpts = null
     if (curves[1]) {
-      const tJ = 0.38
-      const mainTan = curves[0].getTangent(tJ).normalize()
-      let mainSide = this._getTunnelSideVec(mainTan)
+      // Find junction t on main by nearest XZ to branch start.
+      const b0 = curves[1].getPoint(0)
+      let bestT = 0.38
+      let bestD2 = Infinity
+      const samples = 80
+      for (let i = 0; i <= samples; i++) {
+        const t = i / samples
+        const p = curves[0].getPoint(t)
+        const dx = p.x - b0.x
+        const dz = p.z - b0.z
+        const d2 = dx * dx + dz * dz
+        if (d2 < bestD2) {
+          bestD2 = d2
+          bestT = t
+        }
+      }
 
+      const mainTan = curves[0].getTangent(bestT).normalize()
+      const mainSide = this._getTunnelSideVec(mainTan)
       const bTan = curves[1].getTangent(0).normalize()
       const s = Math.sign(bTan.dot(mainSide)) || 1
-      mainOpts = { t0: tJ - 0.09, t1: tJ + 0.09, skipSide: s }
+
+      // Wider window: make sure the branch is both visible and enterable.
+      mainOpts = { t0: bestT - 0.14, t1: bestT + 0.14, skipSide: s }
     }
 
     addWalls(curves[0], 26, 0, 1, mainOpts)
     // Skip the first portion of branch so junction doesn't get blocked by wall-colliders.
-    if (curves[1]) addWalls(curves[1], 18, 0.22, 1)
+    if (curves[1]) addWalls(curves[1], 18, 0.18, 1)
 
     // Caps to prevent walking off ends.
     const endMain = curves[0].getPoint(1)
