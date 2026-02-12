@@ -40,6 +40,17 @@ export class MineManager {
     // Teleport targets
     this.spawnMine = new THREE.Vector3(this.mineOrigin.x + 2.2, 1.65, this.mineOrigin.z)
     this.spawnWorld = new THREE.Vector3(this.entrance.x - 2.6, 1.65, this.entrance.z)
+
+    // Interior should be hidden by default (only visible when player is inside the mine).
+    this._interiorVisible = false
+  }
+
+  /** @param {boolean} v */
+  setInteriorVisible(v) {
+    this._interiorVisible = !!v
+    if (this._mineGroup) this._mineGroup.visible = this._interiorVisible
+    if (this._lights) this._lights.visible = this._interiorVisible
+    if (this._amb) this._amb.visible = this._interiorVisible
   }
 
   init() {
@@ -73,6 +84,9 @@ export class MineManager {
     this.scene.add(this._mineGroup)
     this.scene.add(this._lights)
     this.scene.add(this._amb)
+
+    // Apply current visibility (interior hidden by default).
+    this.setInteriorVisible(this._interiorVisible)
 
     // --- Collision ---
     this._buildWorldColliders()

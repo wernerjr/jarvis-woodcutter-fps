@@ -170,6 +170,8 @@ export class Game {
     this.rocks.init({ seed: 2026, count: 32, radius: 45 })
 
     this.mine.init()
+    // Hide interior while in the world (prevents reaching it by walking out of bounds).
+    this.mine.setInteriorVisible(false)
     this.ores.init({ points: this.mine.getOreSpawnPoints() })
 
     this.grass.init({ seed: 909, radius: 92 })
@@ -1257,10 +1259,12 @@ export class Game {
 
         if (this._fade.toMine) {
           this._inMine = true
+          this.mine.setInteriorVisible(true)
           this.player.position.copy(this.mine.spawnMine)
           this.player.velocity.set(0, 0, 0)
         } else {
           this._inMine = false
+          this.mine.setInteriorVisible(false)
           this.player.position.copy(this.mine.spawnWorld)
           this.player.velocity.set(0, 0, 0)
         }
