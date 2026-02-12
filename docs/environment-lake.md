@@ -8,8 +8,9 @@ Em um trecho do perímetro, a curva do rio pode dar a impressão de “fim”/co
 
 ## Implementação
 - Visual + colisores: `src/game/LakeManager.js`
-  - Mesh simples (elipse) com material igual ao do rio.
-  - Colisão: círculos XZ ao redor do perímetro + midpoints, com 2 faixas para evitar vazamento em diagonal.
+  - Mesh do lago é um **blob orgânico** (não é elipse perfeita), gerado por um shape com wobble (parece mais natural/serpenteante).
+  - Material é igual ao do rio.
+  - Colisão: círculos XZ ao longo do perímetro do blob + midpoints, com 2 faixas para evitar vazamento em diagonal.
 - Integração:
   - `Game.start()` inicializa o lago: `this.lake.init(...)`
   - `Game._loop()` adiciona `lake.getColliders()` junto com os colliders do rio (fora da mina).
