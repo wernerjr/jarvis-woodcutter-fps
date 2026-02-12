@@ -31,7 +31,9 @@ Só aparece quando existe um alvo válido em alcance (mesmo raycast/alcance da i
   - **Destruir**
 
 ## Implementação
-- Seleção da roda é **100% angular** (centro→mouse): índice = `floor(angle / (360/N))`. Sempre existe **exatamente 1** fatia ativa; as demais ficam esmaecidas.
+- Seleção da roda é **puramente angular** (centro→mouse): índice = `floor(angle / (360/N))`.
+  - O **raio é ignorado**: qualquer ponto dentro do setor (do centro até a borda) escolhe a mesma ação.
+  - Sempre existe **exatamente 1** fatia ativa; as demais ficam esmaecidas.
 - `src/game/Game.js`: lógica de tap/hold + seleção angular da roda
 - `src/game/UI.js`: `setInteractHint`, `setWheelActions`, `setWheelActive`
 - `index.html` / `src/style.css`: overlay `#actionWheel` e estilo

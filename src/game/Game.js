@@ -452,11 +452,14 @@ export class Game {
     const dx = x - cx
     const dy = y - cy
 
-    // Always pick exactly one slice when wheel is open (no "between" state).
-    // (Only degenerate case is exactly at center; treat as angle 0.)
+    // Selection is purely angular (radius ignored): any point within the slice selects it.
+    // Degenerate case: exactly at center -> treat as pointing up.
     const d = Math.hypot(dx, dy)
+    let ndx = dx
+    let ndy = dy
     if (d < 0.001) {
-      // keep dx/dy effectively pointing up
+      ndx = 0
+      ndy = -1
     }
 
     const actions = this._wheelActions || []
@@ -468,7 +471,7 @@ export class Game {
     }
 
     // Equal segments: 360 / N. Angle 0 = up.
-    const ang = Math.atan2(dy, dx) // radians, 0 at right
+    const ang = Math.atan2(ndy, ndx) // radians, 0 at right
     let deg = (ang * 180) / Math.PI
     deg = (deg + 450) % 360 // shift so 0 is up
 
