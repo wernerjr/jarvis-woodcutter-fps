@@ -113,8 +113,9 @@ body.state-menu #hud{display:none;}
 .wheelCenter{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:54px;border-radius:999px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-weight:800;z-index:3}
 
 /* dynamic labels */
-.wheelLabel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.35);font-weight:800;min-width:96px;text-align:center;user-select:none;pointer-events:none;z-index:2}
-.wheelLabel.active{outline:2px solid rgba(255,182,106,.7);background:rgba(255,182,106,.10)}
+.wheelLabel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.35);font-weight:800;min-width:96px;text-align:center;user-select:none;pointer-events:none;z-index:2;transition:opacity .08s ease, filter .08s ease}
+.wheelLabel.dim{opacity:.45;filter:saturate(.7) brightness(.9)}
+.wheelLabel.active{opacity:1;outline:2px solid rgba(255,182,106,.7);background:rgba(255,182,106,.10)}
 .wheelLabel.danger{border-color:rgba(255,120,120,.35)}
 .wheelLabel.danger.active{outline-color:rgba(255,120,120,.85);background:rgba(255,120,120,.10)}
 

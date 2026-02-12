@@ -452,11 +452,11 @@ export class Game {
     const dx = x - cx
     const dy = y - cy
 
+    // Always pick exactly one slice when wheel is open (no "between" state).
+    // (Only degenerate case is exactly at center; treat as angle 0.)
     const d = Math.hypot(dx, dy)
-    if (d < 28) {
-      this._wheelAction = null
-      this.ui.setWheelActive?.(null)
-      return
+    if (d < 0.001) {
+      // keep dx/dy effectively pointing up
     }
 
     const actions = this._wheelActions || []
