@@ -682,11 +682,15 @@ export class MineManager {
             pos.setXYZ(idx, vtx.x, vtx.y, vtx.z)
           }
         }
+
+        // We modified geometry positions: ensure normals/bounds are rebuilt.
+        pos.needsUpdate = true
       }
 
       // IMPORTANT: keep tunnel corridor clean. Disable vertex noise here to avoid rock-like bumps.
       // (We keep the low-poly feel via radialSegments=4.)
       geo.computeVertexNormals()
+      geo.computeBoundingSphere()
 
       const tunnel = new THREE.Mesh(geo, mat)
       tunnel.name = name
@@ -780,7 +784,7 @@ export class MineManager {
 
     const up = new THREE.Vector3(0, 1, 0)
 
-    const addWalls = (curve, samples, tStart = 0, tEnd = 1) => {
+    const addWalls = (curve, samples, tStart = 0, tEnd = 1, opts = null) => {
       const wallR = 0.85
       for (let i = 0; i <= samples; i++) {
         const t = tStart + (i / samples) * (tEnd - tStart)
@@ -792,8 +796,14 @@ export class MineManager {
         n.normalize()
 
         const off = this._tunnelRadius - 0.35
-        this._mineColliders.push({ x: p.x + n.x * off, z: p.z + n.z * off, r: wallR })
-        this._mineColliders.push({ x: p.x - n.x * off, z: p.z - n.z * off, r: wallR })
+
+        // Optional: keep junction open by skipping one side in a t-window.
+        const inJ = opts && t >= opts.t0 && t <= opts.t1
+        const skipPos = inJ && opts.skipSide === 1
+        const skipNeg = inJ && opts.skipSide === -1
+
+        if (!skipPos) this._mineColliders.push({ x: p.x + n.x * off, z: p.z + n.z * off, r: wallR })
+        if (!skipNeg) this._mineColliders.push({ x: p.x - n.x * off, z: p.z - n.z * off, r: wallR })
 
         // Add midpoints to reduce diagonal clipping.
         if (i < samples) {
@@ -803,15 +813,34 @@ export class MineManager {
           let n2 = new THREE.Vector3().crossVectors(up, tan2)
           if (n2.lengthSq() < 1e-6) n2.set(1, 0, 0)
           n2.normalize()
-          this._mineColliders.push({ x: p2.x + n2.x * off, z: p2.z + n2.z * off, r: wallR })
-          this._mineColliders.push({ x: p2.x - n2.x * off, z: p2.z - n2.z * off, r: wallR })
+
+          const inJ2 = opts && t2 >= opts.t0 && t2 <= opts.t1
+          const skipPos2 = inJ2 && opts.skipSide === 1
+          const skipNeg2 = inJ2 && opts.skipSide === -1
+
+          if (!skipPos2) this._mineColliders.push({ x: p2.x + n2.x * off, z: p2.z + n2.z * off, r: wallR })
+          if (!skipNeg2) this._mineColliders.push({ x: p2.x - n2.x * off, z: p2.z - n2.z * off, r: wallR })
         }
       }
     }
 
-    addWalls(curves[0], 26)
+    // Keep the branch entrance open by skipping the blocking side on the main tunnel near the junction.
+    let mainOpts = null
+    if (curves[1]) {
+      const tJ = 0.38
+      const mainTan = curves[0].getTangent(tJ)
+      let mainSide = new THREE.Vector3().crossVectors(up, mainTan)
+      if (mainSide.lengthSq() < 1e-6) mainSide.set(1, 0, 0)
+      mainSide.normalize()
+
+      const bTan = curves[1].getTangent(0).normalize()
+      const s = Math.sign(bTan.dot(mainSide)) || 1
+      mainOpts = { t0: tJ - 0.09, t1: tJ + 0.09, skipSide: s }
+    }
+
+    addWalls(curves[0], 26, 0, 1, mainOpts)
     // Skip the first portion of branch so junction doesn't get blocked by wall-colliders.
-    if (curves[1]) addWalls(curves[1], 18, 0.32, 1)
+    if (curves[1]) addWalls(curves[1], 18, 0.22, 1)
 
     // Caps to prevent walking off ends.
     const endMain = curves[0].getPoint(1)
