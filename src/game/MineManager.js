@@ -651,27 +651,42 @@ export class MineManager {
       side: THREE.BackSide,
     })
 
-    // Use simple rectangular corridor volumes (no tube twist). This keeps the mine clean and readable.
+    // Use simple rectangular corridor volumes (no tube twist). Build it in segments so it follows curves.
     const makeBoxTunnel = (curve, name, w = 4.6, h = 4.0) => {
-      const p0 = curve.getPoint(0)
-      const p1 = curve.getPoint(1)
-      const dir = new THREE.Vector3().subVectors(p1, p0)
-      const len = dir.length()
-      if (len < 0.001) return new THREE.Group()
-      dir.normalize()
+      const g = new THREE.Group()
+      g.name = name
 
-      const geo = new THREE.BoxGeometry(w, h, len, 1, 1, 1)
-      const m = new THREE.Mesh(geo, mat)
-      m.name = name
+      // Segment length tuned for smooth curves without gaps.
+      const segs = 14
+      const overlap = 0.35
 
-      // Align box local +Z to the corridor direction.
-      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir)
-      m.quaternion.copy(q)
+      for (let i = 0; i < segs; i++) {
+        const t0 = i / segs
+        const t1 = (i + 1) / segs
 
-      // Center between endpoints.
-      m.position.set((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5 + h * 0.5, (p0.z + p1.z) * 0.5)
+        const p0 = curve.getPoint(t0)
+        const p1 = curve.getPoint(t1)
 
-      return m
+        const dir = new THREE.Vector3().subVectors(p1, p0)
+        const len = dir.length()
+        if (len < 0.001) continue
+        dir.normalize()
+
+        const segLen = len + overlap
+        const geo = new THREE.BoxGeometry(w, h, segLen, 1, 1, 1)
+        const m = new THREE.Mesh(geo, mat)
+
+        // Align box local +Z to segment direction.
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir)
+        m.quaternion.copy(q)
+
+        // Center at mid-point of the segment.
+        m.position.set((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5 + h * 0.5, (p0.z + p1.z) * 0.5)
+
+        g.add(m)
+      }
+
+      return g
     }
 
     return {
