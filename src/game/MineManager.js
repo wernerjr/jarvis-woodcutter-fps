@@ -108,6 +108,7 @@ export class MineManager {
     this._curves = curves
     for (const m of tunnelMeshes) this._mineGroup.add(m)
     this._makeSupportsAndLamps(curves)
+    this._mineGroup.add(this._makeSquareEntranceMouth(curves[0]))
     this._mineGroup.add(this._makeEntranceBackdrop())
     this._mineGroup.add(this._makeMineEndCap(curves[0]))
     this._mineGroup.add(this._makeMineEndRubble(curves[0]))
@@ -651,12 +652,12 @@ export class MineManager {
       const radialSegments = 6
       const geo = new THREE.TubeGeometry(curve, tubularSegments, this._tunnelRadius, radialSegments, false)
 
-      // Slight vertex noise to break perfect tube
+      // Slight vertex noise to break perfect tube (keep subtle to avoid "rocks" intruding into the path)
       const pos = geo.attributes.position
       const v = new THREE.Vector3()
       for (let i = 0; i < pos.count; i++) {
         v.fromBufferAttribute(pos, i)
-        const n = Math.sin(v.x * 0.9 + v.z * 1.1) * 0.12 + Math.sin(v.x * 2.1 - v.z * 1.7) * 0.06
+        const n = Math.sin(v.x * 0.9 + v.z * 1.1) * 0.05 + Math.sin(v.x * 2.1 - v.z * 1.7) * 0.03
         v.y += n
         pos.setXYZ(i, v.x, v.y, v.z)
       }
@@ -802,6 +803,30 @@ export class MineManager {
     // Entry "posts" inside mine (avoid clipping near portal)
     this._mineColliders.push({ x: this.mineOrigin.x + 1.0, z: this.mineOrigin.z + 2.4, r: 0.8 })
     this._mineColliders.push({ x: this.mineOrigin.x + 1.0, z: this.mineOrigin.z - 2.4, r: 0.8 })
+  }
+
+  /** @param {THREE.CatmullRomCurve3} curve */
+  _makeSquareEntranceMouth(curve) {
+    // Make the mine entrance inside feel square, matching the portal opening size.
+    // Purely visual; keep corridor clear.
+    const g = new THREE.Group()
+    g.name = 'MineSquareMouth'
+
+    const o = this.mineOrigin
+    const tan = curve.getTangent(0).normalize()
+
+    // Matches exterior mouth (approx): height ~4.0, width ~4.6.
+    const inner = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 4.2, 4.9),
+      new THREE.MeshStandardMaterial({ color: 0x0b0b10, roughness: 1.0, metalness: 0.0, side: THREE.BackSide })
+    )
+
+    // Place right after the portal exit.
+    inner.position.set(o.x + 0.95, 2.05, o.z)
+    inner.rotation.y = Math.atan2(tan.x, tan.z)
+
+    g.add(inner)
+    return g
   }
 
   _makeEntranceBackdrop() {
