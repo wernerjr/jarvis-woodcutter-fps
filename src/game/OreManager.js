@@ -69,11 +69,11 @@ export class OreManager {
       // Orient to wall if normal provided.
       if (typeof p.nx === 'number' && typeof p.nz === 'number') {
         const n = new THREE.Vector3(p.nx, p.ny ?? 0, p.nz).normalize()
-        // Normal points inward (towards tunnel center). We want the vein to protrude OUT of the wall,
-        // so we orient the mesh to face inward and then flip 180deg.
+        // Normal points inward (towards tunnel center). Orient the vein to face inward,
+        // and push the whole cluster slightly outward so it doesn't end up hidden inside the wall.
         const target = new THREE.Vector3(p.x + n.x, p.y + n.y, p.z + n.z)
         mesh.lookAt(target)
-        mesh.rotateY(Math.PI)
+        mesh.position.addScaledVector(n, -0.10)
       } else {
         mesh.rotation.y = Math.random() * Math.PI * 2
       }
@@ -85,7 +85,7 @@ export class OreManager {
         s.position.set(
           (Math.random() - 0.5) * 0.58,
           (Math.random() - 0.5) * 0.78,
-          0.06 + Math.random() * 0.16
+          -(0.06 + Math.random() * 0.16)
         )
         s.rotation.set((Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.85)
         s.scale.set(0.8 + Math.random() * 0.9, 0.8 + Math.random() * 0.9, 0.8 + Math.random() * 0.9)
