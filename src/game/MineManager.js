@@ -729,11 +729,11 @@ export class MineManager {
       const len = 1.35
       const r = this._tunnelRadius * 0.92
       const geo = new THREE.CylinderGeometry(r, r, len, 4, 1, true)
+      // Align the 4 sides with the tunnel ring orientation BEFORE aligning to tangent.
+      geo.rotateY(this._tunnelRingAngle)
       // Align cylinder Y axis to tangent.
       const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan)
       geo.applyQuaternion(q)
-      // Align the 4 sides with the tunnel ring orientation.
-      geo.rotateOnAxis(tan, this._tunnelRingAngle)
 
       const sleeve = new THREE.Mesh(geo, mat)
       sleeve.name = name
