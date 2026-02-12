@@ -118,6 +118,9 @@ export class Game {
     this._onPointerLockChange = () => this._onPlockChange()
     this._onMouseDown = (e) => this._onMouseDownAny(e)
     this._onMouseUp = (e) => this._onMouseUpAny(e)
+    this._onCanvasClick = (e) => this._onCanvasClickAny(e)
+
+    this._suppressMouseDownUntil = 0
 
     // Hotbar items (separate container). Slot 0 is fixed hand.
     this.hotbar = Array.from({ length: 10 }, (_, i) => (i === 0 ? { id: 'hand', qty: 1 } : null))
@@ -160,6 +163,10 @@ export class Game {
     // Mouse button: hold-to-act
     this.canvas.addEventListener('mousedown', this._onMouseDown)
     window.addEventListener('mouseup', this._onMouseUp)
+
+    // UX: if we're in playing mode but pointer lock is not active (cursor visible),
+    // a single click should re-enter the game (request pointer lock).
+    this.canvas.addEventListener('click', this._onCanvasClick)
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
 
     this.world.init()
@@ -210,6 +217,7 @@ export class Game {
     window.removeEventListener('mousemove', this._onMouseMoveUI)
     this.canvas.removeEventListener('mousedown', this._onMouseDown)
     window.removeEventListener('mouseup', this._onMouseUp)
+    this.canvas.removeEventListener('click', this._onCanvasClick)
   }
 
   _resize() {
@@ -611,8 +619,24 @@ export class Game {
     this.ui.toast('Fogueira apagada.', 900)
   }
 
+  _onCanvasClickAny(e) {
+    if (this.state !== 'playing') return
+
+    // Only relock when no modal/menu is open (state===playing), and we're currently unlocked.
+    if (document.pointerLockElement === this.canvas) return
+
+    // Request pointer lock (browser may require user gesture => click).
+    this._attemptRelock()
+
+    // Prevent this same click from also triggering a swing/place action via mousedown.
+    this._suppressMouseDownUntil = performance.now() + 160
+
+    e.preventDefault?.()
+  }
+
   _onMouseDownAny(e) {
     if (this.state !== 'playing') return
+    if (performance.now() < (this._suppressMouseDownUntil || 0)) return
     if (document.pointerLockElement !== this.canvas) return
 
     // Left mouse: placement hold
@@ -1815,7 +1839,7 @@ export class Game {
     this.trees.update(simDt)
     this.rocks.update(simDt)
     this.fires.update(simDt)
-    this.forges.update(forgeDt)
+    this.forges.update(forgeDt, this.camera)
     this.ores.update(simDt)
     this.grass.update(simDt, this.player.position)
     this.river.update(dt)

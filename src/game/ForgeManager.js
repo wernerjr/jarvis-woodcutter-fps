@@ -95,6 +95,7 @@ export class ForgeManager {
       opacity: 0.0,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
     })
 
     const firePlanes = []
@@ -115,6 +116,7 @@ export class ForgeManager {
       transparent: true,
       opacity: 0.0,
       depthWrite: false,
+      side: THREE.DoubleSide,
     })
 
     const smokePlanes = []
@@ -246,10 +248,13 @@ export class ForgeManager {
     return true
   }
 
-  /** @param {number} dt */
-  update(dt) {
+  /** @param {number} dt @param {THREE.Camera} camera */
+  update(dt, camera) {
     if (dt <= 0) return
     this._t += dt
+
+    const camPos = new THREE.Vector3()
+    if (camera) camera.getWorldPosition(camPos)
 
     for (const f of this._forges.values()) {
       // burn down (only while enabled)
@@ -298,10 +303,10 @@ export class ForgeManager {
 
       const vfxOn = this._t < (f.vfx.activeUntil || 0)
 
-      // Fire: few additive planes, billboard-ish
+      // Fire: few additive planes, billboard to camera
       for (let i = 0; i < firePlanes.length; i++) {
         const p = firePlanes[i]
-        p.lookAt(0, p.position.y, 2)
+        if (camera) p.lookAt(camPos)
         const wob = 0.85 + 0.25 * Math.sin(this._t * (6.5 + i))
         p.scale.set(1, wob, 1)
         p.material.opacity = vfxOn ? (0.55 + 0.25 * flick) * Math.min(1, f.burn / 6) : 0.0
@@ -354,7 +359,7 @@ export class ForgeManager {
         s.vz *= 0.98
 
         const p = Math.min(1, s.age / s.life)
-        m.lookAt(0, m.position.y, 2)
+        if (camera) m.lookAt(camPos)
         m.scale.setScalar((m.scale.x || 1) * (1.0 + dt * 0.15))
         m.material.opacity = (1 - p) * 0.22
 

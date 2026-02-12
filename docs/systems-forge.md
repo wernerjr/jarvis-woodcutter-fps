@@ -12,6 +12,9 @@
   - UI atualiza em tempo real (status por tick + slots via flag `dirty`).
   - VFX: fogo e fumaça apenas quando processamento está ativo.
 
+## VFX (360°)
+Os planos de fogo/fumaça são **DoubleSide** e fazem **billboard** para a câmera (assim aparecem de todos os ângulos).
+
 ## Mesa de Forja — crafting de metal
 - Código: `src/game/ForgeTableManager.js` (+ ghost).
 - UI: modal `#forgeTable` (lista de receitas metal).
