@@ -176,9 +176,8 @@ export class Player {
   /**
    * @param {number} dt
    * @param {{x:number,z:number,r:number}[]} colliders
-   * @param {(x:number,z:number)=>number} [groundYFn] world-space ground height (y) at XZ
    */
-  update(dt, colliders = [], groundYFn = null) {
+  update(dt, colliders = []) {
     // Correct FPS convention: W forward, S backward.
     // (Three.js camera faces -Z; we map forward to -Z.)
     const forward = Number(this._keys.has('KeyS')) - Number(this._keys.has('KeyW'))
@@ -210,11 +209,8 @@ export class Player {
     this._vy += this.gravity * dt
     next.y = this.position.y + this._vy * dt
 
-    const groundY = typeof groundYFn === 'function' ? (groundYFn(next.x, next.z) || 0) : 0
-    const floorY = groundY + this.eyeHeight
-
-    if (next.y <= floorY) {
-      next.y = floorY
+    if (next.y <= this.eyeHeight) {
+      next.y = this.eyeHeight
       this._vy = 0
       this._onGround = true
     } else {

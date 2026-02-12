@@ -1751,8 +1751,7 @@ export class Game {
           // Lake is decorative; collision boundary is enforced by the river.
       : []
 
-    const groundYFn = this._inMine ? null : (x, z) => this.mine.getWorldHeight?.(x, z) ?? 0
-    this.player.update(simDt, colliders, groundYFn)
+    this.player.update(simDt, colliders)
 
     // Torch durability + light intensity (mainly useful at night)
     const night = 1 - this.time.getDayFactor()
