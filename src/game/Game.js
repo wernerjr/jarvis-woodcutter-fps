@@ -176,7 +176,7 @@ export class Game {
     this.river.init({ radius: 96, width: 8, segments: 240 })
     // Lake patch near the river seam to remove the perceived "end" of the river.
     // Keep it small (close to river width) and slightly organic.
-    this.lake.init({ center: { x: 102, z: 0 }, baseR: 7.2 })
+    this.lake.init({ center: { x: 102, z: 0 }, baseR: 6.2 })
 
     this._ensureFadeOverlay()
 

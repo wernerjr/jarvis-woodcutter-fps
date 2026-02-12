@@ -16,5 +16,7 @@ Em um trecho do perímetro, a curva do rio pode dar a impressão de “fim”/co
   - `Game._loop()` adiciona `lake.getColliders()` junto com os colliders do rio (fora da mina).
 
 ## Ajustes
-- Posição e tamanho: `center`, `rx`, `rz` em `LakeManager`.
-- Se houver vazamento (raro), aumentar raio das faixas em `colliderBands`.
+- Posição e tamanho: `center` e `baseR` em `LakeManager` (o lago é um blob orgânico).
+- Distância que o player consegue chegar da água:
+  - ajuste `colliderBands` (offset/raios). Um offset levemente **negativo** coloca o colisor mais para dentro do lago, permitindo chegar mais perto da margem.
+- Se houver vazamento (raro), aumente um pouco os raios das faixas e/ou os midpoints.

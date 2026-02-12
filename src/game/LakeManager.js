@@ -16,7 +16,7 @@ export class LakeManager {
     // Tunables
     this.center = new THREE.Vector3(102, 0, 0)
     // Base radius (keep close to river width ~8, so lake is small)
-    this.baseR = 7.2
+    this.baseR = 6.2
     this.y = 0.021
 
     // Organic wobble (makes it look more natural than a perfect oval)
@@ -26,9 +26,11 @@ export class LakeManager {
     this.amp3 = 0.35
 
     // collider tuning (thick enough to block, but not huge)
+    // Colliders should sit close to the shoreline (like the river), so the player can approach the water.
+    // Use one band slightly inward + one slightly outward to avoid diagonal leaks.
     this.colliderBands = [
-      { off: 0.0, r: 3.3 },
-      { off: 1.2, r: 2.7 },
+      { off: -0.35, r: 2.6 },
+      { off: 0.85, r: 2.2 },
     ]
 
     this._t = 0
