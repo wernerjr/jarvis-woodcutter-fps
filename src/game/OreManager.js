@@ -8,6 +8,10 @@ export class OreManager {
     this._nodes = new Map()
     this._ray = new THREE.Raycaster()
 
+    this._group = new THREE.Group()
+    this._group.name = 'OreNodes'
+    this._visible = true
+
     this._t = 0
     this._respawnSeconds = 90
 
@@ -15,9 +19,23 @@ export class OreManager {
     this.oreHpMax = 34
   }
 
+  /** @param {boolean} v */
+  setVisible(v) {
+    this._visible = !!v
+    if (this._group) this._group.visible = this._visible
+  }
+
   /** @param {{seed?:number, points:{x:number,y:number,z:number}[]}} params */
   init({ points }) {
     this.resetAll()
+
+    // Ensure group is attached (visibility is toggled by Game when entering/exiting mine).
+    if (!this._group) {
+      this._group = new THREE.Group()
+      this._group.name = 'OreNodes'
+    }
+    this.scene.add(this._group)
+    this._group.visible = this._visible
 
     const geo = new THREE.DodecahedronGeometry(0.95, 0)
     const mat = new THREE.MeshStandardMaterial({
@@ -54,7 +72,7 @@ export class OreManager {
         mesh.add(v)
       }
 
-      this.scene.add(mesh)
+      this._group.add(mesh)
 
       const maxHp = this._randInt(this.oreHpMin, this.oreHpMax)
       this._nodes.set(String(i), { mesh, hp: maxHp, maxHp, respawn: 0 })
@@ -64,11 +82,19 @@ export class OreManager {
   resetAll() {
     for (const n of this._nodes.values()) n.mesh.removeFromParent()
     this._nodes.clear()
+
+    if (this._group) {
+      this._group.removeFromParent()
+      this._group = new THREE.Group()
+      this._group.name = 'OreNodes'
+      this._group.visible = this._visible
+    }
   }
 
   /** @param {number} dt */
   update(dt) {
     if (dt <= 0) return
+    if (!this._visible) return
     this._t += dt
 
     for (const n of this._nodes.values()) {
@@ -93,6 +119,7 @@ export class OreManager {
 
   /** @param {THREE.Camera} camera */
   raycastFromCamera(camera) {
+    if (!this._visible) return null
     const origin = new THREE.Vector3()
     const dir = new THREE.Vector3()
     camera.getWorldPosition(origin)

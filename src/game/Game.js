@@ -172,7 +172,10 @@ export class Game {
     this.mine.init()
     // Hide interior while in the world (prevents reaching it by walking out of bounds).
     this.mine.setInteriorVisible(false)
+
     this.ores.init({ points: this.mine.getOreSpawnPoints() })
+    // Ores belong to the mine interior; hide them while outside.
+    this.ores.setVisible(false)
 
     this.grass.init({ seed: 909, radius: 92 })
     this.river.init({ radius: 96, width: 8, segments: 240 })
@@ -815,6 +818,7 @@ export class Game {
     this.forges.resetAll()
     this.ores.resetAll()
     this.ores.init({ points: this.mine.getOreSpawnPoints() })
+    this.ores.setVisible(false)
     this.player.reset()
 
     this.selectHotbar(0)
@@ -1260,11 +1264,13 @@ export class Game {
         if (this._fade.toMine) {
           this._inMine = true
           this.mine.setInteriorVisible(true)
+          this.ores.setVisible(true)
           this.player.position.copy(this.mine.spawnMine)
           this.player.velocity.set(0, 0, 0)
         } else {
           this._inMine = false
           this.mine.setInteriorVisible(false)
+          this.ores.setVisible(false)
           this.player.position.copy(this.mine.spawnWorld)
           this.player.velocity.set(0, 0, 0)
         }

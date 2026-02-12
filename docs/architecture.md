@@ -18,3 +18,5 @@
 
 ## Nota: interior da mina
 O interior da mina existe no mesmo `scene`, porém fica **invisível** enquanto o player está no mundo externo. Ao entrar no portal, o `Game` habilita a visibilidade via `MineManager.setInteriorVisible(true)`.
+
+Minérios (`OreManager`) também são tratados como conteúdo do interior: ficam invisíveis fora da mina e são habilitados/desabilitados junto com o portal.
