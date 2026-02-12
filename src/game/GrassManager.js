@@ -99,7 +99,7 @@ export class GrassManager {
       // around main forest center (keep sightlines)
       { x: 0, z: 0, r: 5 },
       // mine region (approx)
-      { x: 58, z: -18, r: 18 },
+      { x: 58, z: -18, r: 22 },
       // trail corridor to mine (rough) — keep path readable
       { x: 36, z: -14, r: 7 },
       { x: 34, z: -24, r: 7 },
