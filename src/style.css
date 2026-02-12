@@ -107,14 +107,13 @@ body.state-menu #hud{display:none;}
 #wheel{display:none;}
 #actionWheel.overlay{background:rgba(0,0,0,.45)}
 .wheel{position:relative;width:320px;height:320px;border-radius:50%;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);backdrop-filter: blur(6px)}
-.wheelCenter{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:54px;border-radius:999px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-weight:800}
-.wheelItem{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.35);font-weight:800;min-width:96px;text-align:center}
-.wheelItem[data-slot="up"]{top:18%}
-.wheelItem[data-slot="left"]{left:20%}
-.wheelItem[data-slot="right"]{left:80%}
-.wheelItem.active{outline:2px solid rgba(255,182,106,.7);background:rgba(255,182,106,.10)}
-.wheelItem.danger{border-color:rgba(255,120,120,.35)}
-.wheelItem.danger.active{outline-color:rgba(255,120,120,.85);background:rgba(255,120,120,.10)}
+.wheelCenter{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:54px;border-radius:999px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-weight:800;z-index:3}
+
+/* dynamic labels */
+.wheelLabel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.35);font-weight:800;min-width:96px;text-align:center;user-select:none;pointer-events:none;z-index:2}
+.wheelLabel.active{outline:2px solid rgba(255,182,106,.7);background:rgba(255,182,106,.10)}
+.wheelLabel.danger{border-color:rgba(255,120,120,.35)}
+.wheelLabel.danger.active{outline-color:rgba(255,120,120,.85);background:rgba(255,120,120,.10)}
 
 /* Forge UI */
 body.forge-open #forge.overlay{display:flex;}

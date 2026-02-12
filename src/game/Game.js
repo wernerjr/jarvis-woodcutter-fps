@@ -138,6 +138,7 @@ export class Game {
     this._wheelOpen = false
     this._wheelAction = null
     this._wheelTarget = null
+    this._wheelActions = []
 
     this._onKeyDown = (e) => this._onKeyDownAny(e)
     this._onKeyUp = (e) => this._onKeyUpAny(e)
@@ -385,23 +386,26 @@ export class Game {
 
     if (target.kind === 'campfire') {
       const lit = this.fires.isLit(target.id)
+      // No pickup for campfire.
       return [
-        { slot: 'up', id: 'primary', label: lit ? 'Apagar' : 'Acender' },
-        { slot: 'right', id: 'destroy', label: 'Destruir', danger: true },
+        { id: 'primary', label: lit ? 'Apagar' : 'Acender' },
+        { id: 'destroy', label: 'Destruir', danger: true },
       ]
     }
 
     // forge / forgeTable
     return [
-      { slot: 'up', id: 'open', label: 'Abrir' },
-      { slot: 'left', id: 'pickup', label: 'Recolher' },
-      { slot: 'right', id: 'destroy', label: 'Destruir', danger: true },
+      { id: 'open', label: 'Abrir' },
+      { id: 'pickup', label: 'Recolher' },
+      { id: 'destroy', label: 'Destruir', danger: true },
     ]
   }
 
   _openWheel(target) {
     const actions = this._wheelActionsFor(target)
     if (!actions.length) return
+
+    this._wheelActions = actions
 
     this._wheelOpen = true
     this.state = 'wheel'
@@ -425,6 +429,7 @@ export class Game {
     this._wheelOpen = false
     this._wheelAction = null
     this._wheelTarget = null
+    this._wheelActions = []
 
     this.ui.hideWheel?.()
     this.ui.setInteractHint(null)
@@ -454,17 +459,24 @@ export class Game {
       return
     }
 
-    // Map to 3 sectors: up / left / right.
-    let next = null
-    if (dy < -Math.abs(dx) * 0.6) next = 'up'
-    else if (dx < 0) next = 'left'
-    else next = 'right'
+    const actions = this._wheelActions || []
+    const n = actions.length
+    if (!n) {
+      this._wheelAction = null
+      this.ui.setWheelActive?.(null)
+      return
+    }
 
-    const root = this.ui.els?.actionWheelEl
-    const el = root?.querySelector(`.wheelItem[data-slot="${next}"]`)
-    const actionId = el?.getAttribute('data-action') || null
+    // Equal segments: 360 / N. Angle 0 = up.
+    const ang = Math.atan2(dy, dx) // radians, 0 at right
+    let deg = (ang * 180) / Math.PI
+    deg = (deg + 450) % 360 // shift so 0 is up
 
-    this._wheelAction = actionId || null
+    const step = 360 / n
+    const idx = Math.floor(deg / step)
+    const actionId = actions[idx]?.id || null
+
+    this._wheelAction = actionId
     this.ui.setWheelActive?.(this._wheelAction)
   }
 
@@ -507,7 +519,12 @@ export class Game {
 
   _runWheelAction(t, action) {
     if (action === 'open') return this._interactPrimary(t)
-    if (action === 'primary') return this._interactPrimary(t)
+    if (action === 'primary') {
+      this._interactPrimary(t)
+      // Campfire primary must keep gameplay mode (relock).
+      if (t.kind === 'campfire') this.returnToGameMode()
+      return
+    }
 
     if (action === 'pickup') {
       const ok = this._pickupStructure(t)

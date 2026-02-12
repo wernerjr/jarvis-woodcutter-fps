@@ -21,33 +21,71 @@ export class UI {
     this.setWheelActions([])
   }
 
-  /** @param {{slot:'up'|'left'|'right', id:string, label:string, danger?:boolean}[]} actions */
+  /** @param {{id:string, label:string, danger?:boolean}[]} actions */
   setWheelActions(actions) {
     const root = this.els.actionWheelEl
     if (!root) return
 
-    const bySlot = new Map(actions.map((a) => [a.slot, a]))
-    for (const el of root.querySelectorAll('.wheelItem')) {
-      const slot = el.getAttribute('data-slot')
-      const a = bySlot.get(slot)
-      if (!a) {
-        el.classList.add('hidden')
-        el.textContent = ''
-        el.setAttribute('data-action', '')
-        el.classList.remove('danger')
-        continue
-      }
-      el.classList.remove('hidden')
+    const wheel = root.querySelector('.wheel')
+    if (!wheel) return
+
+    // remove old labels (keep center)
+    for (const el of Array.from(wheel.querySelectorAll('.wheelLabel'))) el.remove()
+
+    // If no actions, keep it truly empty (no slices / no labels).
+    if (!actions || actions.length === 0) {
+      wheel.style.background = 'rgba(0,0,0,.28)'
+      wheel.removeAttribute('data-n')
+      return
+    }
+
+    const n = actions.length
+    wheel.setAttribute('data-n', String(n))
+
+    // Paint equal slices using conic-gradient.
+    // Start angle at -90deg so first segment is at the top.
+    const baseA = 'rgba(0,0,0,.22)'
+    const baseB = 'rgba(255,255,255,.05)'
+    const sep = 'rgba(0,0,0,.35)'
+    const eps = 0.9 // degrees for separators
+
+    const step = 360 / n
+    const stops = []
+    for (let i = 0; i < n; i++) {
+      const a0 = i * step
+      const a1 = (i + 1) * step
+      // separator at start
+      stops.push(`${sep} ${a0}deg ${Math.min(a0 + eps, a1)}deg`)
+      const fill0 = Math.min(a0 + eps, a1)
+      const fill1 = Math.max(a1 - eps, fill0)
+      const col = i % 2 === 0 ? baseA : baseB
+      stops.push(`${col} ${fill0}deg ${fill1}deg`)
+      // separator at end
+      stops.push(`${sep} ${Math.max(a1 - eps, a0)}deg ${a1}deg`)
+    }
+    wheel.style.background = `conic-gradient(from -90deg, ${stops.join(',')})`
+
+    // Labels equally distributed (angle at center of each slice)
+    const r = 120
+    for (let i = 0; i < n; i++) {
+      const a = actions[i]
+      const ang = -90 + (i + 0.5) * step
+      const el = document.createElement('div')
+      el.className = 'wheelLabel'
       el.textContent = a.label
       el.setAttribute('data-action', a.id)
       el.classList.toggle('danger', !!a.danger)
+      el.style.transform = `translate(-50%,-50%) rotate(${ang}deg) translate(0, -${r}px) rotate(${-ang}deg)`
+      wheel.appendChild(el)
     }
   }
 
   setWheelActive(actionId) {
     const root = this.els.actionWheelEl
     if (!root) return
-    for (const el of root.querySelectorAll('.wheelItem')) {
+    const wheel = root.querySelector('.wheel')
+    if (!wheel) return
+    for (const el of wheel.querySelectorAll('.wheelLabel')) {
       el.classList.toggle('active', actionId && el.getAttribute('data-action') === actionId)
     }
   }
