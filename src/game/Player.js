@@ -454,6 +454,10 @@ export class Player {
     const head = new THREE.Mesh(headGeo, headMat)
     head.position.set(0.30, -0.45, -0.50)
 
+    // Flame anchor at the top of the torch head (official origin point).
+    const flameAnchor = new THREE.Object3D()
+    flameAnchor.position.set(0.30, -0.38, -0.50)
+
     // Flame (simple emissive cone) animated in update()
     const flameGeo = new THREE.ConeGeometry(0.07, 0.18, 10)
     const flameMat = new THREE.MeshStandardMaterial({
@@ -464,13 +468,14 @@ export class Player {
       opacity: 0.95,
     })
     const flame = new THREE.Mesh(flameGeo, flameMat)
-    // Cone points up (+Y). Position so base sits on the torch head.
-    flame.position.set(0.30, -0.36, -0.50)
+    // Cone points up (+Y). The cone is centered; lift it so its base starts at the anchor.
+    flame.position.set(0, 0.09, 0)
     flame.visible = false
+    flameAnchor.add(flame)
 
     torch.add(stick)
     torch.add(head)
-    torch.add(flame)
+    torch.add(flameAnchor)
     torch.rotation.set(-0.15, 0.25, 0.05)
 
     return { torch, flame }

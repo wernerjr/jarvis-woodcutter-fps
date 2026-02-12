@@ -6,7 +6,9 @@ Chamas low‑poly legíveis (sem partículas pesadas/alpha textures). Usamos um 
 ## Tocha do player
 - Código: `src/game/Player.js` → `_makeTorch()`
 - Implementação: `THREE.ConeGeometry` + `MeshStandardMaterial` emissivo.
-- Orientação: cone aponta para **+Y** (para cima). A posição é ajustada para a base ficar na “cabeça” da tocha.
+- Ponto oficial de origem: **`flameAnchor`** (child transform) no topo da cabeça da tocha.
+  - Ajuste de posição deve ser feito no `flameAnchor` (prefab/child), não via offsets em runtime.
+- Orientação: cone aponta para **+Y** (para cima).
 - Flicker/visibilidade: controlado por `Game` via `player.setTorchFlicker(flicker, heat01)`.
 
 ## Fogueira
