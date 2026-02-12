@@ -6,9 +6,17 @@ export class MineManager {
     this.scene = scene
 
     // Exterior placement (world)
+    // Rectangular mountain: big face points towards the forest (approx origin).
     this.center = new THREE.Vector3(58, 0, -18)
-    // Entrance sits on the mountain rim (not inside the mound), slightly tucked away.
-    this.entrance = new THREE.Vector3(38.0, 0, -28.0)
+
+    // Rect mountain dimensions (must match _makeMountainMesh/_buildWorldColliders)
+    this._mountW = 30 // Z span
+    this._mountD = 22 // X span (depth)
+    this._mountH = 16
+
+    // Entrance: centered on the face that looks towards the forest.
+    // (Final values are computed in init() after we know face direction.)
+    this.entrance = new THREE.Vector3(0, 0, 0)
 
     // Interior placement (kept far away; accessed via portal teleport)
     this.mineOrigin = new THREE.Vector3(-120, 0, 95)
@@ -69,9 +77,18 @@ export class MineManager {
     this._lights = new THREE.Group()
     this._lights.name = 'MineLights'
 
-    // --- Exterior: mountain + entrance + trail ---
+    // Compute entrance point on the face that points to the forest (origin).
+    const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
+    if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
+    toForest.normalize()
+    this.entrance.set(
+      this.center.x + toForest.x * (this._mountD * 0.5 + 0.15),
+      0,
+      this.center.z + toForest.z * (this._mountD * 0.5 + 0.15)
+    )
+
+    // --- Exterior: rectangular mountain + simple portal (no trail) ---
     this._worldGroup.add(this._makeMountainMesh())
-    this._worldGroup.add(this._makeTrail())
     this._worldGroup.add(this._makeEntrance())
     this._worldGroup.add(this._makeMouthGround())
 
@@ -133,60 +150,13 @@ export class MineManager {
   // ----------------- Exterior (world) -----------------
 
   _makeMountainMesh() {
-    // Controlled "mountain mound" built from a deformed plane (heightmap-ish).
-    const size = 66
-    const seg = 34
-    const geo = new THREE.PlaneGeometry(size, size, seg, seg)
-    geo.rotateX(-Math.PI / 2)
+    // Rectangular mountain block: big face towards the forest (origin).
+    // Keep it simple and coherent with the portal.
+    const w = this._mountW
+    const d = this._mountD
+    const h = this._mountH
 
-    const pos = geo.attributes.position
-    const v = new THREE.Vector3()
-
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i)
-
-      const x = v.x
-      const z = v.z
-      const r = Math.sqrt(x * x + z * z)
-      const r01 = Math.min(1, r / (size * 0.5))
-
-      // radial falloff (peak at center)
-      let h = (1 - r01)
-      h = Math.max(0, h)
-      h = Math.pow(h, 1.35)
-
-      // layered cheap noise
-      const n1 = Math.sin(x * 0.18 + z * 0.22)
-      const n2 = Math.sin(x * 0.42 - z * 0.33)
-      const n3 = Math.sin(x * 0.75 + z * 0.64)
-      const noise = (n1 * 0.55 + n2 * 0.30 + n3 * 0.15)
-
-      const ridge = Math.sin((x + z) * 0.10) * 0.6
-
-      // Carve a shallow notch around the entrance so the frame doesn't look "swallowed" by the slope.
-      // Compute entrance position in mountain-local coordinates (plane is centered at origin before mesh transform).
-      const exw = this.entrance.x - this.center.x
-      const ezw = this.entrance.z - this.center.z
-      const rot = -0.35
-      const ex = exw * Math.cos(rot) - ezw * Math.sin(rot)
-      const ez = exw * Math.sin(rot) + ezw * Math.cos(rot)
-
-      const dxE = x - ex
-      const dzE = z - ez
-      const dE = Math.sqrt(dxE * dxE + dzE * dzE)
-      const carveR = 10.5
-      const carve = dE < carveR ? (1 - dE / carveR) : 0
-
-      // Carve more aggressively so the wall/portal reads as cutting into the mountain,
-      // while the mountain still continues above it.
-      const height = h * (20.0 + 5.0 * noise + 2.8 * ridge) - carve * 9.5
-      v.y = Math.max(0, height)
-
-      pos.setXYZ(i, v.x, v.y, v.z)
-    }
-
-    geo.computeVertexNormals()
-
+    const geo = new THREE.BoxGeometry(d, h, w, 1, 1, 1)
     const mat = new THREE.MeshStandardMaterial({
       color: 0x2a2b2a,
       roughness: 1.0,
@@ -194,46 +164,43 @@ export class MineManager {
     })
 
     const m = new THREE.Mesh(geo, mat)
-    m.position.set(this.center.x, 0, this.center.z)
-    m.rotation.y = 0.35
-    m.name = 'Mountain'
+    // Sit on ground (box centered): lift by h/2.
+    m.position.set(this.center.x, h * 0.5, this.center.z)
 
+    // Orient so the large face looks towards the forest.
+    const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
+    if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
+    toForest.normalize()
+    m.rotation.y = Math.atan2(toForest.x, toForest.z)
+
+    m.name = 'Mountain'
     return m
   }
 
   _makeEntrance() {
-    // Simple entrance: a straight rock wall + 3-wood portal (2 posts + top beam).
-    // The entrance is oriented to face away from the mountain center.
+    // Simple portal module: 3 woods on the large face (towards forest).
+    // Keep it centered on the face.
     const g = new THREE.Group()
     g.name = 'MineEntrance'
 
-    const ex = this.entrance.x
-    const ez = this.entrance.z
+    const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
+    if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
+    toForest.normalize()
 
-    const dir = new THREE.Vector3(ex - this.center.x, 0, ez - this.center.z)
-    if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0)
-    dir.normalize()
-    const yaw = Math.atan2(dir.x, dir.z)
+    const yaw = Math.atan2(toForest.x, toForest.z)
 
-    g.position.set(ex, 0, ez)
+    g.position.set(this.entrance.x, 0, this.entrance.z)
     g.rotation.y = yaw
 
-    // Rock wall (paredão) behind the portal, so it feels attached to the mountain.
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x242428, roughness: 1.0, metalness: 0.0 })
-    // Wall is slightly taller than the portal, and centered.
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(9.8, 6.2, 4.8), rockMat)
-    wall.position.set(1.2, 3.4, 0)
-    g.add(wall)
-
-    // Carved dark opening (just visual depth)
+    // Carved dark opening (visual depth)
     const mouthMat = new THREE.MeshStandardMaterial({
       color: 0x09090e,
       roughness: 1.0,
       emissive: 0x050509,
       emissiveIntensity: 0.35,
     })
-    const mouth = new THREE.Mesh(new THREE.BoxGeometry(4.2, 4.0, 2.6), mouthMat)
-    mouth.position.set(0.1, 2.05, 0)
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(4.4, 4.0, 2.8), mouthMat)
+    mouth.position.set(0.0, 2.05, 0)
     g.add(mouth)
 
     // 3 wood pieces portal
@@ -289,169 +256,67 @@ export class MineManager {
     return g
   }
 
+  // Trail removed (no path leading to the mine in the new rectangular-mountain layout).
   _makeTrail() {
-    // Path from the forest edge to the mine entrance.
-    // Anti-intersection rule: any point inside the mountain safe radius is pushed outward.
-    const start = new THREE.Vector3(28, 0, -6)
-    // Bend around the mountain so the entrance feels more tucked away.
-    const mid1 = new THREE.Vector3(36, 0, -14)
-    const mid2 = new THREE.Vector3(34, 0, -24)
-    const mid3 = new THREE.Vector3(36, 0, -34)
-    const end = new THREE.Vector3(this.entrance.x - 0.4, 0, this.entrance.z)
-
-    const raw = [start, mid1, mid2, mid3, end]
-    const safeR = 22.0
-
-    const adjusted = raw.map((p) => {
-      const v = p.clone()
-      const dx = v.x - this.center.x
-      const dz = v.z - this.center.z
-      const d = Math.sqrt(dx * dx + dz * dz)
-      if (d < safeR) {
-        const k = (safeR + 1.2) / Math.max(0.0001, d)
-        v.x = this.center.x + dx * k
-        v.z = this.center.z + dz * k
-      }
-      return v
-    })
-
-    const curve = new THREE.CatmullRomCurve3(adjusted)
-    curve.tension = 0.48
-
-    const samples = 68
-    const width = 4.2
-
-    const pts = []
-    for (let i = 0; i <= samples; i++) {
-      const p = curve.getPoint(i / samples)
-
-      // second pass: ensure no sample point enters the mountain
-      const dx = p.x - this.center.x
-      const dz = p.z - this.center.z
-      const d = Math.sqrt(dx * dx + dz * dz)
-      if (d < safeR) {
-        const k = (safeR + 0.9) / Math.max(0.0001, d)
-        p.x = this.center.x + dx * k
-        p.z = this.center.z + dz * k
-      }
-
-      pts.push(p)
-    }
-
-    // Build a strip (2 verts per point).
-    const verts = []
-    const uvs = []
-    const indices = []
-
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i]
-
-      const prev = pts[Math.max(0, i - 1)]
-      const next = pts[Math.min(pts.length - 1, i + 1)]
-      const dir = next.clone().sub(prev)
-      dir.y = 0
-      if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0)
-      dir.normalize()
-
-      const n = new THREE.Vector3(-dir.z, 0, dir.x)
-      const edge = width * 0.5
-      const y = 0.011
-
-      const l = p.clone().addScaledVector(n, edge)
-      const r = p.clone().addScaledVector(n, -edge)
-
-      verts.push(l.x, y, l.z)
-      verts.push(r.x, y, r.z)
-
-      const vv = i / (pts.length - 1)
-      uvs.push(0, vv)
-      uvs.push(1, vv)
-
-      if (i < pts.length - 1) {
-        const a = i * 2
-        const b = i * 2 + 1
-        const c = i * 2 + 2
-        const d = i * 2 + 3
-        indices.push(a, c, b)
-        indices.push(c, d, b)
-      }
-    }
-
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
-    geo.setIndex(indices)
-    geo.computeVertexNormals()
-
-    // Vertex-color noise (cheap variation)
-    const colors = new Float32Array((pts.length * 2) * 3)
-    for (let i = 0; i < colors.length; i += 3) {
-      const n = 0.72 + Math.random() * 0.28
-      colors[i + 0] = 0.36 * n
-      colors[i + 1] = 0.24 * n
-      colors[i + 2] = 0.16 * n
-    }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0, metalness: 0.0 })
-    const mesh = new THREE.Mesh(geo, mat)
-    mesh.name = 'MudTrail'
-
-    const geo2 = geo.clone()
-    const mat2 = new THREE.MeshStandardMaterial({ color: 0x2b1c12, roughness: 1.0, transparent: true, opacity: 0.22 })
-    const overlay = new THREE.Mesh(geo2, mat2)
-    overlay.position.y = 0.003
-    overlay.scale.set(1.08, 1, 1.08)
-
     const g = new THREE.Group()
-    g.add(mesh)
-    g.add(overlay)
+    g.name = 'MudTrail'
     return g
   }
 
   _buildWorldColliders() {
     this._worldColliders = []
 
-    // Solid collision via multiple rings + interior "fill" points.
-    // The entrance opening is small and aligned to the entrance direction.
+    // Rectangular mountain collision: circles along the rectangle perimeter.
+    // Keep a centered opening (portal) on the face towards the forest.
     const cx = this.center.x
     const cz = this.center.z
-    const entranceDir = Math.atan2(this.entrance.z - cz, this.entrance.x - cx)
 
-    const addRing = (ringR, cR, n, openHalf) => {
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2
-        const da = Math.abs(this._wrapAngle(a - entranceDir))
-        if (da < openHalf) continue
-        this._worldColliders.push({ x: cx + Math.cos(a) * ringR, z: cz + Math.sin(a) * ringR, r: cR })
+    const w = this._mountW
+    const d = this._mountD
+
+    const toForest = new THREE.Vector3(-cx, 0, -cz)
+    if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
+    toForest.normalize()
+    const right = new THREE.Vector3(-toForest.z, 0, toForest.x)
+
+    const add = (x, z, r) => this._worldColliders.push({ x, z, r })
+
+    const halfD = d * 0.5
+    const halfW = w * 0.5
+
+    // Opening on forest-facing face (sd = +halfD): skip colliders near the center.
+    const openHalf = 3.2
+
+    const edgeSamples = 18
+    const cr = 1.25
+
+    const sampleEdge = (sd0, sw0, sd1, sw1, isForestFace) => {
+      for (let i = 0; i <= edgeSamples; i++) {
+        const t = i / edgeSamples
+        const sdv = sd0 + (sd1 - sd0) * t
+        const swv = sw0 + (sw1 - sw0) * t
+
+        if (isForestFace && Math.abs(swv) < openHalf && Math.abs(sdv - halfD) < 1e-6) continue
+
+        add(cx + toForest.x * sdv + right.x * swv, cz + toForest.z * sdv + right.z * swv, cr)
       }
     }
 
-    // Scaled up to match the larger mountain mesh.
-    addRing(24.0, 2.65, 38, 0.55)
-    addRing(19.2, 2.45, 34, 0.50)
-    addRing(14.8, 2.25, 30, 0.42)
+    // Forest-facing edge
+    sampleEdge(halfD, -halfW, halfD, halfW, true)
+    // Back edge
+    sampleEdge(-halfD, -halfW, -halfD, halfW, false)
+    // Left edge
+    sampleEdge(-halfD, -halfW, halfD, -halfW, false)
+    // Right edge
+    sampleEdge(-halfD, halfW, halfD, halfW, false)
 
-    // Fill (prevent any gap between rings)
-    const fill = [
-      { x: cx + 5.0, z: cz + 5.0 },
-      { x: cx + 6.5, z: cz - 4.0 },
-      { x: cx - 4.5, z: cz + 6.0 },
-      { x: cx - 5.5, z: cz - 5.5 },
-      { x: cx + 0.0, z: cz + 7.0 },
-      { x: cx + 0.0, z: cz - 7.0 },
-    ]
-    for (const p of fill) this._worldColliders.push({ x: p.x, z: p.z, r: 2.25 })
+    // Funnel near the portal
+    add(this.entrance.x + right.x * 2.6, this.entrance.z + right.z * 2.6, 0.9)
+    add(this.entrance.x - right.x * 2.6, this.entrance.z - right.z * 2.6, 0.9)
 
-    // Timber posts block sides.
-    this._worldColliders.push({ x: this.entrance.x + 0.4, z: this.entrance.z + 2.0, r: 0.55 })
-    this._worldColliders.push({ x: this.entrance.x + 0.4, z: this.entrance.z - 2.0, r: 0.55 })
-
-    // A short "mouth" corridor outside (helps guide into portal)
-    for (let k = 0; k < 5; k++) {
-      this._worldColliders.push({ x: this.entrance.x + 1.2 + k * 0.9, z: this.entrance.z + 3.0, r: 0.75 })
-      this._worldColliders.push({ x: this.entrance.x + 1.2 + k * 0.9, z: this.entrance.z - 3.0, r: 0.75 })
-    }
+    // Fill to avoid corner squeezing
+    add(cx, cz, 2.0)
   }
 
   // ----------------- Interior (mine) -----------------
