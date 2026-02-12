@@ -60,6 +60,9 @@ html,body{height:100%; margin:0; background:var(--bg); overflow:hidden; font-fam
 body.inventory-open #hotbar{pointer-events:auto;}
 body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 
+/* Generic */
+.hidden{display:none !important;}
+
 /* Overlays */
 .overlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:24px; background: radial-gradient(1000px 600px at 50% 40%, rgba(10,18,10,0.72), rgba(0,0,0,0.80)); pointer-events:none; z-index: 20;}
 .overlay.block{pointer-events:auto;}

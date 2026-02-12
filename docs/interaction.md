@@ -10,7 +10,7 @@ Interação com **estruturas colocadas** é sempre via **F** (nada de clicar nos
 - Se `actionsCount == 0`: a roda **não é ativada/renderizada** (nem o círculo base).
 
 ## Prompt
-Só aparece quando existe um alvo válido em alcance:
+Só aparece quando existe um alvo válido em alcance (mesmo raycast/alcance da interação) e some imediatamente sem alvo:
 - `F: <AçãoPrincipal> • Segure F: mais opções`
 
 ## Ações por estrutura
