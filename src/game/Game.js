@@ -338,11 +338,13 @@ export class Game {
     this._wheelTarget = t
     this._wheelAction = null
 
-    // Hold threshold: open wheel.
+    // Hold threshold: open wheel (only if still aiming at a valid target).
     this._fHoldTimer = window.setTimeout(() => {
       if (!this._fDown) return
       if (this.state !== 'playing') return
-      this._openWheel(t)
+      const nowT = this._getInteractTarget()
+      if (!nowT || nowT.kind !== t.kind || nowT.id !== t.id) return
+      this._openWheel(nowT)
     }, 360)
 
     e.preventDefault?.()
@@ -363,17 +365,44 @@ export class Game {
       return
     }
 
-    // Tap: primary action.
+    // If we released F without still aiming at the target, do nothing.
     const target = this._wheelTarget
+    const nowT = this._getInteractTarget()
     this._wheelTarget = null
-    if (target && this.state === 'playing') {
-      this._interactPrimary(target)
+    if (!target || !nowT || nowT.kind !== target.kind || nowT.id !== target.id) {
+      e.preventDefault?.()
+      return
     }
+
+    // Tap: primary action.
+    if (this.state === 'playing') this._interactPrimary(nowT)
 
     e.preventDefault?.()
   }
 
+  _wheelActionsFor(target) {
+    if (!target) return []
+
+    if (target.kind === 'campfire') {
+      const lit = this.fires.isLit(target.id)
+      return [
+        { slot: 'up', id: 'primary', label: lit ? 'Apagar' : 'Acender' },
+        { slot: 'right', id: 'destroy', label: 'Destruir', danger: true },
+      ]
+    }
+
+    // forge / forgeTable
+    return [
+      { slot: 'up', id: 'open', label: 'Abrir' },
+      { slot: 'left', id: 'pickup', label: 'Recolher' },
+      { slot: 'right', id: 'destroy', label: 'Destruir', danger: true },
+    ]
+  }
+
   _openWheel(target) {
+    const actions = this._wheelActionsFor(target)
+    if (!actions.length) return
+
     this._wheelOpen = true
     this.state = 'wheel'
 
@@ -381,8 +410,9 @@ export class Game {
     this.player.setLocked(false)
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
 
+    this.ui.setWheelActions?.(actions)
     this.ui.showWheel?.()
-    this.ui.setInteractHint('Solte F em: Abrir / Recolher / Destruir')
+    this.ui.setInteractHint('Solte F em uma opção')
 
     // Default selection.
     this._wheelAction = null
@@ -424,11 +454,17 @@ export class Game {
       return
     }
 
-    // Map to 3 sectors: up=open, left=pickup, right=destroy
-    if (dy < -Math.abs(dx) * 0.6) this._wheelAction = 'open'
-    else if (dx < 0) this._wheelAction = 'pickup'
-    else this._wheelAction = 'destroy'
+    // Map to 3 sectors: up / left / right.
+    let next = null
+    if (dy < -Math.abs(dx) * 0.6) next = 'up'
+    else if (dx < 0) next = 'left'
+    else next = 'right'
 
+    const root = this.ui.els?.actionWheelEl
+    const el = root?.querySelector(`.wheelItem[data-slot="${next}"]`)
+    const actionId = el?.getAttribute('data-action') || null
+
+    this._wheelAction = actionId || null
     this.ui.setWheelActive?.(this._wheelAction)
   }
 
@@ -471,6 +507,7 @@ export class Game {
 
   _runWheelAction(t, action) {
     if (action === 'open') return this._interactPrimary(t)
+    if (action === 'primary') return this._interactPrimary(t)
 
     if (action === 'pickup') {
       const ok = this._pickupStructure(t)
@@ -486,8 +523,9 @@ export class Game {
 
   _pickupStructure(t) {
     if (!t) return false
+    if (t.kind === 'campfire') return false
 
-    const itemId = t.kind === 'forge' ? ItemId.FORGE : t.kind === 'forgeTable' ? ItemId.FORGE_TABLE : t.kind === 'campfire' ? ItemId.CAMPFIRE : null
+    const itemId = t.kind === 'forge' ? ItemId.FORGE : t.kind === 'forgeTable' ? ItemId.FORGE_TABLE : null
     if (!itemId) return false
 
     const overflow = this.inventory.add(itemId, 1)

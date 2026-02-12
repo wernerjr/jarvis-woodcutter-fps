@@ -18,13 +18,37 @@ export class UI {
   hideWheel() {
     this.els.actionWheelEl?.classList.add('hidden')
     this.setWheelActive(null)
+    this.setWheelActions([])
   }
 
-  setWheelActive(action) {
+  /** @param {{slot:'up'|'left'|'right', id:string, label:string, danger?:boolean}[]} actions */
+  setWheelActions(actions) {
+    const root = this.els.actionWheelEl
+    if (!root) return
+
+    const bySlot = new Map(actions.map((a) => [a.slot, a]))
+    for (const el of root.querySelectorAll('.wheelItem')) {
+      const slot = el.getAttribute('data-slot')
+      const a = bySlot.get(slot)
+      if (!a) {
+        el.classList.add('hidden')
+        el.textContent = ''
+        el.setAttribute('data-action', '')
+        el.classList.remove('danger')
+        continue
+      }
+      el.classList.remove('hidden')
+      el.textContent = a.label
+      el.setAttribute('data-action', a.id)
+      el.classList.toggle('danger', !!a.danger)
+    }
+  }
+
+  setWheelActive(actionId) {
     const root = this.els.actionWheelEl
     if (!root) return
     for (const el of root.querySelectorAll('.wheelItem')) {
-      el.classList.toggle('active', action && el.getAttribute('data-action') === action)
+      el.classList.toggle('active', actionId && el.getAttribute('data-action') === actionId)
     }
   }
 
