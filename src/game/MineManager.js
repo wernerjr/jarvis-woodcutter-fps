@@ -13,10 +13,11 @@ export class MineManager {
     // Core wall (flat portal face) dimensions:
     // - height reduced ~10% (from 7.8 -> 7.02)
     // - width reduced ~70% (from 30 -> 9)
-    this._coreW = 9 // Z span (flat face / portal area)
+    // NOTE: Werner wants the "rectangle" width to be 9, and the lateral dressing width to be 36.
+    this._mountW = 9 // Z span (core flat face / portal area)
+    this._detailW = 36 // Z span total (including lateral dressing)
 
-    // Overall mountain footprint (includes dressing): 4x the core width laterally.
-    this._mountW = this._coreW * 4 // Z span total
+    this._coreW = this._mountW // alias for readability
 
     this._mountD = 22 // X span (depth)
     this._mountH = 7.02
@@ -161,8 +162,8 @@ export class MineManager {
   _makeMountainMesh() {
     // Single mountain mesh: keep a perfectly flat front face for the portal,
     // and sculpt the rest to resemble the reference low-poly mountain silhouette.
-    const w = this._mountW
-    const coreW = this._coreW
+    const w = this._detailW
+    const coreW = this._mountW
     const d = this._mountD
     const H = this._mountH
 
@@ -380,7 +381,7 @@ export class MineManager {
     const cx = this.center.x
     const cz = this.center.z
 
-    const w = this._mountW
+    const w = this._detailW
     const d = this._mountD
 
     const toForest = new THREE.Vector3(-cx, 0, -cz)
