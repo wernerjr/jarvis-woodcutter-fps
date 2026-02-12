@@ -62,6 +62,7 @@ docker compose up -d --build
 - [Interação (F tap/hold)](docs/interaction.md)
 - [Inventário/hotbar](docs/systems-inventory.md)
 - [Forja & Mesa de Forja](docs/systems-forge.md)
+- [VFX de fogo (tocha/fogueira)](docs/vfx-fire.md)
 
 ## Para IAs / copilots
 Veja **AGENTS.md** (contratos internos, mapa de sistemas e exemplos de tarefas).

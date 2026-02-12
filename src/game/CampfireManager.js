@@ -38,8 +38,8 @@ function makeCampfireMesh() {
     opacity: 0.0,
   })
   const flame = new THREE.Mesh(flameGeo, flameMat)
-  flame.position.set(0, 0.40, 0)
-  flame.rotation.x = Math.PI
+  // Cone points up (+Y). Place so base sits near embers/logs.
+  flame.position.set(0, 0.35, 0)
 
   g.add(base)
   g.add(ember)

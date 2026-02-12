@@ -464,8 +464,8 @@ export class Player {
       opacity: 0.95,
     })
     const flame = new THREE.Mesh(flameGeo, flameMat)
-    flame.position.set(0.30, -0.56, -0.50)
-    flame.rotation.x = Math.PI
+    // Cone points up (+Y). Position so base sits on the torch head.
+    flame.position.set(0.30, -0.36, -0.50)
     flame.visible = false
 
     torch.add(stick)

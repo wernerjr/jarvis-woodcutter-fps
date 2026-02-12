@@ -1745,7 +1745,9 @@ export class Game {
     this.forges.setTorchMain(torchMain)
 
     // Sync flame visuals with the same flicker signal.
-    this.player.setTorchFlicker(flicker, torchOn ? night : 0)
+    // Keep torch flame visible even during daytime.
+    const torchHeat01 = torchOn ? Math.max(0.35, night) : 0
+    this.player.setTorchFlicker(flicker, torchHeat01)
 
     // Sprint FOV (subtle)
     const targetFov = this.player.isSprinting ? 80 : this._baseFov
