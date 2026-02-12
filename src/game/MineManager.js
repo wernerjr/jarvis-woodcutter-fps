@@ -90,10 +90,8 @@ export class MineManager {
       this.center.z + toForest.z * (halfD + 0.02)
     )
 
-    // --- Exterior: rectangular wall + surrounding mountain dressing (no trail) ---
+    // --- Exterior: single carved mountain mesh with a flat face + portal (no trail) ---
     this._worldGroup.add(this._makeMountainMesh())
-    this._worldGroup.add(this._makeMountainDressing())
-    this._worldGroup.add(this._makeSideRocks())
     this._worldGroup.add(this._makeEntrance())
     this._worldGroup.add(this._makeMouthGround())
 
@@ -155,127 +153,83 @@ export class MineManager {
   // ----------------- Exterior (world) -----------------
 
   _makeMountainMesh() {
-    // Rectangular "wall" core: keep front face (portal area) perfectly flat.
+    // Single mountain mesh: keep a perfectly flat front face for the portal,
+    // and sculpt the rest to resemble the reference low-poly mountain silhouette.
     const w = this._mountW
     const d = this._mountD
-    const h = this._mountH
+    const H = this._mountH
 
-    const geo = new THREE.BoxGeometry(d, h, w, 1, 1, 1)
+    // Subdivided box so we can sculpt.
+    const geo = new THREE.BoxGeometry(d, H, w, 16, 10, 20)
+    const pos = geo.attributes.position
+    const v = new THREE.Vector3()
+
+    const halfD = d * 0.5
+    const halfW = w * 0.5
+    const halfH = H * 0.5
+
+    // Peak biased a bit to one side for a more natural look.
+    const peakZ = halfW * 0.18
+
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i)
+
+      // Keep the portal/front face perfectly flat (local +X face).
+      if (v.x > halfD - 0.001) {
+        pos.setXYZ(i, v.x, v.y, v.z)
+        continue
+      }
+
+      // Normalize coords to [0..1]
+      const ax = (v.x + halfD) / d // 0 back .. 1 front
+      const nz = (v.z - peakZ) / (halfW || 1)
+      const az = Math.min(1, Math.abs(nz))
+
+      // Base mound profile: higher towards the back, taper towards front.
+      const back = Math.pow(1 - ax, 0.55)
+      const center = Math.pow(1 - az, 1.2)
+
+      // Heightfield (adds above the box's base height)
+      const extra = (H * 0.95) * back * center
+
+      // Carve to a rocky silhouette (ridges) without spikes.
+      const ridge =
+        0.22 * Math.sin((v.z + 8) * 0.55) * back +
+        0.14 * Math.sin((v.x - 3) * 0.85) * center
+
+      // Raise the top, keep bottom grounded.
+      if (v.y > -halfH + 0.001) {
+        const y01 = (v.y + halfH) / H
+        v.y += extra * Math.pow(y01, 1.35) + ridge
+      }
+
+      // Slightly expand width towards the back/top (bulky mountain).
+      const widen = 1 + 0.22 * back
+      v.z *= widen
+
+      pos.setXYZ(i, v.x, v.y, v.z)
+    }
+
+    geo.computeVertexNormals()
+
     const mat = new THREE.MeshStandardMaterial({
       color: 0x2a2b2a,
       roughness: 1.0,
       metalness: 0.0,
+      flatShading: true,
     })
 
     const m = new THREE.Mesh(geo, mat)
-    // Sit on ground (box centered): lift by h/2.
-    m.position.set(this.center.x, h * 0.5, this.center.z)
+    m.position.set(this.center.x, halfH, this.center.z)
 
-    // Orient so the large face looks towards the forest.
+    // Orient so the flat face is towards the forest.
     const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
     if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
     toForest.normalize()
-    // Align local +X (box depth axis) towards the forest.
-    // RotationY maps +X to (cos(yaw), -sin(yaw)) in XZ.
     m.rotation.y = Math.atan2(-toForest.z, toForest.x)
 
     m.name = 'Mountain'
     return m
-  }
-
-  _makeMountainDressing() {
-    // Visual-only: add chunky low-poly wedges on the sides/back to make the block read as a mountain.
-    // IMPORTANT: do NOT place anything in front of the portal.
-    const g = new THREE.Group()
-    g.name = 'MineMountainDressing'
-
-    const w = this._mountW
-    const d = this._mountD
-    const h = this._mountH
-
-    const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
-    if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
-    toForest.normalize()
-    const right = new THREE.Vector3(-toForest.z, 0, toForest.x)
-
-    const yaw = Math.atan2(-toForest.z, toForest.x)
-
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x26262b, roughness: 1.0, flatShading: true })
-
-    // Wedge geometry: a box we scale in Y and rotate to simulate a slope.
-    const wedgeGeo = new THREE.BoxGeometry(d * 1.1, h * 1.0, 10)
-
-    const mkWedge = (sideSign) => {
-      const m = new THREE.Mesh(wedgeGeo, rockMat)
-      m.rotation.y = yaw
-      // Tilt to create a ramp look (no crazy spikes).
-      m.rotation.z = sideSign * 0.0
-      m.rotation.x = -0.55
-
-      const localZ = sideSign * (w * 0.5 + 6.0)
-      const localX = -d * 0.15
-
-      const wx = this.center.x + toForest.x * localX + right.x * localZ
-      const wz = this.center.z + toForest.z * localX + right.z * localZ
-      m.position.set(wx, h * 0.55, wz)
-      return m
-    }
-
-    // Side wedges
-    g.add(mkWedge(1))
-    g.add(mkWedge(-1))
-
-    // Back wedge (behind the wall)
-    const back = new THREE.Mesh(new THREE.BoxGeometry(10, h * 1.1, w * 1.2), rockMat)
-    back.rotation.y = yaw
-    back.rotation.x = -0.45
-    const backLocalX = -d * 0.95
-    back.position.set(
-      this.center.x + toForest.x * backLocalX,
-      h * 0.62,
-      this.center.z + toForest.z * backLocalX
-    )
-    g.add(back)
-
-    return g
-  }
-
-  _makeSideRocks() {
-    // Rock dressing on the sides/back. Keep the portal front clear.
-    const g = new THREE.Group()
-    g.name = 'MineSideRocks'
-
-    const toForest = new THREE.Vector3(-this.center.x, 0, -this.center.z)
-    if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
-    toForest.normalize()
-    const right = new THREE.Vector3(-toForest.z, 0, toForest.x)
-
-    const rockGeo = new THREE.DodecahedronGeometry(0.9, 0)
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x232328, roughness: 1.0, flatShading: true })
-
-    const count = 22
-    for (let i = 0; i < count; i++) {
-      const side = i % 2 === 0 ? 1 : -1
-      const along = -0.95 + Math.random() * 1.9
-
-      // Local coordinates around the core wall.
-      const lx = (this._mountD * 0.6) * along
-      const lz = side * (this._mountW * 0.85 + Math.random() * 3.0)
-
-      const wx = this.center.x + toForest.x * lx + right.x * lz
-      const wz = this.center.z + toForest.z * lx + right.z * lz
-
-      // Keep front of portal clear.
-      if (Math.hypot(wx - this.entrance.x, wz - this.entrance.z) < 7.5) continue
-
-      const r = new THREE.Mesh(rockGeo, rockMat)
-      r.position.set(wx, 0.25, wz)
-      r.scale.setScalar(0.8 + Math.random() * 1.8)
-      r.rotation.set(Math.random(), Math.random(), Math.random())
-      g.add(r)
-    }
-
-    return g
   }
 
   _makeEntrance() {
