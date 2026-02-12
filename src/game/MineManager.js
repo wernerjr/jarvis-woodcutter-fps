@@ -10,10 +10,16 @@ export class MineManager {
     this.center = new THREE.Vector3(58, 0, -18)
 
     // Rect mountain dimensions (must match _makeMountainMesh/_buildWorldColliders)
-    this._mountW = 30 // Z span
+    // Core wall (flat portal face) dimensions:
+    // - height reduced ~10% (from 7.8 -> 7.02)
+    // - width reduced ~70% (from 30 -> 9)
+    this._coreW = 9 // Z span (flat face / portal area)
+
+    // Overall mountain footprint (includes dressing): 4x the core width laterally.
+    this._mountW = this._coreW * 4 // Z span total
+
     this._mountD = 22 // X span (depth)
-    // Core wall height (portal face). Reduced ~35% to feel less like a massive slab.
-    this._mountH = 7.8
+    this._mountH = 7.02
 
     // Entrance: centered on the face that looks towards the forest.
     // (Final values are computed in init() after we know face direction.)
@@ -156,6 +162,7 @@ export class MineManager {
     // Single mountain mesh: keep a perfectly flat front face for the portal,
     // and sculpt the rest to resemble the reference low-poly mountain silhouette.
     const w = this._mountW
+    const coreW = this._coreW
     const d = this._mountD
     const H = this._mountH
 
@@ -174,8 +181,8 @@ export class MineManager {
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i)
 
-      // Keep the portal/front face perfectly flat (local +X face).
-      if (v.x > halfD - 0.001) {
+      // Keep the portal/front face perfectly flat (local +X face) ONLY for the core width.
+      if (v.x > halfD - 0.001 && Math.abs(v.z) <= (coreW * 0.5 + 0.4)) {
         pos.setXYZ(i, v.x, v.y, v.z)
         continue
       }
@@ -387,7 +394,7 @@ export class MineManager {
     const halfW = w * 0.5
 
     // Opening on forest-facing face (sd = +halfD): skip colliders near the center.
-    const openHalf = 3.2
+    const openHalf = (this._coreW * 0.5) + 0.2
 
     const edgeSamples = 18
     const cr = 1.25
