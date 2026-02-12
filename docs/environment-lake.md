@@ -4,14 +4,13 @@ Em um trecho do perímetro, a curva do rio pode dar a impressão de “fim”/co
 
 ## Objetivo
 - Remover a percepção de que o rio termina antes de conectar.
-- Manter a regra de gameplay: **água = barreira natural** (não atravessável).
+- O limite jogável continua sendo o **rio** (barreira natural). O lago é **visual** (remanso), sem colisão própria.
 
 ## Implementação
 - Visual + colisores: `src/game/LakeManager.js`
   - Mesh do lago é um **blob orgânico** (não é elipse perfeita), gerado por um shape com wobble (parece mais natural/serpenteante).
   - Material é igual ao do rio.
-  - Colisão: círculos XZ ao longo do perímetro do blob + midpoints, com 2 faixas para evitar vazamento em diagonal.
-    - Importante: os offsets usam a **normal local da borda** (não apenas direção radial), para a colisão respeitar o contorno serpenteante.
+  - Colisão: **desativada** (lago visual-only). A barreira do mapa é implementada exclusivamente pelo rio.
 - Integração:
   - `Game.start()` inicializa o lago: `this.lake.init(...)`
   - `Game._loop()` adiciona `lake.getColliders()` junto com os colliders do rio (fora da mina).

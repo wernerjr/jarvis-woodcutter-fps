@@ -1705,7 +1705,7 @@ export class Game {
           .concat(this._inMine ? [] : this.forges.getColliders())
           .concat(this._inMine ? [] : this.forgeTables.getColliders())
           .concat(this._inMine ? [] : this.river.getColliders())
-          .concat(this._inMine ? [] : this.lake.getColliders())
+          // Lake is decorative; collision boundary is enforced by the river.
       : []
 
     this.player.update(simDt, colliders)

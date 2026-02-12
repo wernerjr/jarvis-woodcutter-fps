@@ -158,7 +158,8 @@ export class LakeManager {
 
   /** @returns {{x:number,z:number,r:number}[]} */
   getColliders() {
-    return this._colliders
+    // Lake is visual-only; do not block the player. Use the river as the only boundary.
+    return []
   }
 
   /** @param {number} dt */
