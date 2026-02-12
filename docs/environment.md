@@ -11,7 +11,7 @@ Parâmetros principais:
 - `clear[]`: círculos para limpar grama em áreas de gameplay (spawn, trilha, mina). Se você mover a entrada/trilha da mina, atualize esses pontos (ex.: novos waypoints da trilha).
 
 ## Mina (entrada)
-A entrada da mina no mundo externo é construída para parecer um trecho real dentro da montanha (túnel curto visível, suportes e sombra), e a montanha é maior para dar escala.
+A entrada da mina no mundo externo é construída para parecer um trecho real dentro da montanha (túnel curto visível, suportes e luz interna suave). Também existe um “notch” escavado no mesh da montanha perto da boca para a moldura não parecer engolida pela encosta.
 
 Config atual (2026-02-11):
 - Tufo base ~0.15×0.225 e escala por instância (w ~0.10–0.15, h ~0.16–0.30)

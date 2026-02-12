@@ -163,8 +163,22 @@ export class MineManager {
 
       const ridge = Math.sin((x + z) * 0.10) * 0.6
 
-      const height = h * (17.0 + 4.2 * noise + 2.4 * ridge)
-      v.y = height
+      // Carve a shallow notch around the entrance so the frame doesn't look "swallowed" by the slope.
+      // Compute entrance position in mountain-local coordinates (plane is centered at origin before mesh transform).
+      const exw = this.entrance.x - this.center.x
+      const ezw = this.entrance.z - this.center.z
+      const rot = -0.35
+      const ex = exw * Math.cos(rot) - ezw * Math.sin(rot)
+      const ez = exw * Math.sin(rot) + ezw * Math.cos(rot)
+
+      const dxE = x - ex
+      const dzE = z - ez
+      const dE = Math.sqrt(dxE * dxE + dzE * dzE)
+      const carveR = 7.5
+      const carve = dE < carveR ? (1 - dE / carveR) : 0
+
+      const height = h * (17.0 + 4.2 * noise + 2.4 * ridge) - carve * 5.5
+      v.y = Math.max(0, height)
 
       pos.setXYZ(i, v.x, v.y, v.z)
     }
@@ -225,7 +239,12 @@ export class MineManager {
 
     // dark mouth block (visual shadow), placed behind the frame
     const holeGeo = new THREE.BoxGeometry(3.8, 3.3, 4.7)
-    const holeMat = new THREE.MeshStandardMaterial({ color: 0x07070a, roughness: 1.0 })
+    const holeMat = new THREE.MeshStandardMaterial({
+      color: 0x0a0a10,
+      roughness: 1.0,
+      emissive: 0x050509,
+      emissiveIntensity: 0.35,
+    })
     const hole = new THREE.Mesh(holeGeo, holeMat)
     hole.position.set(ex + 1.55, 1.75, ez)
 
@@ -244,15 +263,15 @@ export class MineManager {
     })
     const inner = new THREE.Mesh(innerGeo, innerMat)
     inner.rotation.z = Math.PI / 2 // length along +X
-    inner.position.set(1.9, 1.75, 0)
+    inner.position.set(2.2, 1.75, 0)
     tunnel.add(inner)
 
-    // Ground strip inside (dirt)
-    const floorGeo = new THREE.PlaneGeometry(6.0, 3.0, 1, 1)
+    // Ground strip inside (dirt) — keep it fully inside the mouth (avoid "plank" sticking out)
+    const floorGeo = new THREE.PlaneGeometry(4.8, 2.6, 1, 1)
     floorGeo.rotateX(-Math.PI / 2)
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x14110f, roughness: 1.0 })
     const floor = new THREE.Mesh(floorGeo, floorMat)
-    floor.position.set(3.0, 0.015, 0)
+    floor.position.set(3.1, 0.015, 0)
     tunnel.add(floor)
 
     // Supports (a couple of frames) to give depth
@@ -277,10 +296,32 @@ export class MineManager {
       tunnel.add(frame)
     }
 
-    // Small warm light deeper inside (subtle)
-    const glow = new THREE.PointLight(0xffb06a, 0.25, 10, 1.6)
+    // Warm lights inside so it doesn't read as a pure black void.
+    const glow = new THREE.PointLight(0xffb06a, 0.45, 12, 1.6)
     glow.position.set(6.0, 2.0, 0)
     tunnel.add(glow)
+
+    const sconceMat = new THREE.MeshStandardMaterial({
+      color: 0xffd0a0,
+      emissive: 0xffa34a,
+      emissiveIntensity: 1.1,
+      roughness: 0.4,
+    })
+    const sconceGeo = new THREE.SphereGeometry(0.12, 8, 6)
+
+    const s1 = new THREE.Mesh(sconceGeo, sconceMat)
+    s1.position.set(2.8, 2.1, 1.15)
+    tunnel.add(s1)
+    const l1 = new THREE.PointLight(0xffb06a, 0.55, 10, 1.7)
+    l1.position.copy(s1.position)
+    tunnel.add(l1)
+
+    const s2 = new THREE.Mesh(sconceGeo, sconceMat)
+    s2.position.set(3.4, 2.1, -1.15)
+    tunnel.add(s2)
+    const l2 = new THREE.PointLight(0xffb06a, 0.55, 10, 1.7)
+    l2.position.copy(s2.position)
+    tunnel.add(l2)
 
     g.add(left)
     g.add(right)
