@@ -184,7 +184,7 @@ export class MineManager {
   }
 
   _makeMountainDressing() {
-    // Visual-only slopes around the core wall to read as a mountain.
+    // Visual-only: add chunky low-poly wedges on the sides/back to make the block read as a mountain.
     // IMPORTANT: do NOT place anything in front of the portal.
     const g = new THREE.Group()
     g.name = 'MineMountainDressing'
@@ -198,47 +198,42 @@ export class MineManager {
     toForest.normalize()
     const right = new THREE.Vector3(-toForest.z, 0, toForest.x)
 
+    const yaw = Math.atan2(-toForest.z, toForest.x)
+
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x26262b, roughness: 1.0, flatShading: true })
 
-    // Side slopes (left/right). These sit on the sides (±Z local) so the front remains clear.
-    const sideLen = d * 1.7
-    const sideH = h * 1.25
-    const sideW = 10
+    // Wedge geometry: a box we scale in Y and rotate to simulate a slope.
+    const wedgeGeo = new THREE.BoxGeometry(d * 1.1, h * 1.0, 10)
 
-    const sideGeo = new THREE.PlaneGeometry(sideLen, sideH, 1, 1)
-    const mkSide = (sign) => {
-      const m = new THREE.Mesh(sideGeo, rockMat)
-      // Make a ramp: tilt and face outward.
-      m.rotation.z = sign * Math.PI / 2
-      m.rotation.x = -Math.PI / 2 + 0.85
+    const mkWedge = (sideSign) => {
+      const m = new THREE.Mesh(wedgeGeo, rockMat)
+      m.rotation.y = yaw
+      // Tilt to create a ramp look (no crazy spikes).
+      m.rotation.z = sideSign * 0.0
+      m.rotation.x = -0.55
 
-      // Position: on the side, slightly above ground.
-      const localZ = sign * (w * 0.5 + sideW * 0.25)
-      const localX = -d * 0.05
+      const localZ = sideSign * (w * 0.5 + 6.0)
+      const localX = -d * 0.15
+
       const wx = this.center.x + toForest.x * localX + right.x * localZ
       const wz = this.center.z + toForest.z * localX + right.z * localZ
-      m.position.set(wx, sideH * 0.48, wz)
-
-      // Yaw align with block.
-      m.rotation.y = Math.atan2(-toForest.z, toForest.x)
+      m.position.set(wx, h * 0.55, wz)
       return m
     }
 
-    g.add(mkSide(1))
-    g.add(mkSide(-1))
+    // Side wedges
+    g.add(mkWedge(1))
+    g.add(mkWedge(-1))
 
-    // Back slope (opposite of forest face): adds mass behind without blocking portal.
-    const backGeo = new THREE.PlaneGeometry(w * 1.7, h * 1.35, 1, 1)
-    const back = new THREE.Mesh(backGeo, rockMat)
-    back.rotation.x = -Math.PI / 2 + 0.78
-    back.rotation.y = Math.atan2(-toForest.z, toForest.x)
-
-    const backLocalX = -d * 0.9
-    const backLocalZ = 0
+    // Back wedge (behind the wall)
+    const back = new THREE.Mesh(new THREE.BoxGeometry(10, h * 1.1, w * 1.2), rockMat)
+    back.rotation.y = yaw
+    back.rotation.x = -0.45
+    const backLocalX = -d * 0.95
     back.position.set(
-      this.center.x + toForest.x * backLocalX + right.x * backLocalZ,
-      h * 0.72,
-      this.center.z + toForest.z * backLocalX + right.z * backLocalZ
+      this.center.x + toForest.x * backLocalX,
+      h * 0.62,
+      this.center.z + toForest.z * backLocalX
     )
     g.add(back)
 
