@@ -37,8 +37,8 @@ export class OreManager {
     this.scene.add(this._group)
     this._group.visible = this._visible
 
-    // Iron ore as "veins" on the wall (smaller, non-rotating).
-    const hitGeo = new THREE.BoxGeometry(0.55, 0.8, 0.12)
+    // Iron ore as wall veins: use a clear, emissive decal-like card + an invisible hitbox.
+    const hitGeo = new THREE.BoxGeometry(0.85, 0.75, 0.28)
     const hitMat = new THREE.MeshStandardMaterial({
       color: 0x000000,
       roughness: 1.0,
@@ -47,19 +47,29 @@ export class OreManager {
       opacity: 0.0,
     })
 
-    const shardGeo = new THREE.BoxGeometry(0.24, 0.14, 0.08)
-    const veinMat = new THREE.MeshStandardMaterial({
-      color: 0x7a3b22,
-      roughness: 0.75,
-      metalness: 0.1,
-      emissive: 0x4a2416,
-      emissiveIntensity: 0.85,
+    const cardGeo = new THREE.PlaneGeometry(1.05, 0.72)
+    const cardMat = new THREE.MeshStandardMaterial({
+      color: 0x6b331e,
+      roughness: 0.85,
+      metalness: 0.15,
+      emissive: 0x6a2a16,
+      emissiveIntensity: 1.25,
+      side: THREE.DoubleSide,
+    })
+
+    const streakGeo = new THREE.BoxGeometry(0.18, 0.05, 0.03)
+    const streakMat = new THREE.MeshStandardMaterial({
+      color: 0x8a4424,
+      roughness: 0.7,
+      metalness: 0.2,
+      emissive: 0x7a2f18,
+      emissiveIntensity: 1.35,
     })
 
     for (let i = 0; i < points.length; i++) {
       const p = points[i]
 
-      // Invisible hitbox mesh (raycast target)
+      // Root: invisible hitbox mesh (raycast target)
       const mesh = new THREE.Mesh(hitGeo, hitMat)
       mesh.position.set(p.x, p.y, p.z)
       mesh.castShadow = false
@@ -67,28 +77,28 @@ export class OreManager {
       mesh.userData.oreId = String(i)
 
       // Orient to wall if normal provided.
+      let n = null
       if (typeof p.nx === 'number' && typeof p.nz === 'number') {
-        const n = new THREE.Vector3(p.nx, p.ny ?? 0, p.nz).normalize()
-        // Normal points inward (towards tunnel center). Orient the vein to face inward,
-        // and push the whole cluster slightly outward so it doesn't end up hidden inside the wall.
+        n = new THREE.Vector3(p.nx, p.ny ?? 0, p.nz).normalize()
         const target = new THREE.Vector3(p.x + n.x, p.y + n.y, p.z + n.z)
         mesh.lookAt(target)
-        mesh.position.addScaledVector(n, -0.10)
+        // Push outward from the wall so it always renders outside the tunnel surface.
+        mesh.position.addScaledVector(n, -0.28)
       } else {
         mesh.rotation.y = Math.random() * Math.PI * 2
       }
 
-      // Visual vein shards attached to the hitbox
-      const shards = 11
-      for (let k = 0; k < shards; k++) {
-        const s = new THREE.Mesh(shardGeo, veinMat)
-        s.position.set(
-          (Math.random() - 0.5) * 0.58,
-          (Math.random() - 0.5) * 0.78,
-          -(0.06 + Math.random() * 0.16)
-        )
-        s.rotation.set((Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.85)
-        s.scale.set(0.8 + Math.random() * 0.9, 0.8 + Math.random() * 0.9, 0.8 + Math.random() * 0.9)
+      // Visible "vein card" + streaks
+      const card = new THREE.Mesh(cardGeo, cardMat)
+      card.position.set(0, 0, -0.08)
+      mesh.add(card)
+
+      const streaks = 12
+      for (let k = 0; k < streaks; k++) {
+        const s = new THREE.Mesh(streakGeo, streakMat)
+        s.position.set((Math.random() - 0.5) * 0.85, (Math.random() - 0.5) * 0.50, -0.10 - Math.random() * 0.10)
+        s.rotation.set((Math.random() - 0.5) * 0.10, (Math.random() - 0.5) * 0.10, (Math.random() - 0.5) * 1.2)
+        s.scale.set(0.8 + Math.random() * 1.8, 0.8 + Math.random() * 1.6, 1.0)
         mesh.add(s)
       }
 
@@ -119,7 +129,7 @@ export class OreManager {
 
     for (const n of this._nodes.values()) {
       if (n.hp > 0) {
-        // No idle rotation (veins should feel embedded in the wall).
+        // No idle rotation.
         continue
       }
 

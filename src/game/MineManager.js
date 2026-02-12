@@ -210,14 +210,15 @@ export class MineManager {
         const wallOut = sideVec.multiplyScalar(side)
 
         // Position at wall. Normal points inward (into tunnel).
-        const off = this._tunnelRadius * 0.92
+        // Push slightly OUTWARD so the vein isn't hidden inside the tunnel mesh.
+        const off = this._tunnelRadius * 0.95
         const x = p.x + wallOut.x * off
         const z = p.z + wallOut.z * off
 
         // Keep veins visible: place around mid-mine eye-height band, but never below floor+eyeHeight.
         const floorY = p.y - this._tunnelRadius + 0.15
         const minY = floorY + 1.65 * 0.92
-        const y = Math.max(minY, midY) + (i % 3) * 0.10
+        const y = Math.max(minY, midY) + (i % 2) * 0.12
 
         pts.push({ x, y, z, nx: -wallOut.x, ny: 0, nz: -wallOut.z })
       }
