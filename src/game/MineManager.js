@@ -109,6 +109,7 @@ export class MineManager {
     for (const m of tunnelMeshes) this._mineGroup.add(m)
     this._makeSupportsAndLamps(curves)
     this._mineGroup.add(this._makeEntranceBackdrop())
+    this._mineGroup.add(this._makeMineEndCap(curves[0]))
     this._mineGroup.add(this._makeMineEndRubble(curves[0]))
 
     this.scene.add(this._worldGroup)
@@ -207,7 +208,10 @@ export class MineManager {
         const off = this._tunnelRadius * 0.92
         const x = p.x + wallOut.x * off
         const z = p.z + wallOut.z * off
-        const y = p.y + 0.4 + (i % 3) * 0.28
+
+        // Keep veins reachable: clamp to a band above the floor.
+        const floorY = p.y - this._tunnelRadius + 0.15
+        const y = floorY + 1.15 + (i % 3) * 0.18
 
         pts.push({ x, y, z, nx: -wallOut.x, ny: 0, nz: -wallOut.z })
       }
@@ -862,34 +866,54 @@ export class MineManager {
   }
 
   /** @param {THREE.CatmullRomCurve3} curve */
+  _makeMineEndCap(curve) {
+    // Solid cap so the end reads "closed" (no exit).
+    const g = new THREE.Group()
+    g.name = 'MineEndCap'
+
+    const end = curve.getPoint(1)
+    const tan = curve.getTangent(1).normalize()
+
+    const mat = new THREE.MeshStandardMaterial({ color: 0x14141a, roughness: 1.0, metalness: 0.0 })
+    const cap = new THREE.Mesh(new THREE.CircleGeometry(this._tunnelRadius * 1.05, 10), mat)
+
+    // Place slightly past the end so it doesn't intersect the last ring.
+    cap.position.set(end.x + tan.x * 0.22, end.y, end.z + tan.z * 0.22)
+
+    // Align circle normal to the tunnel direction.
+    cap.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tan)
+
+    g.add(cap)
+    return g
+  }
+
+  /** @param {THREE.CatmullRomCurve3} curve */
   _makeMineEndRubble(curve) {
-    // Visual closure at the end: rock cluster "blocking" the dead end.
-    // Collision already caps the end; keep this as visual dressing only.
+    // Decorative rock cluster near the end (keep it beyond the cap, never in the path).
     const g = new THREE.Group()
     g.name = 'MineEndRubble'
 
     const end = curve.getPoint(1)
-    const tan = curve.getTangent(1)
+    const tan = curve.getTangent(1).normalize()
 
     const rockGeo = new THREE.DodecahedronGeometry(0.7, 0)
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x1a1a20, roughness: 1.0, metalness: 0.0 })
 
-    const count = 22
+    const upV = new THREE.Vector3(0, 1, 0)
+    let right = new THREE.Vector3().crossVectors(upV, tan)
+    if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
+    right.normalize()
+
+    const count = 20
     for (let i = 0; i < count; i++) {
       const r = new THREE.Mesh(rockGeo, rockMat)
-      const s = 0.8 + Math.random() * 1.7
+      const s = 0.8 + Math.random() * 1.6
       r.scale.setScalar(s)
 
-      // Spread on the end face, slightly beyond the cap.
-      const side = (Math.random() - 0.5) * (this._tunnelRadius * 1.65)
-      const up = (Math.random() - 0.15) * (this._tunnelRadius * 1.25)
-      const depth = 0.6 + Math.random() * 1.4
-
-      // Build local basis
-      const upV = new THREE.Vector3(0, 1, 0)
-      let right = new THREE.Vector3().crossVectors(upV, tan)
-      if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
-      right.normalize()
+      const side = (Math.random() - 0.5) * (this._tunnelRadius * 1.55)
+      const up = (Math.random() - 0.15) * (this._tunnelRadius * 1.15)
+      // Push rubble clearly beyond the cap so player never walks through it mid-path.
+      const depth = 1.6 + Math.random() * 2.2
 
       r.position.set(
         end.x + tan.x * depth + right.x * side,
