@@ -7,6 +7,7 @@ Interação com **estruturas colocadas** é sempre via **F** (nada de clicar nos
 - **Segurar F (hold ~360ms)**: abre a **roda de ações** com opções contextuais; ao soltar F em uma opção, executa.
   - Segmentos sempre dividem o círculo igualmente: **360° ÷ N ações**.
 - Sem alvo válido em alcance: **não mostra prompt** e **não abre roda**.
+- Se `actionsCount == 0`: a roda **não é ativada/renderizada** (nem o círculo base).
 
 ## Prompt
 Só aparece quando existe um alvo válido em alcance:

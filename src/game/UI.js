@@ -12,7 +12,13 @@ export class UI {
   }
 
   showWheel() {
-    this.els.actionWheelEl?.classList.remove('hidden')
+    // Only show if wheel has actions (data-n set by setWheelActions).
+    const root = this.els.actionWheelEl
+    if (!root) return
+    const wheel = root.querySelector('.wheel')
+    const n = Number(wheel?.getAttribute('data-n') || 0)
+    if (!n) return
+    root.classList.remove('hidden')
   }
 
   hideWheel() {
@@ -32,12 +38,18 @@ export class UI {
     // remove old labels (keep center)
     for (const el of Array.from(wheel.querySelectorAll('.wheelLabel'))) el.remove()
 
-    // If no actions, keep it truly empty (no slices / no labels).
+    // If no actions, keep it 100% gone: hide root and remove the base circle styling.
     if (!actions || actions.length === 0) {
-      wheel.style.background = 'rgba(0,0,0,.28)'
+      root.classList.add('hidden')
+      wheel.style.background = 'transparent'
+      wheel.style.borderColor = 'transparent'
+      wheel.style.boxShadow = 'none'
       wheel.removeAttribute('data-n')
       return
     }
+
+    // restore base styling (in case it was cleared)
+    wheel.style.borderColor = 'rgba(255,255,255,.12)'
 
     const n = actions.length
     wheel.setAttribute('data-n', String(n))
