@@ -1296,12 +1296,14 @@ export class Game {
 
         if (this._fade.toMine) {
           this._inMine = true
+          this.world.setGroundVisible(false)
           this.mine.setInteriorVisible(true)
           this.ores.setVisible(true)
           this.player.position.copy(this.mine.spawnMine)
           this.player.velocity.set(0, 0, 0)
         } else {
           this._inMine = false
+          this.world.setGroundVisible(true)
           this.mine.setInteriorVisible(false)
           this.ores.setVisible(false)
           this.player.position.copy(this.mine.spawnWorld)

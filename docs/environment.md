@@ -17,6 +17,7 @@ Colisão: o bloqueio usa um perímetro denso (com leve irregularidade) e mantém
 
 ## Mina (interior)
 - Layout maior, com caminho principal descendo e ramificações.
+- Para imersão, o **chão do mundo externo** (plano y=0) é ocultado enquanto o player está dentro da mina.
 - Minério de ferro aparece como **veios na parede** (menores), sem rotação idle.
 
 O portal é propositalmente simples: **3 peças de madeira** (2 postes + 1 viga), alinhado com a face.

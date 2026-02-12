@@ -59,6 +59,11 @@ export class World {
     return tex
   }
 
+  /** @param {boolean} v */
+  setGroundVisible(v) {
+    if (this._ground) this._ground.visible = !!v
+  }
+
   init() {
     // Lights
     this._sun.position.set(8, 14, 6)

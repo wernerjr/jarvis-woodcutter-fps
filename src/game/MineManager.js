@@ -741,10 +741,10 @@ export class MineManager {
 
     const up = new THREE.Vector3(0, 1, 0)
 
-    const addWalls = (curve, samples) => {
+    const addWalls = (curve, samples, tStart = 0, tEnd = 1) => {
       const wallR = 0.85
       for (let i = 0; i <= samples; i++) {
-        const t = i / samples
+        const t = tStart + (i / samples) * (tEnd - tStart)
         const p = curve.getPoint(t)
         const tan = curve.getTangent(t)
 
@@ -758,7 +758,7 @@ export class MineManager {
 
         // Add midpoints to reduce diagonal clipping.
         if (i < samples) {
-          const t2 = (i + 0.5) / samples
+          const t2 = tStart + ((i + 0.5) / samples) * (tEnd - tStart)
           const p2 = curve.getPoint(t2)
           const tan2 = curve.getTangent(t2)
           let n2 = new THREE.Vector3().crossVectors(up, tan2)
@@ -771,8 +771,9 @@ export class MineManager {
     }
 
     addWalls(curves[0], 26)
-    if (curves[1]) addWalls(curves[1], 18)
-    if (curves[2]) addWalls(curves[2], 18)
+    // Skip the first portion of branches so junction doesn't get blocked by wall-colliders.
+    if (curves[1]) addWalls(curves[1], 18, 0.28, 1)
+    if (curves[2]) addWalls(curves[2], 18, 0.28, 1)
 
     // Caps to prevent walking off ends.
     const endMain = curves[0].getPoint(1)
