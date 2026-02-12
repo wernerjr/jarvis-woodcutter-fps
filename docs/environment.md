@@ -15,6 +15,10 @@ A entrada da mina no mundo externo fica **na borda** (face frontal) de um **pare
 
 Colisão: o bloqueio usa um perímetro denso (com leve irregularidade) e mantém uma abertura apenas no portal.
 
+## Mina (interior)
+- Layout maior, com caminho principal descendo e ramificações.
+- Minério de ferro aparece como **veios na parede** (menores), sem rotação idle.
+
 O portal é propositalmente simples: **3 peças de madeira** (2 postes + 1 viga), alinhado com a face.
 
 Para manter a entrada sempre legível, existem **2 tochas infinitas** (sem durabilidade) fixadas nos postes (uma em cada lado), com luminosidade semelhante à tocha do jogador.

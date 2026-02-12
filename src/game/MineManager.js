@@ -45,8 +45,8 @@ export class MineManager {
 
     this._amb = new THREE.AmbientLight(0x242432, 0.20)
 
-    /** @type {THREE.CatmullRomCurve3|null} */
-    this._curve = null
+    /** @type {THREE.CatmullRomCurve3[]} */
+    this._curves = []
 
     this._tunnelRadius = 2.9
 
@@ -102,11 +102,11 @@ export class MineManager {
     this._worldGroup.add(this._makeEntrance())
     this._worldGroup.add(this._makeMouthGround())
 
-    // --- Interior: curved tunnel + supports + lamps ---
-    const { tunnelMesh, curve } = this._makeTunnel()
-    this._curve = curve
-    this._mineGroup.add(tunnelMesh)
-    this._makeSupportsAndLamps(curve)
+    // --- Interior: bigger mine (descending) with multiple paths + supports + lamps ---
+    const { tunnelMeshes, curves } = this._makeTunnels()
+    this._curves = curves
+    for (const m of tunnelMeshes) this._mineGroup.add(m)
+    this._makeSupportsAndLamps(curves)
 
     this.scene.add(this._worldGroup)
     this.scene.add(this._mineGroup)
@@ -118,7 +118,7 @@ export class MineManager {
 
     // --- Collision ---
     this._buildWorldColliders()
-    this._buildMineColliders(curve)
+    this._buildMineColliders(curves)
 
     // Portal triggers updated (in case entrance moved)
     this.portalEnter = { x: this.entrance.x - 0.6, z: this.entrance.z, r: 1.35 }
@@ -138,21 +138,41 @@ export class MineManager {
   }
 
   getOreSpawnPoints() {
-    // Spawn on alternating sides of the interior tunnel.
+    // Spawn as "veins" on the tunnel walls (needs position + inward normal).
     const pts = []
-    const c = this._curve
-    if (!c) return pts
+    const curves = this._curves
+    if (!curves || !curves.length) return pts
 
-    const count = 10
-    for (let i = 0; i < count; i++) {
-      const t = 0.22 + (i / (count - 1)) * 0.68
-      const p = c.getPoint(t)
-      const tan = c.getTangent(t)
-      const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize()
-      const side = i % 2 === 0 ? 1 : -1
-      const off = this._tunnelRadius * 0.62
-      pts.push({ x: p.x + n.x * off * side, y: 1.05, z: p.z + n.z * off * side })
+    const up = new THREE.Vector3(0, 1, 0)
+
+    const addFromCurve = (c, baseCount, t0, t1) => {
+      for (let i = 0; i < baseCount; i++) {
+        const t = t0 + (i / Math.max(1, baseCount - 1)) * (t1 - t0)
+        const p = c.getPoint(t)
+        const tan = c.getTangent(t)
+
+        // Side vector (roughly horizontal) even when the tunnel descends.
+        let sideVec = new THREE.Vector3().crossVectors(up, tan)
+        if (sideVec.lengthSq() < 1e-6) sideVec.set(1, 0, 0)
+        sideVec.normalize()
+
+        const side = i % 2 === 0 ? 1 : -1
+        const wallOut = sideVec.multiplyScalar(side)
+
+        // Position at wall. Normal points inward (into tunnel).
+        const off = this._tunnelRadius * 0.92
+        const x = p.x + wallOut.x * off
+        const z = p.z + wallOut.z * off
+        const y = p.y + 0.4 + (i % 3) * 0.28
+
+        pts.push({ x, y, z, nx: -wallOut.x, ny: 0, nz: -wallOut.z })
+      }
     }
+
+    // Main path + branches.
+    addFromCurve(curves[0], 10, 0.12, 0.92)
+    if (curves[1]) addFromCurve(curves[1], 6, 0.18, 0.9)
+    if (curves[2]) addFromCurve(curves[2], 6, 0.18, 0.9)
 
     return pts
   }
@@ -533,43 +553,82 @@ export class MineManager {
 
   // ----------------- Interior (mine) -----------------
 
-  _makeTunnel() {
-    // Curve with 2 noticeable bends, placed at mineOrigin.
+  _makeTunnels() {
+    // Bigger mine: one main path descending + 2 branches.
     const o = this.mineOrigin
 
-    const p0 = new THREE.Vector3(o.x + 1.0, 1.8, o.z)
-    const p1 = new THREE.Vector3(o.x + 6.0, 1.9, o.z + 1.2)
-    const p2 = new THREE.Vector3(o.x + 12.0, 2.0, o.z + 6.6)
-    const p3 = new THREE.Vector3(o.x + 18.7, 2.1, o.z + 3.0)
-    const p4 = new THREE.Vector3(o.x + 24.2, 2.15, o.z - 2.2)
-
-    const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3, p4])
-    curve.curveType = 'catmullrom'
-    curve.tension = 0.35
-
-    const tubularSegments = 70
-    const radialSegments = 10
-    const geo = new THREE.TubeGeometry(curve, tubularSegments, this._tunnelRadius, radialSegments, false)
-
-    // Slight vertex noise to break perfect tube
-    const pos = geo.attributes.position
-    const v = new THREE.Vector3()
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i)
-      const n = Math.sin(v.x * 0.9 + v.z * 1.1) * 0.12 + Math.sin(v.x * 2.1 - v.z * 1.7) * 0.06
-      v.y += n
-      pos.setXYZ(i, v.x, v.y, v.z)
+    const mkCurve = (pts) => {
+      const c = new THREE.CatmullRomCurve3(pts)
+      c.curveType = 'catmullrom'
+      c.tension = 0.35
+      return c
     }
-    geo.computeVertexNormals()
 
-    const mat = new THREE.MeshStandardMaterial({ color: 0x131318, roughness: 1.0, metalness: 0.0, side: THREE.BackSide })
-    const tunnel = new THREE.Mesh(geo, mat)
-    tunnel.name = 'MineTunnel'
+    // Main: start near portal, then descend and snake.
+    const main = mkCurve([
+      new THREE.Vector3(o.x + 1.0, 1.8, o.z),
+      new THREE.Vector3(o.x + 7.0, 1.4, o.z + 1.2),
+      new THREE.Vector3(o.x + 14.0, 0.7, o.z + 6.8),
+      new THREE.Vector3(o.x + 22.0, -0.9, o.z + 3.4),
+      new THREE.Vector3(o.x + 30.0, -2.6, o.z - 3.2),
+      new THREE.Vector3(o.x + 40.0, -4.8, o.z - 0.5),
+      new THREE.Vector3(o.x + 52.0, -7.2, o.z + 5.6),
+    ])
 
-    return { tunnelMesh: tunnel, curve }
+    // Branch A (mid): forks to one side.
+    const a = mkCurve([
+      new THREE.Vector3(o.x + 18.0, -0.6, o.z + 4.6),
+      new THREE.Vector3(o.x + 24.0, -2.0, o.z + 10.0),
+      new THREE.Vector3(o.x + 34.0, -3.8, o.z + 12.0),
+      new THREE.Vector3(o.x + 44.0, -5.8, o.z + 8.8),
+    ])
+
+    // Branch B (late): forks to the other side.
+    const b = mkCurve([
+      new THREE.Vector3(o.x + 34.0, -3.6, o.z - 3.2),
+      new THREE.Vector3(o.x + 42.0, -5.0, o.z - 9.0),
+      new THREE.Vector3(o.x + 52.0, -6.6, o.z - 10.0),
+      new THREE.Vector3(o.x + 62.0, -8.1, o.z - 5.2),
+    ])
+
+    const curves = [main, a, b]
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x131318,
+      roughness: 1.0,
+      metalness: 0.0,
+      side: THREE.BackSide,
+    })
+
+    const makeTube = (curve, name) => {
+      const tubularSegments = 110
+      const radialSegments = 10
+      const geo = new THREE.TubeGeometry(curve, tubularSegments, this._tunnelRadius, radialSegments, false)
+
+      // Slight vertex noise to break perfect tube
+      const pos = geo.attributes.position
+      const v = new THREE.Vector3()
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i)
+        const n = Math.sin(v.x * 0.9 + v.z * 1.1) * 0.12 + Math.sin(v.x * 2.1 - v.z * 1.7) * 0.06
+        v.y += n
+        pos.setXYZ(i, v.x, v.y, v.z)
+      }
+      geo.computeVertexNormals()
+
+      const tunnel = new THREE.Mesh(geo, mat)
+      tunnel.name = name
+      return tunnel
+    }
+
+    return {
+      tunnelMeshes: [makeTube(main, 'MineTunnelMain'), makeTube(a, 'MineTunnelBranchA'), makeTube(b, 'MineTunnelBranchB')],
+      curves,
+    }
   }
 
-  _makeSupportsAndLamps(curve) {
+  /** @param {THREE.CatmullRomCurve3[]} curves */
+  _makeSupportsAndLamps(curves) {
     const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e1d, roughness: 1.0 })
     const postGeo = new THREE.BoxGeometry(0.35, 3.2, 0.35)
     const beamGeo = new THREE.BoxGeometry(this._tunnelRadius * 2.0 - 0.4, 0.32, 0.32)
@@ -582,65 +641,108 @@ export class MineManager {
       roughness: 0.4,
     })
 
-    const steps = 6
-    for (let i = 0; i < steps; i++) {
-      const t = 0.18 + (i / (steps - 1)) * 0.76
-      const p = curve.getPoint(t)
-      const tan = curve.getTangent(t)
-      const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize()
+    const up = new THREE.Vector3(0, 1, 0)
 
-      const frame = new THREE.Group()
-      frame.position.set(p.x, 0, p.z)
+    const placeOnCurve = (curve, steps, t0, t1, lightScale = 1.0) => {
+      for (let i = 0; i < steps; i++) {
+        const t = t0 + (i / Math.max(1, steps - 1)) * (t1 - t0)
+        const p = curve.getPoint(t)
+        const tan = curve.getTangent(t)
 
-      const left = new THREE.Mesh(postGeo, woodMat)
-      const right = new THREE.Mesh(postGeo, woodMat)
-      left.position.set(n.x * (this._tunnelRadius - 0.55), 1.6, n.z * (this._tunnelRadius - 0.55))
-      right.position.set(n.x * -(this._tunnelRadius - 0.55), 1.6, n.z * -(this._tunnelRadius - 0.55))
+        let n = new THREE.Vector3().crossVectors(up, tan)
+        if (n.lengthSq() < 1e-6) n.set(1, 0, 0)
+        n.normalize()
 
-      const top = new THREE.Mesh(beamGeo, woodMat)
-      top.position.set(0, 3.05, 0)
-      top.rotation.y = Math.atan2(tan.x, tan.z)
+        const frame = new THREE.Group()
+        frame.position.set(p.x, 0, p.z)
 
-      frame.add(left)
-      frame.add(right)
-      frame.add(top)
-      this._mineGroup.add(frame)
+        const left = new THREE.Mesh(postGeo, woodMat)
+        const right = new THREE.Mesh(postGeo, woodMat)
+        left.position.set(n.x * (this._tunnelRadius - 0.55), 1.6 + (p.y - 1.8) * 0.12, n.z * (this._tunnelRadius - 0.55))
+        right.position.set(n.x * -(this._tunnelRadius - 0.55), 1.6 + (p.y - 1.8) * 0.12, n.z * -(this._tunnelRadius - 0.55))
 
-      const lamp = new THREE.Mesh(lampGeo, lampMat)
-      lamp.position.set(p.x + n.x * 1.1, 2.45, p.z + n.z * 1.1)
-      this._mineGroup.add(lamp)
+        const top = new THREE.Mesh(beamGeo, woodMat)
+        top.position.set(0, 3.05 + (p.y - 1.8) * 0.12, 0)
+        top.rotation.y = Math.atan2(tan.x, tan.z)
 
-      const light = new THREE.PointLight(0xffb06a, 0.95, 16, 1.6)
-      light.position.set(lamp.position.x, lamp.position.y, lamp.position.z)
-      this._lights.add(light)
+        frame.add(left)
+        frame.add(right)
+        frame.add(top)
+        this._mineGroup.add(frame)
+
+        const lamp = new THREE.Mesh(lampGeo, lampMat)
+        lamp.position.set(p.x + n.x * 1.1, p.y + 1.25, p.z + n.z * 1.1)
+        this._mineGroup.add(lamp)
+
+        const light = new THREE.PointLight(0xffb06a, 0.95 * lightScale, 16, 1.6)
+        light.position.set(lamp.position.x, lamp.position.y, lamp.position.z)
+        this._lights.add(light)
+      }
     }
 
-    const end = curve.getPoint(0.98)
-    const fill = new THREE.PointLight(0xffb88a, 0.55, 18, 1.4)
-    fill.position.set(end.x, 2.6, end.z)
+    // Main tunnel: more lights.
+    placeOnCurve(curves[0], 10, 0.08, 0.96, 1.0)
+    // Branches: fewer.
+    if (curves[1]) placeOnCurve(curves[1], 5, 0.12, 0.92, 0.85)
+    if (curves[2]) placeOnCurve(curves[2], 5, 0.12, 0.92, 0.85)
+
+    // Fill at the end of the main path
+    const end = curves[0].getPoint(0.98)
+    const fill = new THREE.PointLight(0xffb88a, 0.55, 22, 1.4)
+    fill.position.set(end.x, end.y + 1.8, end.z)
     this._lights.add(fill)
   }
 
-  _buildMineColliders(curve) {
+  /** @param {THREE.CatmullRomCurve3[]} curves */
+  _buildMineColliders(curves) {
     this._mineColliders = []
 
-    // Curved tunnel walls
-    const samples = 18
-    const wallR = 0.85
-    for (let i = 0; i <= samples; i++) {
-      const t = i / samples
-      const p = curve.getPoint(t)
-      const tan = curve.getTangent(t)
-      const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize()
+    const up = new THREE.Vector3(0, 1, 0)
 
-      const off = this._tunnelRadius - 0.35
-      this._mineColliders.push({ x: p.x + n.x * off, z: p.z + n.z * off, r: wallR })
-      this._mineColliders.push({ x: p.x - n.x * off, z: p.z - n.z * off, r: wallR })
+    const addWalls = (curve, samples) => {
+      const wallR = 0.85
+      for (let i = 0; i <= samples; i++) {
+        const t = i / samples
+        const p = curve.getPoint(t)
+        const tan = curve.getTangent(t)
+
+        let n = new THREE.Vector3().crossVectors(up, tan)
+        if (n.lengthSq() < 1e-6) n.set(1, 0, 0)
+        n.normalize()
+
+        const off = this._tunnelRadius - 0.35
+        this._mineColliders.push({ x: p.x + n.x * off, z: p.z + n.z * off, r: wallR })
+        this._mineColliders.push({ x: p.x - n.x * off, z: p.z - n.z * off, r: wallR })
+
+        // Add midpoints to reduce diagonal clipping.
+        if (i < samples) {
+          const t2 = (i + 0.5) / samples
+          const p2 = curve.getPoint(t2)
+          const tan2 = curve.getTangent(t2)
+          let n2 = new THREE.Vector3().crossVectors(up, tan2)
+          if (n2.lengthSq() < 1e-6) n2.set(1, 0, 0)
+          n2.normalize()
+          this._mineColliders.push({ x: p2.x + n2.x * off, z: p2.z + n2.z * off, r: wallR })
+          this._mineColliders.push({ x: p2.x - n2.x * off, z: p2.z - n2.z * off, r: wallR })
+        }
+      }
     }
 
-    // End cap
-    const end = curve.getPoint(1)
-    this._mineColliders.push({ x: end.x, z: end.z, r: 2.0 })
+    addWalls(curves[0], 26)
+    if (curves[1]) addWalls(curves[1], 18)
+    if (curves[2]) addWalls(curves[2], 18)
+
+    // Caps to prevent walking off ends.
+    const endMain = curves[0].getPoint(1)
+    this._mineColliders.push({ x: endMain.x, z: endMain.z, r: 2.2 })
+    if (curves[1]) {
+      const endA = curves[1].getPoint(1)
+      this._mineColliders.push({ x: endA.x, z: endA.z, r: 2.0 })
+    }
+    if (curves[2]) {
+      const endB = curves[2].getPoint(1)
+      this._mineColliders.push({ x: endB.x, z: endB.z, r: 2.0 })
+    }
 
     // Entry "posts" inside mine (avoid clipping near portal)
     this._mineColliders.push({ x: this.mineOrigin.x + 1.0, z: this.mineOrigin.z + 2.4, r: 0.8 })

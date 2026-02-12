@@ -25,7 +25,7 @@ export class OreManager {
     if (this._group) this._group.visible = this._visible
   }
 
-  /** @param {{seed?:number, points:{x:number,y:number,z:number}[]}} params */
+  /** @param {{seed?:number, points:{x:number,y:number,z:number,nx?:number,ny?:number,nz?:number}[]}} params */
   init({ points }) {
     this.resetAll()
 
@@ -37,39 +37,57 @@ export class OreManager {
     this.scene.add(this._group)
     this._group.visible = this._visible
 
-    const geo = new THREE.DodecahedronGeometry(0.95, 0)
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x2f2f35,
+    // Iron ore as "veins" on the wall (smaller, non-rotating).
+    const hitGeo = new THREE.BoxGeometry(0.55, 0.8, 0.12)
+    const hitMat = new THREE.MeshStandardMaterial({
+      color: 0x000000,
       roughness: 1.0,
       metalness: 0.0,
-      emissive: 0x101018,
-      emissiveIntensity: 0.25,
+      transparent: true,
+      opacity: 0.0,
     })
 
-    const veinGeo = new THREE.IcosahedronGeometry(0.28, 0)
+    const shardGeo = new THREE.BoxGeometry(0.22, 0.12, 0.06)
     const veinMat = new THREE.MeshStandardMaterial({
       color: 0x7a3b22,
       roughness: 0.8,
       metalness: 0.1,
       emissive: 0x3a1a10,
-      emissiveIntensity: 0.55,
+      emissiveIntensity: 0.6,
     })
 
     for (let i = 0; i < points.length; i++) {
       const p = points[i]
-      const mesh = new THREE.Mesh(geo, mat)
+
+      // Invisible hitbox mesh (raycast target)
+      const mesh = new THREE.Mesh(hitGeo, hitMat)
       mesh.position.set(p.x, p.y, p.z)
-      mesh.rotation.y = Math.random() * Math.PI * 2
       mesh.castShadow = false
-      mesh.receiveShadow = true
+      mesh.receiveShadow = false
       mesh.userData.oreId = String(i)
 
-      // add a few "veins"
-      for (let k = 0; k < 4; k++) {
-        const v = new THREE.Mesh(veinGeo, veinMat)
-        v.position.set((Math.random() - 0.5) * 1.2, 0.15 + Math.random() * 0.6, (Math.random() - 0.5) * 1.2)
-        v.scale.setScalar(0.8 + Math.random() * 0.7)
-        mesh.add(v)
+      // Orient to wall if normal provided.
+      if (typeof p.nx === 'number' && typeof p.nz === 'number') {
+        const n = new THREE.Vector3(p.nx, p.ny ?? 0, p.nz).normalize()
+        // Look towards the tunnel center (inward normal), and keep Y up.
+        const target = new THREE.Vector3(p.x + n.x, p.y + n.y, p.z + n.z)
+        mesh.lookAt(target)
+      } else {
+        mesh.rotation.y = Math.random() * Math.PI * 2
+      }
+
+      // Visual vein shards attached to the hitbox
+      const shards = 9
+      for (let k = 0; k < shards; k++) {
+        const s = new THREE.Mesh(shardGeo, veinMat)
+        s.position.set(
+          (Math.random() - 0.5) * 0.55,
+          (Math.random() - 0.5) * 0.75,
+          0.02 + Math.random() * 0.08
+        )
+        s.rotation.set((Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.85)
+        s.scale.set(0.8 + Math.random() * 0.9, 0.8 + Math.random() * 0.9, 0.8 + Math.random() * 0.9)
+        mesh.add(s)
       }
 
       this._group.add(mesh)
@@ -99,8 +117,7 @@ export class OreManager {
 
     for (const n of this._nodes.values()) {
       if (n.hp > 0) {
-        // subtle idle wobble
-        n.mesh.rotation.y += dt * 0.35
+        // No idle rotation (veins should feel embedded in the wall).
         continue
       }
 
