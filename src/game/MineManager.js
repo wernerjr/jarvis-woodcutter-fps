@@ -217,10 +217,9 @@ export class MineManager {
       }
     }
 
-    // Main path + branches.
+    // Main path + branch pocket.
     addFromCurve(curves[0], 10, 0.12, 0.92)
-    if (curves[1]) addFromCurve(curves[1], 6, 0.18, 0.9)
-    if (curves[2]) addFromCurve(curves[2], 6, 0.18, 0.9)
+    if (curves[1]) addFromCurve(curves[1], 6, 0.22, 0.9)
 
     return pts
   }
@@ -602,7 +601,7 @@ export class MineManager {
   // ----------------- Interior (mine) -----------------
 
   _makeTunnels() {
-    // Bigger mine: one main path descending + 2 branches.
+    // Rebuilt mine: one main path (smooth slight descent) + one short branch pocket.
     const o = this.mineOrigin
 
     const mkCurve = (pts) => {
@@ -612,34 +611,26 @@ export class MineManager {
       return c
     }
 
-    // Main: start near portal, then descend smoothly and snake.
+    // Main: smooth slight descent; ends a bit below ground for depth.
     const main = mkCurve([
       new THREE.Vector3(o.x + 1.0, 1.8, o.z),
-      new THREE.Vector3(o.x + 7.0, 1.55, o.z + 1.2),
-      new THREE.Vector3(o.x + 14.0, 1.05, o.z + 6.8),
-      new THREE.Vector3(o.x + 22.0, 0.10, o.z + 3.4),
-      new THREE.Vector3(o.x + 30.0, -1.05, o.z - 3.2),
-      new THREE.Vector3(o.x + 40.0, -2.75, o.z - 0.5),
-      new THREE.Vector3(o.x + 52.0, -4.85, o.z + 5.6),
+      new THREE.Vector3(o.x + 7.5, 1.55, o.z + 1.2),
+      new THREE.Vector3(o.x + 15.5, 1.05, o.z + 6.4),
+      new THREE.Vector3(o.x + 25.0, 0.25, o.z + 3.1),
+      new THREE.Vector3(o.x + 34.0, -0.55, o.z - 3.0),
+      new THREE.Vector3(o.x + 44.0, -1.35, o.z - 0.6),
+      new THREE.Vector3(o.x + 56.0, -2.10, o.z + 5.2),
     ])
 
-    // Branch A (mid): forks to one side.
+    // Branch: short side pocket (readable), no crossing.
     const a = mkCurve([
-      new THREE.Vector3(o.x + 18.0, 0.25, o.z + 4.6),
-      new THREE.Vector3(o.x + 24.0, -0.55, o.z + 10.0),
-      new THREE.Vector3(o.x + 34.0, -1.75, o.z + 12.0),
-      new THREE.Vector3(o.x + 44.0, -3.10, o.z + 8.8),
+      new THREE.Vector3(o.x + 22.5, 0.45, o.z + 4.2),
+      new THREE.Vector3(o.x + 28.5, -0.10, o.z + 10.2),
+      new THREE.Vector3(o.x + 36.5, -0.85, o.z + 11.5),
+      new THREE.Vector3(o.x + 40.5, -1.15, o.z + 7.8),
     ])
 
-    // Branch B (late): forks to the other side.
-    const b = mkCurve([
-      new THREE.Vector3(o.x + 34.0, -1.60, o.z - 3.2),
-      new THREE.Vector3(o.x + 42.0, -2.70, o.z - 9.0),
-      new THREE.Vector3(o.x + 52.0, -3.85, o.z - 10.0),
-      new THREE.Vector3(o.x + 62.0, -5.10, o.z - 5.2),
-    ])
-
-    const curves = [main, a, b]
+    const curves = [main, a]
 
     const mat = new THREE.MeshStandardMaterial({
       color: 0x131318,
@@ -671,7 +662,7 @@ export class MineManager {
     }
 
     return {
-      tunnelMeshes: [makeTube(main, 'MineTunnelMain'), makeTube(a, 'MineTunnelBranchA'), makeTube(b, 'MineTunnelBranchB')],
+      tunnelMeshes: [makeTube(main, 'MineTunnelMain'), makeTube(a, 'MineTunnelBranchA')],
       curves,
     }
   }
@@ -741,9 +732,8 @@ export class MineManager {
 
     // Main tunnel: more lights.
     placeOnCurve(curves[0], 11, 0.08, 0.96, 1.0)
-    // Branches: fewer.
-    if (curves[1]) placeOnCurve(curves[1], 5, 0.18, 0.92, 0.85)
-    if (curves[2]) placeOnCurve(curves[2], 5, 0.18, 0.92, 0.85)
+    // Branch: fewer.
+    if (curves[1]) placeOnCurve(curves[1], 5, 0.22, 0.92, 0.85)
 
     // Fill at the end of the main path
     const end = curves[0].getPoint(0.98)
@@ -788,9 +778,8 @@ export class MineManager {
     }
 
     addWalls(curves[0], 26)
-    // Skip the first portion of branches so junction doesn't get blocked by wall-colliders.
-    if (curves[1]) addWalls(curves[1], 18, 0.28, 1)
-    if (curves[2]) addWalls(curves[2], 18, 0.28, 1)
+    // Skip the first portion of branch so junction doesn't get blocked by wall-colliders.
+    if (curves[1]) addWalls(curves[1], 18, 0.32, 1)
 
     // Caps to prevent walking off ends.
     const endMain = curves[0].getPoint(1)

@@ -16,7 +16,7 @@ A entrada da mina no mundo externo fica **na borda** (face frontal) de um **pare
 Colisão: o bloqueio usa um perímetro denso (com leve irregularidade) e mantém uma abertura apenas no portal.
 
 ## Mina (interior)
-- Layout maior, com caminho principal descendo e ramificações.
+- Layout maior, com caminho principal descendo e uma ramificação curta.
 - Para imersão, o **chão do mundo externo** (plano y=0) é ocultado enquanto o player está dentro da mina.
 - Suportes de madeira (postes + viga) acompanham a descida: postes vão até o piso e a viga acompanha o teto.
 - No fim do caminho principal existe um fechamento (cap) e um aglomerado de pedras decorativas, sem aparência de saída.
