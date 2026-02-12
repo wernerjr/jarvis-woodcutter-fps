@@ -7,7 +7,8 @@ export class MineManager {
 
     // Exterior placement (world)
     this.center = new THREE.Vector3(58, 0, -18)
-    this.entrance = new THREE.Vector3(47.8, 0, -18)
+    // Entrance sits on the mountain rim (not inside the mound), slightly tucked away.
+    this.entrance = new THREE.Vector3(38.0, 0, -28.0)
 
     // Interior placement (kept far away; accessed via portal teleport)
     this.mineOrigin = new THREE.Vector3(-120, 0, 95)
@@ -257,6 +258,16 @@ export class MineManager {
       g.add(s)
     }
 
+    // Camouflage rocks (remanso/cover) to make the entrance less obvious from a distance.
+    const bigGeo = new THREE.DodecahedronGeometry(0.85, 0)
+    for (let i = 0; i < 3; i++) {
+      const b = new THREE.Mesh(bigGeo, stoneMat)
+      b.position.set(this.entrance.x - 0.8 + Math.random() * 2.2, 0.35, this.entrance.z + (Math.random() - 0.5) * 3.6)
+      b.scale.setScalar(1.0 + Math.random() * 0.9)
+      b.rotation.set(Math.random(), Math.random(), Math.random())
+      g.add(b)
+    }
+
     g.add(dirt)
     return g
   }
@@ -265,9 +276,10 @@ export class MineManager {
     // Path from the forest edge to the mine entrance.
     // Anti-intersection rule: any point inside the mountain safe radius is pushed outward.
     const start = new THREE.Vector3(28, 0, -6)
-    const mid1 = new THREE.Vector3(40, 0, -10)
-    const mid2 = new THREE.Vector3(44, 0, -30)
-    const mid3 = new THREE.Vector3(52, 0, -26)
+    // Bend around the mountain so the entrance feels more tucked away.
+    const mid1 = new THREE.Vector3(36, 0, -14)
+    const mid2 = new THREE.Vector3(34, 0, -24)
+    const mid3 = new THREE.Vector3(36, 0, -34)
     const end = new THREE.Vector3(this.entrance.x - 0.4, 0, this.entrance.z)
 
     const raw = [start, mid1, mid2, mid3, end]

@@ -8,7 +8,7 @@ Parâmetros principais:
 - `h` / `w`: escala por instância (altura e largura) — **afinamos reduzindo `w` mais que `h`**
 - `instancesPerChunk`: densidade por chunk
 - `viewDist`: distância de render (culling por chunk)
-- `clear[]`: círculos para limpar grama em áreas de gameplay (spawn, trilha, mina)
+- `clear[]`: círculos para limpar grama em áreas de gameplay (spawn, trilha, mina). Se você mover a entrada/trilha da mina, atualize esses pontos (ex.: novos waypoints da trilha).
 
 Config atual (2026-02-11):
 - Tufo base ~0.15×0.225 e escala por instância (w ~0.10–0.15, h ~0.16–0.30)

@@ -100,10 +100,10 @@ export class GrassManager {
       { x: 0, z: 0, r: 5 },
       // mine region (approx)
       { x: 58, z: -18, r: 18 },
-      // trail corridor to mine (rough)
-      { x: 40, z: -10, r: 7 },
-      { x: 44, z: -30, r: 7 },
-      { x: 52, z: -26, r: 7 },
+      // trail corridor to mine (rough) — keep path readable
+      { x: 36, z: -14, r: 7 },
+      { x: 34, z: -24, r: 7 },
+      { x: 36, z: -34, r: 7 },
     ]
 
     const isClear = (x, z) => {
