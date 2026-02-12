@@ -191,6 +191,11 @@ export class MineManager {
     const up = new THREE.Vector3(0, 1, 0)
 
     const addFromCurve = (c, baseCount, t0, t1) => {
+      // Target height band: mid-mine (based on main curve), so veins stay in the player's view.
+      const mainMid = curves[0]?.getPoint(0.52) ?? new THREE.Vector3(0, 0, 0)
+      const midFloorY = mainMid.y - this._tunnelRadius + 0.15
+      const midY = midFloorY + 1.65 * 0.98
+
       for (let i = 0; i < baseCount; i++) {
         const t = t0 + (i / Math.max(1, baseCount - 1)) * (t1 - t0)
         const p = c.getPoint(t)
@@ -209,17 +214,18 @@ export class MineManager {
         const x = p.x + wallOut.x * off
         const z = p.z + wallOut.z * off
 
-        // Keep veins reachable: clamp to a band above the floor.
+        // Keep veins visible: place around mid-mine eye-height band, but never below floor+eyeHeight.
         const floorY = p.y - this._tunnelRadius + 0.15
-        const y = floorY + 1.15 + (i % 3) * 0.18
+        const minY = floorY + 1.65 * 0.92
+        const y = Math.max(minY, midY) + (i % 3) * 0.10
 
         pts.push({ x, y, z, nx: -wallOut.x, ny: 0, nz: -wallOut.z })
       }
     }
 
     // Main path + branch pocket.
-    addFromCurve(curves[0], 10, 0.12, 0.92)
-    if (curves[1]) addFromCurve(curves[1], 6, 0.22, 0.9)
+    addFromCurve(curves[0], 12, 0.14, 0.92)
+    if (curves[1]) addFromCurve(curves[1], 8, 0.24, 0.9)
 
     return pts
   }

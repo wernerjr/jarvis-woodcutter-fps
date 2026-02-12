@@ -47,13 +47,13 @@ export class OreManager {
       opacity: 0.0,
     })
 
-    const shardGeo = new THREE.BoxGeometry(0.22, 0.12, 0.06)
+    const shardGeo = new THREE.BoxGeometry(0.24, 0.14, 0.08)
     const veinMat = new THREE.MeshStandardMaterial({
       color: 0x7a3b22,
-      roughness: 0.8,
+      roughness: 0.75,
       metalness: 0.1,
-      emissive: 0x3a1a10,
-      emissiveIntensity: 0.6,
+      emissive: 0x4a2416,
+      emissiveIntensity: 0.85,
     })
 
     for (let i = 0; i < points.length; i++) {
@@ -69,21 +69,23 @@ export class OreManager {
       // Orient to wall if normal provided.
       if (typeof p.nx === 'number' && typeof p.nz === 'number') {
         const n = new THREE.Vector3(p.nx, p.ny ?? 0, p.nz).normalize()
-        // Look towards the tunnel center (inward normal), and keep Y up.
+        // Normal points inward (towards tunnel center). We want the vein to protrude OUT of the wall,
+        // so we orient the mesh to face inward and then flip 180deg.
         const target = new THREE.Vector3(p.x + n.x, p.y + n.y, p.z + n.z)
         mesh.lookAt(target)
+        mesh.rotateY(Math.PI)
       } else {
         mesh.rotation.y = Math.random() * Math.PI * 2
       }
 
       // Visual vein shards attached to the hitbox
-      const shards = 9
+      const shards = 11
       for (let k = 0; k < shards; k++) {
         const s = new THREE.Mesh(shardGeo, veinMat)
         s.position.set(
-          (Math.random() - 0.5) * 0.55,
-          (Math.random() - 0.5) * 0.75,
-          0.02 + Math.random() * 0.08
+          (Math.random() - 0.5) * 0.58,
+          (Math.random() - 0.5) * 0.78,
+          0.06 + Math.random() * 0.16
         )
         s.rotation.set((Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.85)
         s.scale.set(0.8 + Math.random() * 0.9, 0.8 + Math.random() * 0.9, 0.8 + Math.random() * 0.9)
