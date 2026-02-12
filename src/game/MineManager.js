@@ -720,11 +720,34 @@ export class MineManager {
       return tunnel
     }
 
+    const makeJunctionSleeve = (curve, name) => {
+      // Visual-only sleeve to hide texture seams at the branch mouth.
+      const t = 0.08
+      const p = curve.getPoint(t)
+      const tan = curve.getTangent(t).normalize()
+
+      const len = 1.35
+      const r = this._tunnelRadius * 0.92
+      const geo = new THREE.CylinderGeometry(r, r, len, 4, 1, true)
+      // Align cylinder Y axis to tangent.
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan)
+      geo.applyQuaternion(q)
+      // Align the 4 sides with the tunnel ring orientation.
+      geo.rotateOnAxis(tan, this._tunnelRingAngle)
+
+      const sleeve = new THREE.Mesh(geo, mat)
+      sleeve.name = name
+      sleeve.position.set(p.x, p.y, p.z)
+      return sleeve
+    }
+
     return {
       tunnelMeshes: [
         makeTube(main, 'MineTunnelMain'),
         // Taper the branch start so it doesn't create a "lombada"/bump inside the main corridor.
         makeTube(a, 'MineTunnelBranchA', { taperStart: 0.22, taperMin: 0.25 }),
+        // Sleeve hides the visual seam/texture break at the branch mouth.
+        makeJunctionSleeve(a, 'MineTunnelBranchSleeve'),
       ],
       curves,
     }
