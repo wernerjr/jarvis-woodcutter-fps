@@ -228,6 +228,13 @@ export class MineManager {
         0.12 * Math.sin((v.x - 3) * 0.85) * center +
         0.22 * noise01 * back * center
 
+      // Make the forest-facing side more organic too (except the flat core):
+      // a tiny inward/outward wobble that fades away near the core.
+      if (v.x > halfD - 0.6 && Math.abs(v.z) > coreLimit) {
+        const az2 = Math.min(1, (Math.abs(v.z) - coreLimit) / Math.max(0.001, (halfW - coreLimit)))
+        v.x += 0.25 * noise01 * az2
+      }
+
       // Raise the top, keep bottom grounded.
       if (v.y > -halfH + 0.001) {
         const y01 = (v.y + halfH) / H
@@ -398,8 +405,8 @@ export class MineManager {
   _buildWorldColliders() {
     this._worldColliders = []
 
-    // Collision boundary should follow the mountain footprint (approx), not a perfect rectangle.
-    // Use a dense perimeter loop with small irregularity and an opening at the portal.
+    // Rebuild collision after the final shape is defined.
+    // Perimeter follows the same irregular "lines" as the mountain sculpt (and keeps the portal opening).
     const cx = this.center.x
     const cz = this.center.z
 
@@ -414,85 +421,111 @@ export class MineManager {
     const halfD = d * 0.5
     const halfW = w * 0.5
 
+    // Opening matches the flat core width.
     const openHalf = (this._coreW * 0.5) + 0.25
 
     // Two bands + midpoints to avoid diagonal leaks.
-    const bandA = { off: 0.2, r: 1.35 }
-    const bandB = { off: 1.3, r: 1.05 }
+    const bandA = { off: 0.15, r: 1.35 }
+    const bandB = { off: 1.15, r: 1.05 }
 
-    const pushBands = (sdv, swv, nx, nz) => {
-      // world point
-      const wx = cx + toForest.x * sdv + right.x * swv
-      const wz = cz + toForest.z * sdv + right.z * swv
-
-      // outward normal in world (nx,nz are in local sd/sw space)
-      const nwx = toForest.x * nx + right.x * nz
-      const nwz = toForest.z * nx + right.z * nz
+    const pushBandsWorld = (wx, wz, nwx, nwz) => {
       const len = Math.hypot(nwx, nwz) || 1
       const ox = nwx / len
       const oz = nwz / len
-
       this._worldColliders.push({ x: wx + ox * bandA.off, z: wz + oz * bandA.off, r: bandA.r })
       this._worldColliders.push({ x: wx + ox * bandB.off, z: wz + oz * bandB.off, r: bandB.r })
     }
 
-    // Sample perimeter in local (sd, sw) space.
-    const edgeSamples = 26
     const noise = (t) => 0.35 * Math.sin(t * 7.1) + 0.22 * Math.sin(t * 13.7 + 1.3)
 
-    const sampleEdge = (sd0, sw0, sd1, sw1, isForestFace, nx, nz, t0) => {
+    // Compute a perimeter point in local (sd,sw) plus the local outward normal.
+    const perimeterPoint = (edgeId, t) => {
+      // base rectangle perimeter in (sd,sw)
+      let sdv, swv, nx, nz
+      if (edgeId === 0) {
+        // forest face: sd=+halfD
+        sdv = halfD
+        swv = -halfW + (halfW * 2) * t
+        nx = 1
+        nz = 0
+      } else if (edgeId === 1) {
+        // back: sd=-halfD
+        sdv = -halfD
+        swv = -halfW + (halfW * 2) * t
+        nx = -1
+        nz = 0
+      } else if (edgeId === 2) {
+        // left: sw=-halfW
+        sdv = -halfD + (halfD * 2) * t
+        swv = -halfW
+        nx = 0
+        nz = -1
+      } else {
+        // right: sw=+halfW
+        sdv = -halfD + (halfD * 2) * t
+        swv = halfW
+        nx = 0
+        nz = 1
+      }
+
+      // Apply same style of irregularity used by the sculpt/collision earlier.
+      const n = noise(edgeId + t)
+
+      // Forest face: keep opening clean. Outside opening, also apply the same indentation used to break the rectangle.
+      if (edgeId === 0) {
+        const a = Math.abs(swv)
+        if (a < openHalf) return null
+
+        const az2 = Math.min(1, (a - openHalf) / Math.max(0.001, (halfW - openHalf)))
+        const indent = 1.4 + az2 * 4.6
+        sdv -= indent
+
+        // small irregularity far from opening
+        if (a > openHalf + 1.0) {
+          sdv += nx * n * 0.35
+          swv += nz * n * 0.35
+        }
+      } else {
+        // Other edges can wobble a bit.
+        sdv += nx * n
+        swv += nz * n
+      }
+
+      return { sdv, swv, nx, nz }
+    }
+
+    const edgeSamples = 28
+    for (let edgeId = 0; edgeId < 4; edgeId++) {
       for (let i = 0; i <= edgeSamples; i++) {
         const t = i / edgeSamples
-        let sdv = sd0 + (sd1 - sd0) * t
-        let swv = sw0 + (sw1 - sw0) * t
 
-        // Skip portal opening on forest-facing edge.
-        if (isForestFace && Math.abs(swv) < openHalf && Math.abs(sdv - halfD) < 1e-6) continue
-
-        // Irregularity: push outward a bit (not on forest face near opening).
-        const n = noise(t0 + t)
-        if (!isForestFace) {
-          sdv += nx * n
-          swv += nz * n
-        } else if (Math.abs(swv) > openHalf + 1.0) {
-          // Allow small irregularity far from the opening.
-          sdv += nx * n * 0.65
-          swv += nz * n * 0.65
+        const p = perimeterPoint(edgeId, t)
+        if (p) {
+          const wx = cx + toForest.x * p.sdv + right.x * p.swv
+          const wz = cz + toForest.z * p.sdv + right.z * p.swv
+          const nwx = toForest.x * p.nx + right.x * p.nz
+          const nwz = toForest.z * p.nx + right.z * p.nz
+          pushBandsWorld(wx, wz, nwx, nwz)
         }
 
-        // Point + midpoint (reduces gaps)
-        pushBands(sdv, swv, nx, nz)
+        // midpoint
         if (i < edgeSamples) {
           const t2 = (i + 0.5) / edgeSamples
-          let sd2 = sd0 + (sd1 - sd0) * t2
-          let sw2 = sw0 + (sw1 - sw0) * t2
-          const n2 = noise(t0 + t2)
-          if (!isForestFace) {
-            sd2 += nx * n2
-            sw2 += nz * n2
-          } else if (Math.abs(sw2) > openHalf + 1.0) {
-            sd2 += nx * n2 * 0.65
-            sw2 += nz * n2 * 0.65
-          }
-          if (!(isForestFace && Math.abs(sw2) < openHalf && Math.abs(sd2 - halfD) < 1e-6)) {
-            pushBands(sd2, sw2, nx, nz)
+          const p2 = perimeterPoint(edgeId, t2)
+          if (p2) {
+            const wx2 = cx + toForest.x * p2.sdv + right.x * p2.swv
+            const wz2 = cz + toForest.z * p2.sdv + right.z * p2.swv
+            const nwx2 = toForest.x * p2.nx + right.x * p2.nz
+            const nwz2 = toForest.z * p2.nx + right.z * p2.nz
+            pushBandsWorld(wx2, wz2, nwx2, nwz2)
           }
         }
       }
     }
 
-    // Forest-facing edge: sd=+halfD, outward normal +sd
-    sampleEdge(halfD, -halfW, halfD, halfW, true, 1, 0, 0.0)
-    // Back edge: sd=-halfD, outward normal -sd
-    sampleEdge(-halfD, -halfW, -halfD, halfW, false, -1, 0, 1.0)
-    // Left edge: sw=-halfW, outward normal -sw
-    sampleEdge(-halfD, -halfW, halfD, -halfW, false, 0, -1, 2.0)
-    // Right edge: sw=+halfW, outward normal +sw
-    sampleEdge(-halfD, halfW, halfD, halfW, false, 0, 1, 3.0)
-
-    // Funnel near the portal (keeps player from clipping around the opening edges)
-    this._worldColliders.push({ x: this.entrance.x + right.x * 2.3, z: this.entrance.z + right.z * 2.3, r: 0.95 })
-    this._worldColliders.push({ x: this.entrance.x - right.x * 2.3, z: this.entrance.z - right.z * 2.3, r: 0.95 })
+    // Funnel near the portal (helps prevent clipping around opening edges)
+    this._worldColliders.push({ x: this.entrance.x + right.x * 2.0, z: this.entrance.z + right.z * 2.0, r: 0.95 })
+    this._worldColliders.push({ x: this.entrance.x - right.x * 2.0, z: this.entrance.z - right.z * 2.0, r: 0.95 })
 
     // Fill: prevents corner squeezing into interior.
     this._worldColliders.push({ x: cx, z: cz, r: 2.0 })
