@@ -215,15 +215,25 @@ export class MineManager {
       // Heightfield (adds above the box's base height)
       const extra = (H * 0.95) * back * center
 
+      // Add irregularity (deterministic low-cost noise). Stronger towards the back.
+      const n =
+        Math.sin((v.z + 11.7) * 0.35 + (v.y + 2.0) * 0.22) * 0.55 +
+        Math.sin((v.x - 5.3) * 0.48 - (v.z - 2.1) * 0.28) * 0.35 +
+        Math.sin((v.x + v.z) * 0.18 + 1.2) * 0.25
+      const noise01 = Math.max(-1, Math.min(1, n))
+
       // Carve to a rocky silhouette (ridges) without spikes.
       const ridge =
         0.18 * Math.sin((v.z + 8) * 0.55) * back * center +
-        0.12 * Math.sin((v.x - 3) * 0.85) * center
+        0.12 * Math.sin((v.x - 3) * 0.85) * center +
+        0.22 * noise01 * back * center
 
       // Raise the top, keep bottom grounded.
       if (v.y > -halfH + 0.001) {
         const y01 = (v.y + halfH) / H
-        v.y += extra * Math.pow(y01, 1.35) + ridge
+        // Noise fades near the base to keep the skirt clean.
+        const nFade = Math.pow(Math.max(0, y01), 1.1)
+        v.y += extra * Math.pow(y01, 1.35) + ridge * (0.65 + 0.35 * nFade)
       }
 
       // Slightly expand width towards the back/top (bulky mountain).
@@ -388,8 +398,8 @@ export class MineManager {
   _buildWorldColliders() {
     this._worldColliders = []
 
-    // Rectangular mountain collision: circles along the rectangle perimeter.
-    // Keep a centered opening (portal) on the face towards the forest.
+    // Collision boundary should follow the mountain footprint (approx), not a perfect rectangle.
+    // Use a dense perimeter loop with small irregularity and an opening at the portal.
     const cx = this.center.x
     const cz = this.center.z
 
@@ -401,44 +411,91 @@ export class MineManager {
     toForest.normalize()
     const right = new THREE.Vector3(-toForest.z, 0, toForest.x)
 
-    const add = (x, z, r) => this._worldColliders.push({ x, z, r })
-
     const halfD = d * 0.5
     const halfW = w * 0.5
 
-    // Opening on forest-facing face (sd = +halfD): skip colliders near the center.
-    const openHalf = (this._coreW * 0.5) + 0.2
+    const openHalf = (this._coreW * 0.5) + 0.25
 
-    const edgeSamples = 18
-    const cr = 1.25
+    // Two bands + midpoints to avoid diagonal leaks.
+    const bandA = { off: 0.2, r: 1.35 }
+    const bandB = { off: 1.3, r: 1.05 }
 
-    const sampleEdge = (sd0, sw0, sd1, sw1, isForestFace) => {
+    const pushBands = (sdv, swv, nx, nz) => {
+      // world point
+      const wx = cx + toForest.x * sdv + right.x * swv
+      const wz = cz + toForest.z * sdv + right.z * swv
+
+      // outward normal in world (nx,nz are in local sd/sw space)
+      const nwx = toForest.x * nx + right.x * nz
+      const nwz = toForest.z * nx + right.z * nz
+      const len = Math.hypot(nwx, nwz) || 1
+      const ox = nwx / len
+      const oz = nwz / len
+
+      this._worldColliders.push({ x: wx + ox * bandA.off, z: wz + oz * bandA.off, r: bandA.r })
+      this._worldColliders.push({ x: wx + ox * bandB.off, z: wz + oz * bandB.off, r: bandB.r })
+    }
+
+    // Sample perimeter in local (sd, sw) space.
+    const edgeSamples = 26
+    const noise = (t) => 0.35 * Math.sin(t * 7.1) + 0.22 * Math.sin(t * 13.7 + 1.3)
+
+    const sampleEdge = (sd0, sw0, sd1, sw1, isForestFace, nx, nz, t0) => {
       for (let i = 0; i <= edgeSamples; i++) {
         const t = i / edgeSamples
-        const sdv = sd0 + (sd1 - sd0) * t
-        const swv = sw0 + (sw1 - sw0) * t
+        let sdv = sd0 + (sd1 - sd0) * t
+        let swv = sw0 + (sw1 - sw0) * t
 
+        // Skip portal opening on forest-facing edge.
         if (isForestFace && Math.abs(swv) < openHalf && Math.abs(sdv - halfD) < 1e-6) continue
 
-        add(cx + toForest.x * sdv + right.x * swv, cz + toForest.z * sdv + right.z * swv, cr)
+        // Irregularity: push outward a bit (not on forest face near opening).
+        const n = noise(t0 + t)
+        if (!isForestFace) {
+          sdv += nx * n
+          swv += nz * n
+        } else if (Math.abs(swv) > openHalf + 1.0) {
+          // Allow small irregularity far from the opening.
+          sdv += nx * n * 0.65
+          swv += nz * n * 0.65
+        }
+
+        // Point + midpoint (reduces gaps)
+        pushBands(sdv, swv, nx, nz)
+        if (i < edgeSamples) {
+          const t2 = (i + 0.5) / edgeSamples
+          let sd2 = sd0 + (sd1 - sd0) * t2
+          let sw2 = sw0 + (sw1 - sw0) * t2
+          const n2 = noise(t0 + t2)
+          if (!isForestFace) {
+            sd2 += nx * n2
+            sw2 += nz * n2
+          } else if (Math.abs(sw2) > openHalf + 1.0) {
+            sd2 += nx * n2 * 0.65
+            sw2 += nz * n2 * 0.65
+          }
+          if (!(isForestFace && Math.abs(sw2) < openHalf && Math.abs(sd2 - halfD) < 1e-6)) {
+            pushBands(sd2, sw2, nx, nz)
+          }
+        }
       }
     }
 
-    // Forest-facing edge
-    sampleEdge(halfD, -halfW, halfD, halfW, true)
-    // Back edge
-    sampleEdge(-halfD, -halfW, -halfD, halfW, false)
-    // Left edge
-    sampleEdge(-halfD, -halfW, halfD, -halfW, false)
-    // Right edge
-    sampleEdge(-halfD, halfW, halfD, halfW, false)
+    // Forest-facing edge: sd=+halfD, outward normal +sd
+    sampleEdge(halfD, -halfW, halfD, halfW, true, 1, 0, 0.0)
+    // Back edge: sd=-halfD, outward normal -sd
+    sampleEdge(-halfD, -halfW, -halfD, halfW, false, -1, 0, 1.0)
+    // Left edge: sw=-halfW, outward normal -sw
+    sampleEdge(-halfD, -halfW, halfD, -halfW, false, 0, -1, 2.0)
+    // Right edge: sw=+halfW, outward normal +sw
+    sampleEdge(-halfD, halfW, halfD, halfW, false, 0, 1, 3.0)
 
-    // Funnel near the portal
-    add(this.entrance.x + right.x * 2.6, this.entrance.z + right.z * 2.6, 0.9)
-    add(this.entrance.x - right.x * 2.6, this.entrance.z - right.z * 2.6, 0.9)
+    // Funnel near the portal (keeps player from clipping around the opening edges)
+    this._worldColliders.push({ x: this.entrance.x + right.x * 2.3, z: this.entrance.z + right.z * 2.3, r: 0.95 })
+    this._worldColliders.push({ x: this.entrance.x - right.x * 2.3, z: this.entrance.z - right.z * 2.3, r: 0.95 })
 
-    // Fill to avoid corner squeezing
-    add(cx, cz, 2.0)
+    // Fill: prevents corner squeezing into interior.
+    this._worldColliders.push({ x: cx, z: cz, r: 2.0 })
   }
 
   // ----------------- Interior (mine) -----------------
