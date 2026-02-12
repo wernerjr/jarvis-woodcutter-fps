@@ -209,9 +209,8 @@ export class MineManager {
         const side = i % 2 === 0 ? 1 : -1
         const wallOut = sideVec.multiplyScalar(side)
 
-        // Position at wall. Normal points inward (into tunnel).
-        // Push slightly OUTWARD so the vein isn't hidden inside the tunnel mesh.
-        const off = this._tunnelRadius * 0.95
+        // Position at inner wall (slightly INSIDE the tunnel so it's visible, not buried in terrain).
+        const off = this._tunnelRadius * 0.78
         const x = p.x + wallOut.x * off
         const z = p.z + wallOut.z * off
 

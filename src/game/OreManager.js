@@ -84,21 +84,22 @@ export class OreManager {
         n = new THREE.Vector3(p.nx, p.ny ?? 0, p.nz).normalize()
         const target = new THREE.Vector3(p.x + n.x, p.y + n.y, p.z + n.z)
         mesh.lookAt(target)
-        // Push outward from the wall so it always renders outside the tunnel surface.
-        mesh.position.addScaledVector(n, -0.28)
+        // Push slightly INWARD (towards tunnel center) so the card is visible on the inner wall.
+        mesh.position.addScaledVector(n, 0.08)
       } else {
         mesh.rotation.y = Math.random() * Math.PI * 2
       }
 
       // Visible "vein card" + streaks
       const card = new THREE.Mesh(cardGeo, cardMat)
-      card.position.set(0, 0, -0.08)
+      // Place towards the tunnel interior (lookAt points -Z to the center).
+      card.position.set(0, 0, -0.10)
       mesh.add(card)
 
       const streaks = 12
       for (let k = 0; k < streaks; k++) {
         const s = new THREE.Mesh(streakGeo, streakMat)
-        s.position.set((Math.random() - 0.5) * 0.85, (Math.random() - 0.5) * 0.50, -0.10 - Math.random() * 0.10)
+        s.position.set((Math.random() - 0.5) * 0.85, (Math.random() - 0.5) * 0.50, -0.12 - Math.random() * 0.14)
         s.rotation.set((Math.random() - 0.5) * 0.10, (Math.random() - 0.5) * 0.10, (Math.random() - 0.5) * 1.2)
         s.scale.set(0.8 + Math.random() * 1.8, 0.8 + Math.random() * 1.6, 1.0)
         mesh.add(s)
