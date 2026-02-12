@@ -334,6 +334,7 @@ export class MineManager {
   }
 
   _makeMouthGround() {
+    // Keep the entrance clean: no rocks in front of the portal.
     const g = new THREE.Group()
 
     const dirtGeo = new THREE.CircleGeometry(5.2, 12)
@@ -341,26 +342,6 @@ export class MineManager {
     const dirt = new THREE.Mesh(dirtGeo, dirtMat)
     dirt.rotation.x = -Math.PI / 2
     dirt.position.set(this.entrance.x + 1.4, 0.012, this.entrance.z)
-
-    const stoneGeo = new THREE.DodecahedronGeometry(0.35, 0)
-    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x2b2b33, roughness: 1.0 })
-    for (let i = 0; i < 7; i++) {
-      const s = new THREE.Mesh(stoneGeo, stoneMat)
-      s.position.set(this.entrance.x + 0.6 + Math.random() * 4.0, 0.18, this.entrance.z + (Math.random() - 0.5) * 5.4)
-      s.scale.setScalar(0.7 + Math.random() * 1.2)
-      s.rotation.set(Math.random(), Math.random(), Math.random())
-      g.add(s)
-    }
-
-    // Camouflage rocks (remanso/cover) to make the entrance less obvious from a distance.
-    const bigGeo = new THREE.DodecahedronGeometry(0.85, 0)
-    for (let i = 0; i < 3; i++) {
-      const b = new THREE.Mesh(bigGeo, stoneMat)
-      b.position.set(this.entrance.x - 0.8 + Math.random() * 2.2, 0.35, this.entrance.z + (Math.random() - 0.5) * 3.6)
-      b.scale.setScalar(1.0 + Math.random() * 0.9)
-      b.rotation.set(Math.random(), Math.random(), Math.random())
-      g.add(b)
-    }
 
     g.add(dirt)
     return g
