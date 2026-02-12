@@ -182,14 +182,28 @@ export class MineManager {
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i)
 
+      const coreLimit = (coreW * 0.5 + 0.4)
+
       // Keep the portal/front face perfectly flat (local +X face) ONLY for the core width.
-      if (v.x > halfD - 0.001 && Math.abs(v.z) <= (coreW * 0.5 + 0.4)) {
+      if (v.x > halfD - 0.001 && Math.abs(v.z) <= coreLimit) {
         pos.setXYZ(i, v.x, v.y, v.z)
         continue
       }
 
+      // If we are on the front face but outside the core, push it inward to avoid the giant rectangle look.
+      if (v.x > halfD - 0.001 && Math.abs(v.z) > coreLimit) {
+        const az2 = Math.min(1, (Math.abs(v.z) - coreLimit) / Math.max(0.001, (halfW - coreLimit)))
+        const indent = 1.4 + az2 * 4.6
+        v.x -= indent
+
+        // Slight vertical shaping so the top edge isn't perfectly straight.
+        const y01 = (v.y + halfH) / H
+        v.y += (H * 0.35) * (1 - az2) * Math.pow(Math.max(0, y01), 1.2)
+      }
+
       // Normalize coords to [0..1]
-      const ax = (v.x + halfD) / d // 0 back .. 1 front
+      const axRaw = (v.x + halfD) / d // 0 back .. 1 front
+      const ax = Math.min(axRaw, 0.92) // keep some shape near the front
       const nz = (v.z - peakZ) / (halfW || 1)
       const az = Math.min(1, Math.abs(nz))
 
