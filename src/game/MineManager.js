@@ -174,7 +174,8 @@ export class MineManager {
     if (toForest.lengthSq() < 1e-6) toForest.set(-1, 0, 0)
     toForest.normalize()
     // Align local +X (box depth axis) towards the forest.
-    m.rotation.y = Math.atan2(toForest.z, toForest.x)
+    // RotationY maps +X to (cos(yaw), -sin(yaw)) in XZ.
+    m.rotation.y = Math.atan2(-toForest.z, toForest.x)
 
     m.name = 'Mountain'
     return m
@@ -191,10 +192,10 @@ export class MineManager {
     toForest.normalize()
 
     // Align local +X (portal depth axis) towards the forest.
-    const yaw = Math.atan2(toForest.z, toForest.x)
+    const yaw = Math.atan2(-toForest.z, toForest.x)
 
-    // Push portal outward (towards torches) so the wood sits clearly on the outer face.
-    g.position.set(this.entrance.x + toForest.x * 0.55, 0, this.entrance.z + toForest.z * 0.55)
+    // Push portal outward from the face (towards the forest) so wood sits outside the rectangle.
+    g.position.set(this.entrance.x + toForest.x * 0.65, 0, this.entrance.z + toForest.z * 0.65)
     g.rotation.y = yaw
 
     // Carved dark opening (visual depth)
