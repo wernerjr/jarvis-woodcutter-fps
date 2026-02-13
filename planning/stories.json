@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "project": "jarvis-woodcutter-fps",
+  "updatedAt": "2026-02-13T16:17:00Z",
+  "statusLegend": {
+    "epic": ["todo", "doing", "done"],
+    "story": ["todo", "doing", "done"]
+  },
+  "epics": [
+    {
+      "id": "P0",
+      "title": "MVP online jogável (conectar + movimento suave + mundo consistente)",
+      "status": "todo",
+      "stories": [
+        {
+          "id": "P0-S1",
+          "title": "Autenticação mínima no WebSocket (join com token curto)",
+          "status": "todo",
+          "objective": "Impedir spoof simples de guestId e preparar terreno para anti-grief básico sem complicar o MVP.",
+          "description": "Hoje o protocolo de WS aceita `guestId` no `join`. O objetivo é exigir um token curto emitido pelo backend HTTP (fluxo guest existente: `POST /api/auth/guest`) e validá-lo no handshake/join do WebSocket. Isso reduz o risco de alguém entrar como outro jogador e cria uma base para evoluir permissões e rate limits.\n\nEscopo MVP: autenticação apenas de identidade (quem é o player), sem autorização granular de ações ainda.",
+          "acceptanceCriteria": [
+            "O endpoint `POST /api/auth/guest` retorna um `token` (além do guestId) ou um objeto de sessão equivalente.",
+            "O client usa esse `token` ao conectar no WS (via querystring, header ou dentro do `join`) e o server rejeita conexões/joins sem token válido.",
+            "Ao token inválido/expirado, o server responde com erro claro (e o client volta ao menu/mostra toast).",
+            "Reconexão automática do client obtém/usa token válido (reusar token enquanto válido; reemitir se necessário).",
+            "Documentação atualizada em `docs/multiplayer-ws.md` com o formato final (ex.: campo `token`)."
+          ],
+          "technicalDecisions": [
+            "Formato sugerido: JWT assinado com secret do server OU HMAC simples (p.ex. payload JSON com exp + assinatura).",
+            "Duração: curta (ex.: 15–60 minutos) e renovável no reconnect.",
+            "Validação: server extrai `guestId` do token (não confiar no guestId enviado pelo client).",
+            "Compatibilidade: manter `v` do protocolo; se necessário, aceitar temporariamente ambos (com feature flag) durante migração local." 
+          ]
+        },
+        {
+          "id": "P0-S2",
+          "title": "Suavização de players remotos (interpolação bufferizada no client)",
+          "status": "todo",
+          "objective": "Fazer o multiplayer parecer jogável (sem teleporte/engasgos) com snapshots 10Hz, sem mudar o protocolo.",
+          "description": "O server publica `snapshot` (10Hz) com posição/yaw dos players. No client, a renderização de players remotos deve usar um buffer de snapshots (100–200ms) e interpolar para o tempo atual. Em caso de atraso, extrapolar levemente com clamps para evitar saltos grandes.\n\nIsso é puramente client-side: não altera simulação do server, só a apresentação.",
+          "acceptanceCriteria": [
+            "Com latency moderada (ex.: 80–150ms), players remotos se movem de forma contínua (sem jitter visível).",
+            "Ao perder 1–2 snapshots, o movimento continua com extrapolação curta (ex.: até 250ms) e depois faz snap suave.",
+            "Yaw remoto também interpola sem ‘quebras’ (ex.: tratar wrap de ângulos).",
+            "Existe um modo debug para visualizar buffer/latência (ex.: overlay opcional) sem poluir UI normal." 
+          ],
+          "technicalDecisions": [
+            "Usar ‘render time’ = now - interpolationDelay (ex.: 150ms).",
+            "Armazenar snapshots em fila por player (max 20–40 itens).",
+            "Interpolar por lerp de posição e slerp/lerp de yaw (com ajuste de wrap para -pi..pi).",
+            "Clamps: velocidade máxima e distância máxima por frame para evitar teleporte por dados ruins." 
+          ]
+        },
+        {
+          "id": "P0-S3",
+          "title": "Mundo server-authoritative para coletas/cortes (worldEvent estrito + worldChunk confirmação)",
+          "status": "todo",
+          "objective": "Evitar desync e duplicação de loot garantindo que remoções/loot só aconteçam quando o server confirmar.",
+          "description": "O doc já define `worldEvent` (client→server) e `worldChunk` (server→client) com listas `removed*` e `placed`. A história é implementar o fluxo completo no client e server: client envia eventos (treeCut, rockCollect, stickCollect, oreBreak, place) e dá feedback local apenas ‘cosmético’/temporário; o server valida (mínimo) e emite `worldChunk` atualizado; o client aplica o estado authoritative ao mundo.\n\nIsso habilita multiplayer real para recursos compartilhados.",
+          "acceptanceCriteria": [
+            "Ao coletar um recurso, o client não adiciona loot definitivo nem remove definitivamente a entidade antes de `worldChunk` confirmar.",
+            "Quando `worldChunk` chega com `removedTrees/removedRocks/removedSticks/removedOres`, o mundo reflete exatamente esse estado.",
+            "Respawn: ao expirar o tempo do server (rocks 30s, sticks 30s, trees 45s, ore 120s), o server envia `worldChunk` removendo o id da lista e o client faz a entidade reaparecer.",
+            "Conflito: se dois players tentam coletar a mesma entidade, apenas um recebe confirmação (o outro vê falha/‘já coletado’ via atualização do chunk).",
+            "`place` cria/replica estruturas via `placed` no chunk (sem duplicar ao reconectar).",
+            "Documentação atualizada com o comportamento de confirmação e UX (feedback local vs authoritative)."
+          ],
+          "technicalDecisions": [
+            "Definir chunking (mesmo que simplificado) e chave estável `chunkX/chunkZ` para entidades.",
+            "No client, manter uma camada ‘pending events’ por id para mostrar feedback (ex.: fade) enquanto aguarda confirmação.",
+            "No server, persistir estado por chunk (versão incremental) e sempre enviar `version` para ordenação/diagnóstico.",
+            "Validação mínima no server: evento só aceito se player estiver dentro de um raio do alvo e em ‘estado jogável’." 
+          ]
+        },
+        {
+          "id": "P0-S4",
+          "title": "Reconexão + re-sync de estado (players + chunks próximos)",
+          "status": "todo",
+          "objective": "Garantir que quedas de conexão não corrompem o mundo local nem deixem ‘fantasmas’ de players/entidades.",
+          "description": "O client já tenta reconectar (documentado). A história é garantir um re-sync completo: ao reconectar, o client faz `join` novamente, limpa players remotos antigos, re-solicita/aceita `worldChunk` dos chunks relevantes e re-aplica estado authoritative do mundo.\n\nTambém incluir UX mínima: indicador ‘reconectando’ e fallback para menu se falhar.",
+          "acceptanceCriteria": [
+            "Ao desconectar e reconectar, o client não mantém players remotos antigos (limpa corretamente).",
+            "Após reconexão, o client recebe `welcome` e volta a receber `snapshot` e `worldChunk` sem duplicação.",
+            "O estado do mundo ao redor (remoções/placed) fica consistente com o server após no máximo alguns segundos.",
+            "Se o reconnect falhar após N tentativas (ex.: 5), o client retorna ao menu e informa o usuário." 
+          ],
+          "technicalDecisions": [
+            "Implementar um ‘session generation id’ local: qualquer mensagem recebida de uma conexão antiga é descartada.",
+            "No join, incluir spawn/posição inicial; se houver persistência de player-state, preferir spawn do server.",
+            "No client, organizar uma API `multiplayer.reset()` para limpar caches (snapshots, pending events, entities)." 
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P1",
+      "title": "Publicável (deploy robusto + observabilidade + validações básicas)",
+      "status": "todo",
+      "stories": [
+        {
+          "id": "P1-S1",
+          "title": "Observabilidade mínima do multiplayer (logs + contagem de players por worldId)",
+          "status": "todo",
+          "objective": "Permitir diagnosticar problemas de conexão/jitter e validar adoção (quantos players online) sem ferramentas externas.",
+          "description": "Adicionar logs estruturados no server para eventos importantes (connect/disconnect, join, erro de parse, rejeições). Expor um endpoint simples (ex.: `/api/mp/stats`) protegido/oculto (ou só em dev) com contagem de conexões e players por `worldId`.\n\nMeta: ajudar a debugar no VPS rapidamente.",
+          "acceptanceCriteria": [
+            "Logs indicam: connection open/close, playerId, worldId, motivo de close (quando disponível).",
+            "Erros de mensagem inválida não derrubam o processo e são logados com throttle.",
+            "Endpoint de stats retorna contagem de players ativos por worldId e total de conexões.",
+            "Docs (README ou docs multiplayer) mencionam como usar o endpoint em dev." 
+          ],
+          "technicalDecisions": [
+            "Usar logger do Fastify (pino) com campos: event, worldId, playerId, remoteAddress.",
+            "Throttle de logs para erros repetitivos (ex.: 1 log/seg por conexão).",
+            "Se stats endpoint em prod: proteger com token de admin ou desabilitar via env." 
+          ]
+        },
+        {
+          "id": "P1-S2",
+          "title": "Validação + rate limit de worldEvent no server (anti-spam MVP)",
+          "status": "todo",
+          "objective": "Evitar grief e overload por spam de eventos sem implementar anti-cheat completo.",
+          "description": "Implementar validações baratas para `worldEvent`: limitar frequência por player (bucket simples), validar alcance máximo (distância do player ao alvo), e validar que o alvo existe no chunk esperado. Rejeitar eventos inválidos sem modificar world state.\n\nManter UX: client recebe update via `worldChunk` (ou mensagem de erro opcional) e ‘pending’ some.",
+          "acceptanceCriteria": [
+            "Um player não consegue enviar >X worldEvents/seg (configurável) sem ser throttled.",
+            "Eventos fora do raio permitido são rejeitados e não alteram `worldChunk`.",
+            "Servidor permanece estável sob spam (não cresce memória por fila infinita).",
+            "Parâmetros de rate limit/raio ficam em constantes/ENV para tuning." 
+          ],
+          "technicalDecisions": [
+            "Token bucket por conexão com reset por segundo (simples).",
+            "Raio por tipo (coleta menor, place maior) com constantes.",
+            "Rejeição: opção A) log + ignorar; opção B) enviar mensagem `error` (com `t:'error'`) — decidir e documentar." 
+          ]
+        },
+        {
+          "id": "P1-S3",
+          "title": "Checklist de deploy (Caddy + WS upgrade) e smoke test reproduzível",
+          "status": "todo",
+          "objective": "Reduzir ‘funciona local mas não no servidor’ garantindo proxy correto de /ws e um smoke test de saúde.",
+          "description": "Consolidar no repo um checklist de deploy: rotas do Caddy (`/`, `/api/*`, `/ws` com upgrade), portas, envs necessárias (DATABASE_URL/WOODCUTTER_DATABASE_URL etc). Criar um smoke test manual: abrir client, gerar guest, conectar WS, ver outro player.\n\nNão é automação pesada; é doc+passo-a-passo.",
+          "acceptanceCriteria": [
+            "Existe doc no repo com configuração mínima de Caddy e observações de WebSocket upgrade.",
+            "Smoke test lista comandos e endpoints esperados (health, auth/guest, connect ws).",
+            "README principal referencia esse doc." 
+          ],
+          "technicalDecisions": [
+            "Manter texto alinhado com README atual (porta 3023, /ws).",
+            "Reforçar uso de `infup` quando depender de secrets do Infisical." 
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Base para escala (otimizações de rede e organização)",
+      "status": "todo",
+      "stories": [
+        {
+          "id": "P2-S1",
+          "title": "Otimizar snapshots: deltas e/ou compactação (sem quebrar compatibilidade)",
+          "status": "todo",
+          "objective": "Reduzir bandwidth e melhorar responsividade para mais players.",
+          "description": "Atualmente `snapshot` envia todos players. Evoluir para: (a) deltas por seq/version, (b) reduzir frequência adaptativa, (c) payload mais compacto (campos curtos, arredondamento), ou (d) compressão no transporte (quando aplicável).\n\nEscopo: manter uma estratégia compatível com `v` do protocolo.",
+          "acceptanceCriteria": [
+            "Existe uma opção de payload ‘compact’ (feature flag) que reduz tamanho médio de mensagem.",
+            "Client e server conseguem negociar versão (campo `v` ou `capabilities`).",
+            "Sem regressão perceptível de movimento remoto quando compact ativo." 
+          ],
+          "technicalDecisions": [
+            "Preferir primeiro: reduzir precisão (ex.: 2 casas decimais) e nomes de campos.",
+            "Depois: deltas por player com seq/ack.",
+            "Manter fallback para snapshot completo em intervalos (ex.: a cada 2s)." 
+          ]
+        },
+        {
+          "id": "P2-S2",
+          "title": "Lobbies/world selection (worldId) e separação por sala mais explícita",
+          "status": "todo",
+          "objective": "Permitir múltiplas salas e facilitar testes (dev/prod) sem misturar players.",
+          "description": "Hoje existe `worldId` no join. Criar uma UX mínima no menu para escolher `worldId` (ou ‘public’/‘dev’). Garantir no server que rooms e chunks são isolados por worldId.",
+          "acceptanceCriteria": [
+            "Player consegue escolher worldId no menu (persistir no localStorage).",
+            "Players em worldIds diferentes não se veem nem compartilham worldChunk.",
+            "Docs atualizadas com convenção de worldId." 
+          ],
+          "technicalDecisions": [
+            "Validar worldId no server (regex/allowlist) para evitar abuso.",
+            "Definir limite de worldIds simultâneos (anti OOM) ou TTL de rooms vazias." 
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Melhorias fáceis de gameplay (client-only, não quebrar multiplayer)",
+      "status": "todo",
+      "stories": [
+        {
+          "id": "P3-S1",
+          "title": "Feedback de hit/impacto (hitmarker + som por material + micro recoil visual)",
+          "status": "todo",
+          "objective": "Melhorar a sensação de ‘peso’ e clareza de acerto sem alterar regras de dano/loot.",
+          "description": "Adicionar feedback visual e sonoro ao acertar: hitmarker discreto no centro, som diferente por alvo (madeira/pedra/minério) e micro-animação da mão/arma. Tudo local e acionado no momento em que o client detecta o impacto (janela de swing existente).\n\nNão altera `worldEvent` nem o timing server-authoritative.",
+          "acceptanceCriteria": [
+            "Ao acertar madeira/pedra/minério, o feedback é consistente e distinto.",
+            "Configuração simples para intensidade (ou toggle) no menu de performance/pausa.",
+            "Não muda o balanceamento (dano, durabilidade, alcance)." 
+          ],
+          "technicalDecisions": [
+            "Som: usar arquivos leves (ogg) e limitar sobreposição (cooldown curto).",
+            "Visual: hitmarker via DOM/CSS (mais barato que material shader).",
+            "Acionamento: usar o callback `Player.onImpact(fn)` (contrato citado no AGENTS.md)." 
+          ]
+        },
+        {
+          "id": "P3-S2",
+          "title": "Realce de alvo interagível (outline/emissive) + prompt contextual mais legível",
+          "status": "todo",
+          "objective": "Aumentar a legibilidade do que pode ser interagido sob a mira, reduzindo frustração.",
+          "description": "Quando o raycast encontra um alvo válido em alcance (mesma regra do prompt `F:`), aplicar um realce visual sutil no alvo (ex.: material emissive/scale pequeno ou outline simples). Atualizar o prompt para incluir nome do alvo e ação principal (ex.: `F: Abrir Forja`).\n\nTudo client-only.",
+          "acceptanceCriteria": [
+            "Realce aparece apenas com alvo válido e some instantaneamente ao perder alvo.",
+            "O prompt não aparece quando não há alvo (regra já documentada).",
+            "Performance: não adicionar pós-process pesado; manter barato." 
+          ],
+          "technicalDecisions": [
+            "Evitar EffectComposer/OutlinePass no MVP; preferir emissive/hover material swap.",
+            "Manter uma referência ao ‘lastHighlighted’ para restaurar material sem leaks.",
+            "Sincronizar com a lógica existente de `UI.setInteractHint` (documentada em docs/interaction.md)." 
+          ]
+        },
+        {
+          "id": "P3-S3",
+          "title": "Sway/bobbing e animação da ferramenta na mão (com opção de desligar)",
+          "status": "todo",
+          "objective": "Dar sensação de FPS mais ‘vivo’ sem tocar em física/posicionamento authoritative.",
+          "description": "Adicionar sway (resposta ao mouse) e bobbing (passos) no modelo da ferramenta/mão e/ou na câmera, com amplitude pequena e opção de desligar no menu.\n\nGarantir que raycasts e lógica de impacto continuem baseados na câmera real e no timing do swing, para não impactar o multiplayer.",
+          "acceptanceCriteria": [
+            "Sway/bob não afeta a direção real do raycast/interação.",
+            "Existe toggle no menu/pausa para desativar (acessibilidade).",
+            "Sem náusea: amplitude e frequência conservadoras (valores default)." 
+          ],
+          "technicalDecisions": [
+            "Aplicar sway no objeto do modelo da ferramenta (não na câmera), ou aplicar em um ‘cameraRig’ separado com offset apenas visual.",
+            "Bobbing ligado à velocidade do player (input/magnitude) e não ao dt cru.",
+            "Persistir preferências no localStorage." 
+          ]
+        }
+      ]
+    }
+  ]
+}
