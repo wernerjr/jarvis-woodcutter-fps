@@ -15,7 +15,7 @@ Pré-req: Node 22+ e **pnpm**.
 pnpm install
 
 # Ajuste se necessário (credenciais do shared-postgres)
-export DATABASE_URL='postgres://woodcutter:woodcutter@shared-postgres:5432/woodcutter'
+export WOODCUTTER_DATABASE_URL='postgres://woodcutter:<SENHA>@shared-postgres:5432/woodcutter'
 
 pnpm dev
 ```

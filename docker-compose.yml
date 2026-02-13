@@ -20,7 +20,9 @@ services:
       PORT: "3023"
       # Uses the shared Postgres container on the shared docker network.
       # Override via env if needed.
-      DATABASE_URL: "${DATABASE_URL:-postgres://woodcutter:woodcutter@shared-postgres:5432/woodcutter}"
+      # Prefer Infisical-provided connection string.
+      # WOODCUTTER_DATABASE_URL should include user/pass/host/port/db.
+      DATABASE_URL: "${WOODCUTTER_DATABASE_URL:-${DATABASE_URL:-postgres://woodcutter:woodcutter@shared-postgres:5432/woodcutter}}"
     expose:
       - "3023"
     networks:
