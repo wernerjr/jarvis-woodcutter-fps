@@ -24,6 +24,8 @@ import { CampfireGhost } from './CampfireGhost.js'
 import { ForgeGhost } from './ForgeGhost.js'
 import { ForgeTableGhost } from './ForgeTableGhost.js'
 import { raycastGround } from './raycastGround.js'
+import { RemotePlayersManager } from './RemotePlayersManager.js'
+import { WsClient } from '../net/wsClient.js'
 
 export class Game {
   /**
@@ -73,6 +75,11 @@ export class Game {
     this.forgeTables = new ForgeTableManager({ scene: this.scene })
     this.mine = new MineManager({ scene: this.scene })
     this.ores = new OreManager({ scene: this.scene })
+
+    this.remotePlayers = new RemotePlayersManager({ scene: this.scene })
+    this.ws = null
+    this.wsMeId = null
+    this._wsPoseAt = 0
 
     this._inMine = false
     this._fadeEl = null
@@ -877,6 +884,9 @@ export class Game {
     await this.sfx.enable()
     await this._lockPointer()
 
+    // Multiplayer (MVP): connect WS when starting to play
+    this._connectWsIfPossible()
+
     this.ui.toast('Corte árvores! (I inventário • 1/2/3 ferramenta • Shift correr • Espaço pular)')
   }
 
@@ -917,6 +927,7 @@ export class Game {
 
   restart() {
     // Restart from pause: reset score + world and keep in playing state.
+    this._disconnectWs()
     this.score = 0
     this.ui.setScore(0)
     this.inventory.clear()
@@ -944,6 +955,7 @@ export class Game {
 
   quitToMenu() {
     // Quit resets progress.
+    this._disconnectWs()
     this.score = 0
     this.ui.setScore(0)
     this.inventory.clear()
@@ -1568,6 +1580,65 @@ export class Game {
     }
   }
 
+  // ----------------- multiplayer (WS MVP) -----------------
+
+  _connectWsIfPossible() {
+    if (this.ws) return
+    if (!this._persistCtx?.guestId || !this._persistCtx?.worldId) return
+
+    this.ws = new WsClient({
+      onOpen: () => {
+        this.ws?.send({
+          t: 'join',
+          v: 1,
+          guestId: this._persistCtx.guestId,
+          worldId: this._persistCtx.worldId,
+        })
+      },
+      onClose: () => {
+        this.wsMeId = null
+        this.remotePlayers.clear()
+      },
+      onMessage: (msg) => this._onWsMessage(msg),
+    })
+
+    this.ws.connect()
+  }
+
+  _onWsMessage(msg) {
+    if (!msg || typeof msg !== 'object') return
+    if (msg.t === 'welcome') {
+      this.wsMeId = msg.id
+      return
+    }
+    if (msg.t === 'snapshot') {
+      this.remotePlayers.applySnapshot({ meId: this.wsMeId, players: msg.players })
+    }
+  }
+
+  _sendWsPose() {
+    if (!this.ws || !this.wsMeId) return
+    const now = performance.now()
+    if (now - (this._wsPoseAt || 0) < 100) return // 10Hz
+    this._wsPoseAt = now
+
+    this.ws.send({
+      t: 'pose',
+      x: this.player.position.x,
+      y: this.player.position.y,
+      z: this.player.position.z,
+      yaw: this.player.yaw.rotation.y,
+      at: Date.now(),
+    })
+  }
+
+  _disconnectWs() {
+    this.ws?.close()
+    this.ws = null
+    this.wsMeId = null
+    this.remotePlayers.clear()
+  }
+
   // ----------------- tool helpers -----------------
 
   _isAxeId(id) {
@@ -1806,6 +1877,8 @@ export class Game {
 
     const groundY = this._inMine ? this.mine.getFloorYAt(this.player.position.x, this.player.position.z) : 0
     this.player.update(simDt, colliders, groundY)
+
+    if (simDt > 0) this._sendWsPose()
 
     // Torch durability + light intensity (mainly useful at night)
     const night = 1 - this.time.getDayFactor()
