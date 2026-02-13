@@ -595,10 +595,21 @@ export class Game {
     // clear previous
     if (this._hlMeshes?.length) {
       for (const m of this._hlMeshes) {
-        m.material.emissiveIntensity = m.userData.__hlPrevEmi ?? m.material.emissiveIntensity
-        m.material.emissive = m.userData.__hlPrevEmiColor ?? m.material.emissive
-        delete m.userData.__hlPrevEmi
-        delete m.userData.__hlPrevEmiColor
+        const mat = m.material
+        if (mat && typeof mat === 'object') {
+          if ('emissiveIntensity' in mat) {
+            mat.emissiveIntensity = m.userData.__hlPrevEmiIntensity ?? mat.emissiveIntensity
+          }
+          // IMPORTANT: emissive is a mutable Color; store/restore hex, not the object reference.
+          if (mat.emissive && typeof mat.emissive.getHex === 'function' && typeof mat.emissive.setHex === 'function') {
+            const prevHex = m.userData.__hlPrevEmiHex
+            if (typeof prevHex === 'number') {
+              try { mat.emissive.setHex(prevHex) } catch {}
+            }
+          }
+        }
+        delete m.userData.__hlPrevEmiIntensity
+        delete m.userData.__hlPrevEmiHex
       }
     }
     this._hlMeshes = []
@@ -623,12 +634,20 @@ export class Game {
       meshes.push(obj)
     })
 
+    const HL_HEX = 0x7feaa0 // softer green
+    const HL_INTENSITY = 0.22
+
     for (const m of meshes) {
       const mat = m.material
-      m.userData.__hlPrevEmi = mat.emissiveIntensity
-      m.userData.__hlPrevEmiColor = mat.emissive
-      try { mat.emissive?.setHex?.(0x9ff5a8) } catch {}
-      mat.emissiveIntensity = Math.max(mat.emissiveIntensity ?? 0, 0.55)
+      m.userData.__hlPrevEmiIntensity = mat.emissiveIntensity
+      try {
+        m.userData.__hlPrevEmiHex = mat.emissive?.getHex?.()
+      } catch {
+        m.userData.__hlPrevEmiHex = null
+      }
+
+      try { mat.emissive?.setHex?.(HL_HEX) } catch {}
+      mat.emissiveIntensity = Math.max(mat.emissiveIntensity ?? 0, HL_INTENSITY)
     }
 
     this._hlMeshes = meshes

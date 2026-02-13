@@ -10,12 +10,12 @@
     {
       "id": "P4",
       "title": "Fixes de UX + persistência (highlight, autosave em menus, forja persistente)",
-      "status": "todo",
+      "status": "doing",
       "stories": [
         {
           "id": "P4-S1",
           "title": "Highlight de alvo: limpar ao perder alvo + verde mais leve/translúcido",
-          "status": "todo",
+          "status": "done",
           "objective": "Corrigir bug visual onde o realce verde permanece após perder o alvo e ajustar o highlight para ficar mais sutil.",
           "description": "Hoje, ao mirar/‘passar o mouse’ sobre forja/mesa/fogueira, o highlight fica verde. Ao tirar o alvo (mover a mira), o highlight às vezes não volta ao normal. Precisamos garantir que: (1) o highlight sempre é limpo ao perder alvo, (2) o verde é mais leve e menos chamativo, e (3) tenha aparência um pouco translúcida, sem pós-process pesado.",
           "acceptanceCriteria": [

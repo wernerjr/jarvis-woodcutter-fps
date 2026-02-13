@@ -16,6 +16,8 @@ Só aparece quando existe um alvo válido em alcance (mesmo raycast/alcance da i
 ## Realce visual (client-only)
 Quando existe alvo válido sob a mira, o client aplica um realce emissivo leve no mesh do alvo.
 - Barato (sem pós-process)
+- Verde **sutil** (intensidade baixa)
+- Ao perder o alvo, o realce é **sempre removido** (não pode ficar “preso”)
 - Não altera multiplayer (apenas apresentação)
 
 ## Ações por estrutura
