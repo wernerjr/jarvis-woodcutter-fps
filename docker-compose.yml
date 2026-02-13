@@ -1,12 +1,46 @@
 services:
-  jarvis-woodcutter:
-    build: .
-    container_name: jarvis-woodcutter
+  client:
+    build:
+      context: .
+      dockerfile: apps/client/Dockerfile
+    container_name: jarvis-woodcutter-client
     restart: unless-stopped
     expose:
       - "80"
     networks:
       - shared
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: jarvis-woodcutter-server
+    restart: unless-stopped
+    environment:
+      PORT: "3023"
+      DATABASE_URL: "postgres://jarvis:jarvis@postgres:5432/jarvis"
+    expose:
+      - "3023"
+    depends_on:
+      - postgres
+    networks:
+      - shared
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: jarvis-woodcutter-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: jarvis
+      POSTGRES_DB: jarvis
+    volumes:
+      - jarvis_woodcutter_pg:/var/lib/postgresql/data
+    networks:
+      - shared
+
+volumes:
+  jarvis_woodcutter_pg:
 
 networks:
   shared:

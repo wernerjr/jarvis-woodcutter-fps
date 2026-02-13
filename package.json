@@ -1,17 +1,17 @@
 {
   "name": "jarvis-woodcutter-fps",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "pnpm -r --parallel dev",
+    "dev:client": "pnpm -C apps/client dev",
+    "dev:server": "pnpm -C apps/server dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "db:migrate": "pnpm -C apps/server db:migrate",
+    "db:studio": "pnpm -C apps/server db:studio"
   },
   "devDependencies": {
-    "vite": "^7.3.1"
-  },
-  "dependencies": {
-    "three": "^0.182.0"
+    "pnpm": "^9.15.9"
   }
 }
