@@ -77,7 +77,7 @@ export class RockManager {
     const hit = hits[0]
     const rockId = hit.object?.userData?.id
     if (!rockId) return null
-    return { rockId, distance: hit.distance }
+    return { rockId, distance: hit.distance, point: hit.point?.clone?.() }
   }
 
   collect(rockId, { world = false } = {}) {

@@ -1695,39 +1695,52 @@ export class Game {
     const placed = Array.isArray(st.placed) ? st.placed : []
 
     for (const id of removedTrees) {
-      if (this._appliedWorld.trees.has(String(id))) continue
-      this._appliedWorld.trees.add(String(id))
-      this.trees.markWorldRemoved(String(id))
-      const k = `treeCut:${String(id)}`
+      const sid = String(id)
+      if (this._appliedWorld.trees.has(sid)) continue
+      this._appliedWorld.trees.add(sid)
+
+      const k = `treeCut:${sid}`
       const fn = this._pendingWorldActions.get(k)
       if (fn) {
         this._pendingWorldActions.delete(k)
         fn()
+        continue
       }
+
+      // Not our pending action: apply as world removal immediately.
+      this.trees.markWorldRemoved(sid)
     }
 
     for (const id of removedRocks) {
-      if (this._appliedWorld.rocks.has(String(id))) continue
-      this._appliedWorld.rocks.add(String(id))
-      this.rocks.markWorldRemoved(String(id))
-      const k = `rockCollect:${String(id)}`
+      const sid = String(id)
+      if (this._appliedWorld.rocks.has(sid)) continue
+      this._appliedWorld.rocks.add(sid)
+
+      const k = `rockCollect:${sid}`
       const fn = this._pendingWorldActions.get(k)
       if (fn) {
         this._pendingWorldActions.delete(k)
         fn()
+        continue
       }
+
+      this.rocks.markWorldRemoved(sid)
     }
 
     for (const id of removedOres) {
-      if (this._appliedWorld.ores.has(String(id))) continue
-      this._appliedWorld.ores.add(String(id))
-      this.ores.markWorldRemoved(String(id))
-      const k = `oreBreak:${String(id)}`
+      const sid = String(id)
+      if (this._appliedWorld.ores.has(sid)) continue
+      this._appliedWorld.ores.add(sid)
+
+      const k = `oreBreak:${sid}`
       const fn = this._pendingWorldActions.get(k)
       if (fn) {
         this._pendingWorldActions.delete(k)
         fn()
+        continue
       }
+
+      this.ores.markWorldRemoved(sid)
     }
 
     for (const p of placed) {
@@ -2067,7 +2080,9 @@ export class Game {
       }
     })
 
-    this._sendWorldEvent({ kind: 'rockCollect', rockId, x: this.player.position.x, z: this.player.position.z, at: Date.now() })
+    const px = hit.point?.x ?? this.player.position.x
+    const pz = hit.point?.z ?? this.player.position.z
+    this._sendWorldEvent({ kind: 'rockCollect', rockId, x: px, z: pz, at: Date.now() })
   }
 
   _loop = () => {
