@@ -95,12 +95,12 @@
     {
       "id": "P1",
       "title": "Publicável (deploy robusto + observabilidade + validações básicas)",
-      "status": "todo",
+      "status": "doing",
       "stories": [
         {
           "id": "P1-S1",
           "title": "Observabilidade mínima do multiplayer (logs + contagem de players por worldId)",
-          "status": "todo",
+          "status": "done",
           "objective": "Permitir diagnosticar problemas de conexão/jitter e validar adoção (quantos players online) sem ferramentas externas.",
           "description": "Adicionar logs estruturados no server para eventos importantes (connect/disconnect, join, erro de parse, rejeições). Expor um endpoint simples (ex.: `/api/mp/stats`) protegido/oculto (ou só em dev) com contagem de conexões e players por `worldId`.\n\nMeta: ajudar a debugar no VPS rapidamente.",
           "acceptanceCriteria": [

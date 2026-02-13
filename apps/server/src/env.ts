@@ -18,6 +18,10 @@ const EnvSchema = z.object({
     .string()
     .min(8, 'WOODCUTTER_WS_AUTH_SECRET must be at least 8 chars')
     .default(process.env.WOODCUTTER_WS_AUTH_SECRET || process.env.WS_AUTH_SECRET || 'dev-insecure-secret'),
+
+  // Optional token to protect /api/mp/stats.
+  // If blank/undefined: endpoint is open (use only in dev).
+  WOODCUTTER_MP_STATS_TOKEN: z.string().optional().default(process.env.WOODCUTTER_MP_STATS_TOKEN || ''),
 });
 
 export const env = EnvSchema.parse(process.env);

@@ -147,12 +147,27 @@ function safeJsonParse(data: any): any {
   }
 }
 
+function createLogThrottle() {
+  const last = new Map<string, number>();
+  return {
+    shouldLog(key: string, everyMs: number) {
+      const now = Date.now();
+      const prev = last.get(key) ?? 0;
+      if (now - prev < everyMs) return false;
+      last.set(key, now);
+      return true;
+    },
+  };
+}
+
 function nowMs() {
   return Date.now();
 }
 
-export function registerWs(app: FastifyInstance) {
+export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp/stats.js').MpStatsCollector } = {}) {
   const wss = new WebSocketServer({ noServer: true });
+  const mpStats = opts.mpStats;
+  const logThrottle = createLogThrottle();
 
   // Respawn rules (server-authoritative)
   const ROCK_RESPAWN_MS = 30_000;
@@ -532,20 +547,31 @@ export function registerWs(app: FastifyInstance) {
     wss.close();
   });
 
-  wss.on('connection', (ws: AnyWs) => {
+  wss.on('connection', (ws: AnyWs, req: any) => {
+    const remoteAddress = String(req?.socket?.remoteAddress || '');
+    mpStats?.onConnOpen();
+    app.log.info({ event: 'ws_open', remoteAddress }, 'ws connection opened');
+
     ws.on('message', (raw) => {
       const msg = safeJsonParse(raw) as ClientMsg | null;
-      if (!msg || typeof msg !== 'object') return;
+      if (!msg || typeof msg !== 'object') {
+        if (logThrottle.shouldLog(`bad_json:${remoteAddress}`, 1000)) {
+          app.log.warn({ event: 'ws_bad_json', remoteAddress }, 'ws invalid json');
+        }
+        return;
+      }
 
       if (msg.t === 'join') {
         if (msg.v !== 1) return;
         if (!msg.worldId) {
+          app.log.warn({ event: 'ws_join_reject', remoteAddress, reason: 'missing_worldId' }, 'ws join rejected');
           const err: ServerErrorMsg = { t: 'error', v: 1, code: 'bad_join', message: 'missing worldId' };
           if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(err));
           try { ws.close(); } catch {}
           return;
         }
         if (!msg.token) {
+          app.log.warn({ event: 'ws_join_reject', remoteAddress, reason: 'missing_token', worldId: msg.worldId }, 'ws join rejected');
           const err: ServerErrorMsg = { t: 'error', v: 1, code: 'auth_required', message: 'missing token' };
           if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(err));
           try { ws.close(); } catch {}
@@ -555,6 +581,7 @@ export function registerWs(app: FastifyInstance) {
         const vtok = verifyGuestToken(String(msg.token));
         if (!vtok.ok) {
           const code: ServerErrorMsg['code'] = vtok.error === 'expired' ? 'auth_expired' : 'auth_invalid';
+          app.log.warn({ event: 'ws_join_reject', remoteAddress, reason: code, worldId: msg.worldId }, 'ws join rejected');
           const err: ServerErrorMsg = { t: 'error', v: 1, code, message: 'invalid token' };
           if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(err));
           try { ws.close(); } catch {}
@@ -596,6 +623,9 @@ export function registerWs(app: FastifyInstance) {
 
         if (!rooms.has(msg.worldId)) rooms.set(msg.worldId, new Set());
         rooms.get(msg.worldId)!.add(id);
+
+        mpStats?.onJoin(msg.worldId);
+        app.log.info({ event: 'ws_join', remoteAddress, worldId: msg.worldId, playerId: id }, 'ws player joined');
 
         const welcome: ServerWelcomeMsg = { t: 'welcome', v: 1, id, worldId: msg.worldId };
         ws.send(JSON.stringify(welcome));
@@ -820,14 +850,26 @@ export function registerWs(app: FastifyInstance) {
 
     ws.on('close', () => {
       const pid = ws.__playerId;
-      if (!pid) return;
+      if (!pid) {
+        mpStats?.onConnClose();
+        app.log.info({ event: 'ws_close', remoteAddress }, 'ws connection closed');
+        return;
+      }
       const st = players.get(pid);
-      if (!st) return;
+      if (!st) {
+        mpStats?.onConnClose();
+        app.log.info({ event: 'ws_close', remoteAddress, playerId: pid }, 'ws connection closed');
+        return;
+      }
 
       // Remove from room
       const ids = rooms.get(st.worldId);
       ids?.delete(pid);
       if (ids && ids.size === 0) rooms.delete(st.worldId);
+
+      mpStats?.onLeave(st.worldId);
+      mpStats?.onConnClose();
+      app.log.info({ event: 'ws_leave', remoteAddress, worldId: st.worldId, playerId: pid }, 'ws player left');
 
       players.delete(pid);
     });

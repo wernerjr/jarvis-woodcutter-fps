@@ -6,6 +6,12 @@
 - URL: `/ws`
 - Transporte: WebSocket (ws/wss via Caddy)
 
+## Observabilidade (P1)
+- Stats (HTTP): `GET /api/mp/stats`
+  - Opcionalmente protegido por header `x-mp-token: <WOODCUTTER_MP_STATS_TOKEN>`
+  - Retorna conexões totais e contagem de players por `worldId`
+- Logs do server (Fastify logger): `ws_open/ws_join/ws_leave/ws_bad_json/ws_join_reject`
+
 ## Visão geral
 - O client conecta ao WS ao entrar em **Play**.
 - Antes de conectar/join, o client obtém um token via `POST /api/auth/guest` (token curto, 60min) e envia no `join`.
