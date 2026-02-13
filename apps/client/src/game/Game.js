@@ -1750,9 +1750,19 @@ export class Game {
       return
     }
     if (msg.t === 'snapshot') {
-      this.remotePlayers.applySnapshot({ meId: this.wsMeId, players: msg.players })
+      const players = Array.isArray(msg.players)
+        ? msg.players.map((p) => {
+            if (Array.isArray(p)) {
+              // compact tuple: [id,x,y,z,yaw]
+              return { id: p[0], x: p[1], y: p[2], z: p[3], yaw: p[4] }
+            }
+            return p
+          })
+        : []
 
-      const me = (msg.players || []).find((p) => p.id === this.wsMeId)
+      this.remotePlayers.applySnapshot({ meId: this.wsMeId, players })
+
+      const me = players.find((p) => p.id === this.wsMeId)
       if (me && this.state === 'playing') {
         this._applyServerCorrection(me)
       }

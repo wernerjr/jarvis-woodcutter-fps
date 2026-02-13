@@ -154,12 +154,12 @@
     {
       "id": "P2",
       "title": "Base para escala (otimizações de rede e organização)",
-      "status": "todo",
+      "status": "doing",
       "stories": [
         {
           "id": "P2-S1",
           "title": "Otimizar snapshots: deltas e/ou compactação (sem quebrar compatibilidade)",
-          "status": "todo",
+          "status": "done",
           "objective": "Reduzir bandwidth e melhorar responsividade para mais players.",
           "description": "Atualmente `snapshot` envia todos players. Evoluir para: (a) deltas por seq/version, (b) reduzir frequência adaptativa, (c) payload mais compacto (campos curtos, arredondamento), ou (d) compressão no transporte (quando aplicável).\n\nEscopo: manter uma estratégia compatível com `v` do protocolo.",
           "acceptanceCriteria": [

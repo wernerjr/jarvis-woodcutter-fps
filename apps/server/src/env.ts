@@ -27,6 +27,9 @@ const EnvSchema = z.object({
   WOODCUTTER_WORLD_EVENT_RATE_PER_SEC: z.coerce.number().int().positive().default(12),
   WOODCUTTER_WORLD_EVENT_BURST: z.coerce.number().int().positive().default(24),
   WOODCUTTER_WORLD_EVENT_RADIUS: z.coerce.number().positive().default(3.25),
+
+  // Network: compact snapshots (optional)
+  WOODCUTTER_SNAPSHOT_COMPACT: z.coerce.boolean().default(false),
 });
 
 export const env = EnvSchema.parse(process.env);

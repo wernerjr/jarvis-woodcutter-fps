@@ -117,12 +117,22 @@ type PlayerState = {
   input?: InputMsg;
 };
 
-type ServerSnapshotMsg = {
-  t: 'snapshot';
-  v: 1;
-  worldId: string;
-  players: Array<{ id: string; x: number; y: number; z: number; yaw: number }>;
-};
+type ServerSnapshotMsg =
+  | {
+      t: 'snapshot';
+      v: 1;
+      worldId: string;
+      players: Array<{ id: string; x: number; y: number; z: number; yaw: number }>;
+    }
+  | {
+      // Compact form (optional): players as tuples to reduce payload size.
+      // [id,x,y,z,yaw]
+      t: 'snapshot';
+      v: 1;
+      c: 1;
+      worldId: string;
+      players: Array<[string, number, number, number, number]>;
+    };
 
 type ServerWelcomeMsg = { t: 'welcome'; v: 1; id: string; worldId: string };
 
@@ -397,15 +407,28 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
     const ids = rooms.get(worldId);
     if (!ids || ids.size === 0) return;
 
-    const payload: ServerSnapshotMsg = {
-      t: 'snapshot',
-      v: 1,
-      worldId,
-      players: Array.from(ids)
-        .map((id) => players.get(id))
-        .filter(Boolean)
-        .map((p) => ({ id: p!.id, x: p!.x, y: p!.y, z: p!.z, yaw: p!.yaw })),
-    };
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    const payload: ServerSnapshotMsg = env.WOODCUTTER_SNAPSHOT_COMPACT
+      ? {
+          t: 'snapshot',
+          v: 1,
+          c: 1,
+          worldId,
+          players: Array.from(ids)
+            .map((id) => players.get(id))
+            .filter(Boolean)
+            .map((p) => [p!.id, round2(p!.x), round2(p!.y), round2(p!.z), round2(p!.yaw)] as [string, number, number, number, number]),
+        }
+      : {
+          t: 'snapshot',
+          v: 1,
+          worldId,
+          players: Array.from(ids)
+            .map((id) => players.get(id))
+            .filter(Boolean)
+            .map((p) => ({ id: p!.id, x: round2(p!.x), y: round2(p!.y), z: round2(p!.z), yaw: round2(p!.yaw) })),
+        };
 
     const txt = JSON.stringify(payload);
     for (const client of wss.clients) {

@@ -99,6 +99,7 @@ Exemplos de rejeição:
 ```
 
 #### `snapshot`
+Formato padrão:
 ```json
 {
   "t": "snapshot",
@@ -109,6 +110,22 @@ Exemplos de rejeição:
   ]
 }
 ```
+
+Formato compacto (opcional, server-side):
+```json
+{
+  "t": "snapshot",
+  "v": 1,
+  "c": 1,
+  "worldId": "world-1",
+  "players": [
+    ["<guestId>", 0, 1.65, 0, 0]
+  ]
+}
+```
+- Ativado via env `WOODCUTTER_SNAPSHOT_COMPACT=true` no server.
+- O client aceita ambos os formatos.
+
 
 #### `worldChunk`
 Estado persistido de um chunk do mundo. O servidor envia quando:
