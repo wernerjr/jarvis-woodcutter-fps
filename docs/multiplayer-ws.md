@@ -48,6 +48,23 @@
 - `seq`: sequência monotônica (anti re-order)
 - `at`: epoch ms (telemetria/diagnóstico)
 
+### Client → Server (eventos do mundo)
+
+#### `worldEvent`
+Evento "estrito": o client solicita uma mudança no mundo, mas **só aplica loot/remoção** quando o servidor confirmar via `worldChunk`.
+
+Tipos atuais (`kind`):
+- `treeCut` → `{ treeId, x, z, at }`
+- `rockCollect` → `{ rockId, x, z, at }`
+- `stickCollect` → `{ stickId, x, z, at }`
+- `oreBreak` → `{ oreId, x, z, at }`
+- `place` → `{ placeKind, id, x, z, at }`
+
+Exemplo:
+```json
+{ "t": "worldEvent", "v": 1, "kind": "rockCollect", "rockId": "12", "x": 1.2, "z": -3.4, "at": 1700000000000 }
+```
+
 ### Server → Client
 
 #### `welcome`
@@ -67,14 +84,49 @@
 }
 ```
 
+#### `worldChunk`
+Estado persistido de um chunk do mundo. O servidor envia quando:
+- o player entra (chunks próximos)
+- alguém altera o mundo naquele chunk (e também no respawn)
+
+`removed*` são **remoções ativas** (temporárias) — quando o id some da lista, a entidade reaparece.
+
+```json
+{
+  "t": "worldChunk",
+  "v": 1,
+  "worldId": "world-1",
+  "chunkX": 0,
+  "chunkZ": 0,
+  "version": 12,
+  "state": {
+    "removedTrees": ["1", "9"],
+    "removedRocks": ["2"],
+    "removedSticks": ["7"],
+    "removedOres": ["3"],
+    "placed": [
+      { "id": "camp-1", "type": "campfire", "x": 1.0, "z": 2.0 }
+    ]
+  }
+}
+```
+
 ## Regras do servidor (MVP)
 - Rooms são separadas por `worldId`.
 - Server-authoritative: o servidor simula com física simples (gravidade + pulo + movimento no plano).
 - Colisão no servidor (MVP): **macro boundary** para não sair do mapa (não cobre árvores/props ainda).
 - `pose` foi removido; o client não manda posição.
 
+### Respawn (server-authoritative)
+O servidor persiste respawn temporário por chunk (campos internos `*RespawnUntil`) e emite `worldChunk` no collect/break e no respawn.
+Tempos atuais:
+- rocks: **30s**
+- sticks (galhos no chão): **30s**
+- trees: **45s**
+- iron ore: **120s (2min)**
+
 ## Próximos passos (planejado)
 - Autenticação do WS via token/assinatura (ou reaproveitar guest + sessão).
 - Trocar `pose` por `input` (server-authoritative de verdade).
 - Deltas/snapshots otimizados.
-- Replicação de entidades do mundo.
+- Replicação de entidades do mundo (incl. chunks com removals temporários/respawn).

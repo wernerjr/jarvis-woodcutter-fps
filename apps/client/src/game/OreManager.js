@@ -6,6 +6,7 @@ export class OreManager {
     this.scene = scene
 
     this._nodes = new Map()
+    this._nodesByChunk = new Map() // "cx:cz" -> Set<oreId>
     this._ray = new THREE.Raycaster()
 
     this._group = new THREE.Group()
@@ -13,7 +14,11 @@ export class OreManager {
     this._visible = true
 
     this._t = 0
+    // Client timer respawn is disabled for world-authoritative ores.
     this._respawnSeconds = 90
+
+    // Must match server wsServer.ts
+    this._chunkSize = 32
 
     this.oreHpMin = 22
     this.oreHpMax = 34
@@ -92,6 +97,14 @@ export class OreManager {
       }
 
       this._group.add(mesh)
+
+      const cx = Math.floor(mesh.position.x / this._chunkSize)
+      const cz = Math.floor(mesh.position.z / this._chunkSize)
+      mesh.userData.chunkX = cx
+      mesh.userData.chunkZ = cz
+      const ck = `${cx}:${cz}`
+      if (!this._nodesByChunk.has(ck)) this._nodesByChunk.set(ck, new Set())
+      this._nodesByChunk.get(ck).add(String(i))
 
       const maxHp = this._randInt(this.oreHpMin, this.oreHpMax)
       this._nodes.set(String(i), { mesh, hp: maxHp, maxHp, respawn: 0 })
@@ -187,9 +200,11 @@ export class OreManager {
     if (n.worldRemoved) return false
     if (n.hp > 0) return false
 
+    // World-authoritative: once confirmed by server, keep removed until worldChunk respawns it.
     n.pendingBreak = false
+    n.worldRemoved = true
     n.mesh.visible = false
-    n.respawn = this._respawnSeconds
+    n.respawn = 0
     return true
   }
 
@@ -202,6 +217,34 @@ export class OreManager {
     n.respawn = 0
     n.mesh.visible = false
     return true
+  }
+
+  respawnWorld(oreId) {
+    const n = this._nodes.get(String(oreId))
+    if (!n) return false
+    n.worldRemoved = false
+    n.pendingBreak = false
+    const maxHp = this._randInt(this.oreHpMin, this.oreHpMax)
+    n.maxHp = maxHp
+    n.hp = maxHp
+    n.respawn = 0
+    n.mesh.visible = true
+    n.mesh.scale.set(1, 1, 1)
+    return true
+  }
+
+  /** Apply authoritative removed list for a whole chunk (supports respawn). */
+  applyChunkState(chunkX, chunkZ, removedOres) {
+    const ck = `${Number(chunkX)}:${Number(chunkZ)}`
+    const ids = this._nodesByChunk.get(ck)
+    if (!ids) return
+
+    const removed = new Set((removedOres || []).map((id) => String(id)))
+
+    for (const id of ids) {
+      if (removed.has(String(id))) this.markWorldRemoved(id)
+      else this.respawnWorld(id)
+    }
   }
 
   _randInt(min, max) {

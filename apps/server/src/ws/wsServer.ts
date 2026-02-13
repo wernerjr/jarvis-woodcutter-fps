@@ -29,6 +29,7 @@ type TeleportMsg = { t: 'teleport'; v: 1; x: number; y: number; z: number; at: n
 type WorldEventMsg =
   | { t: 'worldEvent'; v: 1; kind: 'treeCut'; treeId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'rockCollect'; rockId: string; x: number; z: number; at: number }
+  | { t: 'worldEvent'; v: 1; kind: 'stickCollect'; stickId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'oreBreak'; oreId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'place'; placeKind: 'campfire' | 'forge' | 'forgeTable'; id: string; x: number; z: number; at: number };
 
@@ -69,7 +70,9 @@ type WorldChunkMsg = {
   version: number;
   state: {
     removedTrees: string[];
+    /** Active removals only (server-authoritative). */
     removedRocks: string[];
+    removedSticks: string[];
     removedOres: string[];
     placed: Array<{ id: string; type: 'campfire' | 'forge' | 'forgeTable'; x: number; z: number }>;
   };
@@ -94,6 +97,17 @@ function nowMs() {
 export function registerWs(app: FastifyInstance) {
   const wss = new WebSocketServer({ noServer: true });
 
+  // Respawn rules (server-authoritative)
+  const ROCK_RESPAWN_MS = 30_000;
+  const STICK_RESPAWN_MS = 30_000;
+  const TREE_RESPAWN_MS = 45_000;
+  const ORE_RESPAWN_MS = 120_000;
+
+  // worldId:chunkX:chunkZ:<kind>:<id> -> timeout
+  const respawnTimers = new Map<string, NodeJS.Timeout>();
+
+  type RespawnKind = 'rock' | 'stick' | 'tree' | 'ore';
+
   /** playerId -> state */
   const players = new Map<string, PlayerState>();
   /** worldId -> set(playerId) */
@@ -105,6 +119,39 @@ export function registerWs(app: FastifyInstance) {
     cz: Math.floor(z / chunkSize),
   });
 
+  function chunkKey(worldId: string, chunkX: number, chunkZ: number) {
+    return `${worldId}:${chunkX}:${chunkZ}`;
+  }
+
+  function timerKey(worldId: string, chunkX: number, chunkZ: number, kind: RespawnKind, id: string) {
+    return `${worldId}:${chunkX}:${chunkZ}:${kind}:${id}`;
+  }
+
+  function normalizeRespawns(st: any, field: string, legacyRemovedField: string): Record<string, number> {
+    const m = (st?.[field] ?? null) as any;
+    if (m && typeof m === 'object' && !Array.isArray(m)) {
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(m)) {
+        const id = String(k);
+        const until = typeof v === 'number' && Number.isFinite(v) ? v : NaN;
+        if (id && Number.isFinite(until)) out[id] = until;
+      }
+      return out;
+    }
+
+    // Legacy: removedX as string[] (treated as permanent removals)
+    const legacy = Array.isArray(st?.[legacyRemovedField]) ? (st[legacyRemovedField] as any[]).map(String) : [];
+    const out: Record<string, number> = {};
+    for (const id of legacy) out[String(id)] = Number.POSITIVE_INFINITY;
+    return out;
+  }
+
+  function activeRemoved(respawnUntil: Record<string, number>, t = nowMs()) {
+    return Object.entries(respawnUntil)
+      .filter(([, until]) => until > t)
+      .map(([id]) => String(id));
+  }
+
   async function getChunk(worldId: string, chunkX: number, chunkZ: number) {
     const row = await db
       .select()
@@ -114,15 +161,43 @@ export function registerWs(app: FastifyInstance) {
 
     if (row[0]) {
       const st = (row[0].state ?? {}) as any;
+
+      const treeRespawnUntil = normalizeRespawns(st, 'treeRespawnUntil', 'removedTrees');
+      const rockRespawnUntil = normalizeRespawns(st, 'rockRespawnUntil', 'removedRocks');
+      const stickRespawnUntil = normalizeRespawns(st, 'stickRespawnUntil', 'removedSticks');
+      const oreRespawnUntil = normalizeRespawns(st, 'oreRespawnUntil', 'removedOres');
+
+      // Schedule respawn broadcasts for any timed entities in this chunk.
+      const schedule = (kind: RespawnKind, id: string, until: number) => {
+        if (!Number.isFinite(until) || until === Number.POSITIVE_INFINITY) return;
+        const tk = timerKey(worldId, chunkX, chunkZ, kind, id);
+        if (respawnTimers.has(tk)) return;
+        const delay = Math.max(0, until - nowMs());
+        const h = setTimeout(() => {
+          respawnTimers.delete(tk);
+          expireEntityIfNeeded({ worldId, chunkX, chunkZ, kind, id }).catch(() => null);
+        }, delay);
+        respawnTimers.set(tk, h);
+      };
+
+      for (const [id, until] of Object.entries(treeRespawnUntil)) schedule('tree', id, until);
+      for (const [id, until] of Object.entries(rockRespawnUntil)) schedule('rock', id, until);
+      for (const [id, until] of Object.entries(stickRespawnUntil)) schedule('stick', id, until);
+      for (const [id, until] of Object.entries(oreRespawnUntil)) schedule('ore', id, until);
+
       return {
         worldId,
         chunkX,
         chunkZ,
         version: Number(row[0].version ?? 0),
+        // Full persisted state (used for writes).
+        rawState: st,
+        // Client-facing state (derived).
         state: {
-          removedTrees: Array.isArray(st.removedTrees) ? st.removedTrees.map(String) : [],
-          removedRocks: Array.isArray(st.removedRocks) ? st.removedRocks.map(String) : [],
-          removedOres: Array.isArray(st.removedOres) ? st.removedOres.map(String) : [],
+          removedTrees: activeRemoved(treeRespawnUntil),
+          removedRocks: activeRemoved(rockRespawnUntil),
+          removedSticks: activeRemoved(stickRespawnUntil),
+          removedOres: activeRemoved(oreRespawnUntil),
           placed: Array.isArray(st.placed)
             ? st.placed
                 .map((p: any) => ({ id: String(p?.id), type: p?.type, x: Number(p?.x), z: Number(p?.z) }))
@@ -139,8 +214,65 @@ export function registerWs(app: FastifyInstance) {
       chunkX,
       chunkZ,
       version: 0,
-      state: { removedTrees: [], removedRocks: [], removedOres: [], placed: [] },
+      rawState: {},
+      state: { removedTrees: [], removedRocks: [], removedSticks: [], removedOres: [], placed: [] },
     };
+  }
+
+  async function expireEntityIfNeeded(params: { worldId: string; chunkX: number; chunkZ: number; kind: RespawnKind; id: string }) {
+    const { worldId, chunkX, chunkZ, kind, id } = params;
+
+    const row = await db
+      .select()
+      .from(worldChunkState)
+      .where(and(eq(worldChunkState.worldId, worldId), eq(worldChunkState.chunkX, chunkX), eq(worldChunkState.chunkZ, chunkZ)))
+      .limit(1);
+
+    if (!row[0]) return;
+
+    const st = (row[0].state ?? {}) as any;
+
+    const field = kind === 'tree' ? 'treeRespawnUntil' : kind === 'rock' ? 'rockRespawnUntil' : kind === 'stick' ? 'stickRespawnUntil' : 'oreRespawnUntil';
+    const legacyField = kind === 'tree' ? 'removedTrees' : kind === 'rock' ? 'removedRocks' : kind === 'stick' ? 'removedSticks' : 'removedOres';
+
+    const respawnUntil = normalizeRespawns(st, field, legacyField);
+
+    const until = respawnUntil[String(id)];
+    if (until == null) return;
+    if (until > nowMs()) return; // not yet
+
+    delete respawnUntil[String(id)];
+
+    const version = Number(row[0].version ?? 0) + 1;
+    const next = structuredClone(st) as any;
+    next[field] = respawnUntil;
+    // stop writing legacy permanent fields going forward
+    next[legacyField] = [];
+
+    await saveChunk({ worldId, chunkX, chunkZ, version, state: next });
+
+    const treeRespawnUntil = normalizeRespawns(next, 'treeRespawnUntil', 'removedTrees');
+    const rockRespawnUntil = normalizeRespawns(next, 'rockRespawnUntil', 'removedRocks');
+    const stickRespawnUntil = normalizeRespawns(next, 'stickRespawnUntil', 'removedSticks');
+    const oreRespawnUntil = normalizeRespawns(next, 'oreRespawnUntil', 'removedOres');
+
+    const out: WorldChunkMsg = {
+      t: 'worldChunk',
+      v: 1,
+      worldId,
+      chunkX,
+      chunkZ,
+      version,
+      state: {
+        removedTrees: activeRemoved(treeRespawnUntil),
+        removedRocks: activeRemoved(rockRespawnUntil),
+        removedSticks: activeRemoved(stickRespawnUntil),
+        removedOres: activeRemoved(oreRespawnUntil),
+        placed: Array.isArray(next.placed) ? next.placed : [],
+      },
+    };
+
+    broadcastWorldChunk(worldId, chunkX, chunkZ, out);
   }
 
   async function saveChunk(next: { worldId: string; chunkX: number; chunkZ: number; version: number; state: any }) {
@@ -435,24 +567,64 @@ export function registerWs(app: FastifyInstance) {
 
         getChunk(st.worldId, cx, cz)
           .then(async (chunk) => {
-            const next = structuredClone(chunk.state) as any;
+            // IMPORTANT: start from full persisted state, not the derived client-facing arrays.
+            const next = structuredClone(chunk.rawState ?? {}) as any;
             next.removedTrees = Array.isArray(next.removedTrees) ? next.removedTrees.map(String) : [];
-            next.removedRocks = Array.isArray(next.removedRocks) ? next.removedRocks.map(String) : [];
             next.removedOres = Array.isArray(next.removedOres) ? next.removedOres.map(String) : [];
             next.placed = Array.isArray(next.placed) ? next.placed : [];
+
+            // Respawns are timed & server-authoritative.
+            const treeRespawnUntil = normalizeRespawns(next, 'treeRespawnUntil', 'removedTrees');
+            const rockRespawnUntil = normalizeRespawns(next, 'rockRespawnUntil', 'removedRocks');
+            const stickRespawnUntil = normalizeRespawns(next, 'stickRespawnUntil', 'removedSticks');
+            const oreRespawnUntil = normalizeRespawns(next, 'oreRespawnUntil', 'removedOres');
+
+            const schedule = (kind: RespawnKind, id: string, delayMs: number) => {
+              const tk = timerKey(st.worldId, cx, cz, kind, id);
+              if (respawnTimers.has(tk)) return;
+              const h = setTimeout(() => {
+                respawnTimers.delete(tk);
+                expireEntityIfNeeded({ worldId: st.worldId, chunkX: cx, chunkZ: cz, kind, id }).catch(() => null);
+              }, delayMs);
+              respawnTimers.set(tk, h);
+            };
 
             if (msg.kind === 'treeCut') {
               const id = String((msg as any).treeId || '');
               if (!id) return;
-              if (!next.removedTrees.includes(id)) next.removedTrees.push(id);
+
+              const until = nowMs() + TREE_RESPAWN_MS;
+              treeRespawnUntil[id] = until;
+              next.treeRespawnUntil = treeRespawnUntil;
+              next.removedTrees = [];
+              schedule('tree', id, TREE_RESPAWN_MS);
             } else if (msg.kind === 'rockCollect') {
               const id = String((msg as any).rockId || '');
               if (!id) return;
-              if (!next.removedRocks.includes(id)) next.removedRocks.push(id);
+
+              const until = nowMs() + ROCK_RESPAWN_MS;
+              rockRespawnUntil[id] = until;
+              next.rockRespawnUntil = rockRespawnUntil;
+              next.removedRocks = [];
+              schedule('rock', id, ROCK_RESPAWN_MS);
+            } else if (msg.kind === 'stickCollect') {
+              const id = String((msg as any).stickId || '');
+              if (!id) return;
+
+              const until = nowMs() + STICK_RESPAWN_MS;
+              stickRespawnUntil[id] = until;
+              next.stickRespawnUntil = stickRespawnUntil;
+              next.removedSticks = [];
+              schedule('stick', id, STICK_RESPAWN_MS);
             } else if (msg.kind === 'oreBreak') {
               const id = String((msg as any).oreId || '');
               if (!id) return;
-              if (!next.removedOres.includes(id)) next.removedOres.push(id);
+
+              const until = nowMs() + ORE_RESPAWN_MS;
+              oreRespawnUntil[id] = until;
+              next.oreRespawnUntil = oreRespawnUntil;
+              next.removedOres = [];
+              schedule('ore', id, ORE_RESPAWN_MS);
             } else if (msg.kind === 'place') {
               const id = String((msg as any).id || '');
               const placeKind = (msg as any).placeKind;
@@ -475,9 +647,10 @@ export function registerWs(app: FastifyInstance) {
               chunkZ: cz,
               version,
               state: {
-                removedTrees: next.removedTrees,
-                removedRocks: next.removedRocks,
-                removedOres: next.removedOres,
+                removedTrees: activeRemoved(treeRespawnUntil),
+                removedRocks: activeRemoved(rockRespawnUntil),
+                removedSticks: activeRemoved(stickRespawnUntil),
+                removedOres: activeRemoved(oreRespawnUntil),
                 placed: next.placed,
               },
             };

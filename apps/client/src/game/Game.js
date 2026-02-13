@@ -4,6 +4,7 @@ import { World } from './World.js'
 import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
 import { RockManager } from './RockManager.js'
+import { StickManager } from './StickManager.js'
 import { GrassManager } from './GrassManager.js'
 import { RiverManager } from './RiverManager.js'
 import { LakeManager } from './LakeManager.js'
@@ -70,6 +71,7 @@ export class Game {
     this.camera.add(this.torchSpot)
     this.trees = new TreeManager({ scene: this.scene })
     this.rocks = new RockManager({ scene: this.scene })
+    this.sticks = new StickManager({ scene: this.scene })
     this.fires = new CampfireManager({ scene: this.scene })
     this.forges = new ForgeManager({ scene: this.scene })
     this.forgeTables = new ForgeTableManager({ scene: this.scene })
@@ -203,6 +205,7 @@ export class Game {
 
     this.trees.init({ seed: 1337, count: 42, radius: 42 })
     this.rocks.init({ seed: 2026, count: 32, radius: 45 })
+    this.sticks.init({ seed: 1991, count: 46, radius: 45 })
 
     this.mine.init()
     // Hide interior while in the world (prevents reaching it by walking out of bounds).
@@ -1701,57 +1704,61 @@ export class Game {
 
     const removedTrees = Array.isArray(st.removedTrees) ? st.removedTrees : []
     const removedRocks = Array.isArray(st.removedRocks) ? st.removedRocks : []
+    const removedSticks = Array.isArray(st.removedSticks) ? st.removedSticks : []
     const removedOres = Array.isArray(st.removedOres) ? st.removedOres : []
     const placed = Array.isArray(st.placed) ? st.placed : []
 
+    // Trees can respawn (server-authoritative): apply full chunk state every time.
     for (const id of removedTrees) {
       const sid = String(id)
-      if (this._appliedWorld.trees.has(sid)) continue
-      this._appliedWorld.trees.add(sid)
-
       const k = `treeCut:${sid}`
       const fn = this._pendingWorldActions.get(k)
       if (fn) {
         this._pendingWorldActions.delete(k)
         fn()
-        continue
       }
-
-      // Not our pending action: apply as world removal immediately.
-      this.trees.markWorldRemoved(sid)
     }
 
+    this.trees.applyChunkState(msg.chunkX, msg.chunkZ, removedTrees)
+
+    // Rocks can respawn (server-authoritative): apply full chunk state every time.
+    // First, resolve any pending confirmations (grant item, etc.).
     for (const id of removedRocks) {
       const sid = String(id)
-      if (this._appliedWorld.rocks.has(sid)) continue
-      this._appliedWorld.rocks.add(sid)
-
       const k = `rockCollect:${sid}`
       const fn = this._pendingWorldActions.get(k)
       if (fn) {
         this._pendingWorldActions.delete(k)
         fn()
-        continue
       }
-
-      this.rocks.markWorldRemoved(sid)
     }
 
+    this.rocks.applyChunkState(msg.chunkX, msg.chunkZ, removedRocks)
+
+    // Sticks can respawn (server-authoritative): apply full chunk state every time.
+    for (const id of removedSticks) {
+      const sid = String(id)
+      const k = `stickCollect:${sid}`
+      const fn = this._pendingWorldActions.get(k)
+      if (fn) {
+        this._pendingWorldActions.delete(k)
+        fn()
+      }
+    }
+    this.sticks.applyChunkState(msg.chunkX, msg.chunkZ, removedSticks)
+
+    // Ores can respawn (server-authoritative): apply full chunk state every time.
     for (const id of removedOres) {
       const sid = String(id)
-      if (this._appliedWorld.ores.has(sid)) continue
-      this._appliedWorld.ores.add(sid)
-
       const k = `oreBreak:${sid}`
       const fn = this._pendingWorldActions.get(k)
       if (fn) {
         this._pendingWorldActions.delete(k)
         fn()
-        continue
       }
-
-      this.ores.markWorldRemoved(sid)
     }
+
+    this.ores.applyChunkState(msg.chunkX, msg.chunkZ, removedOres)
 
     for (const p of placed) {
       const type = String(p?.type || '')
@@ -2078,25 +2085,61 @@ export class Game {
       return
     }
 
-    const hit = this.rocks.raycastFromCamera(this.camera)
+    const rockHit = this.rocks.raycastFromCamera(this.camera)
+    const stickHit = this.sticks.raycastFromCamera(this.camera)
+
+    // Choose nearest.
+    const hit =
+      rockHit && stickHit ? (rockHit.distance <= stickHit.distance ? { kind: 'rock', ...rockHit } : { kind: 'stick', ...stickHit }) : rockHit ? { kind: 'rock', ...rockHit } : stickHit ? { kind: 'stick', ...stickHit } : null
+
     if (!hit || hit.distance > 2.0) {
-      this.ui.toast('Nenhuma pedra perto.', 800)
+      this.ui.toast('Nada para pegar por perto.', 800)
       return
     }
 
-    // Strict: wait for server confirmation to remove + grant item.
-    const rockId = String(hit.rockId)
-    const key = `rockCollect:${rockId}`
+    if (hit.kind === 'rock') {
+      // Strict: wait for server confirmation to remove + grant item.
+      const rockId = String(hit.rockId)
+      const key = `rockCollect:${rockId}`
+      this._pendingWorldActions.set(key, () => {
+        const ok = this.rocks.collect(rockId, { world: true })
+        if (!ok) return
+
+        const overflow = this.inventory.add(ItemId.STONE, 1)
+        if (overflow) {
+          this.ui.toast('Inventário cheio: pedra descartada.', 1200)
+          this.sfx.click()
+        } else {
+          this.ui.toast('Pegou: +1 pedra', 900)
+          this.sfx.pickup()
+          if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+        }
+      })
+
+      const px = hit.point?.x ?? this.player.position.x
+      const pz = hit.point?.z ?? this.player.position.z
+      const sent = this._sendWorldEvent({ kind: 'rockCollect', rockId, x: px, z: pz, at: Date.now() })
+      if (!sent) {
+        this._pendingWorldActions.delete(key)
+        this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+      }
+
+      return
+    }
+
+    // stick
+    const stickId = String(hit.stickId)
+    const key = `stickCollect:${stickId}`
     this._pendingWorldActions.set(key, () => {
-      const ok = this.rocks.collect(rockId, { world: true })
+      const ok = this.sticks.collect(stickId, { world: true })
       if (!ok) return
 
-      const overflow = this.inventory.add(ItemId.STONE, 1)
+      const overflow = this.inventory.add(ItemId.STICK, 1)
       if (overflow) {
-        this.ui.toast('Inventário cheio: pedra descartada.', 1200)
+        this.ui.toast('Inventário cheio: galho descartado.', 1200)
         this.sfx.click()
       } else {
-        this.ui.toast('Pegou: +1 pedra', 900)
+        this.ui.toast('Pegou: +1 galho', 900)
         this.sfx.pickup()
         if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
       }
@@ -2104,7 +2147,7 @@ export class Game {
 
     const px = hit.point?.x ?? this.player.position.x
     const pz = hit.point?.z ?? this.player.position.z
-    const sent = this._sendWorldEvent({ kind: 'rockCollect', rockId, x: px, z: pz, at: Date.now() })
+    const sent = this._sendWorldEvent({ kind: 'stickCollect', stickId, x: px, z: pz, at: Date.now() })
     if (!sent) {
       this._pendingWorldActions.delete(key)
       this.ui.toast('Sem conexão com o servidor (WS).', 1100)
@@ -2272,6 +2315,7 @@ export class Game {
     this.world.update(simDt, { camera: this.camera, player: this.player, time: this.time })
     this.trees.update(simDt)
     this.rocks.update(simDt)
+    this.sticks.update(simDt)
     this.fires.update(simDt)
     this.forges.update(forgeDt, this.camera)
     this.ores.update(simDt)

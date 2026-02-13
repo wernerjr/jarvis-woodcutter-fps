@@ -58,11 +58,15 @@ export class TreeManager {
     this.scene = scene
 
     this._trees = new Map() // id -> { mesh, collider }
+    this._treesByChunk = new Map() // "cx:cz" -> Set<id>
     this._raycaster = new THREE.Raycaster()
     this._raycaster.far = 5
 
     this._respawnSec = 5.0
     this._idCounter = 1
+
+    // Must match server wsServer.ts
+    this._chunkSize = 32
 
     this._tmpVec = new THREE.Vector3()
   }
@@ -85,6 +89,15 @@ export class TreeManager {
       const sph = new THREE.Sphere(mesh.position.clone().add(new THREE.Vector3(0, trunkH * 0.8, 0)), Math.max(0.5, leafR * 0.75))
 
       mesh.userData.id = id
+
+      const cx = Math.floor(mesh.position.x / this._chunkSize)
+      const cz = Math.floor(mesh.position.z / this._chunkSize)
+      mesh.userData.chunkX = cx
+      mesh.userData.chunkZ = cz
+      const ck = `${cx}:${cz}`
+      if (!this._treesByChunk.has(ck)) this._treesByChunk.set(ck, new Set())
+      this._treesByChunk.get(ck).add(id)
+
       this.scene.add(mesh)
 
       this._trees.set(id, { mesh, sphere: sph })
@@ -98,6 +111,12 @@ export class TreeManager {
       // keep collider centered if animating
       const trunkH = mesh.userData.trunkH
       sphere.center.set(mesh.position.x, mesh.position.y + trunkH * 0.8, mesh.position.z)
+
+      // Server-authoritative world removals (respawn comes from worldChunk updates).
+      if (mesh.userData.worldRemoved) {
+        mesh.visible = false
+        continue
+      }
 
       if (mesh.userData.falling) {
         mesh.userData.fallT = Math.min(1, mesh.userData.fallT + dt / 0.55)
@@ -247,6 +266,28 @@ export class TreeManager {
     mesh.userData.falling = false
     mesh.visible = false
     return true
+  }
+
+  respawnWorld(treeId) {
+    const item = this._trees.get(String(treeId))
+    if (!item) return false
+    const { mesh } = item
+    this._respawn(mesh)
+    return true
+  }
+
+  /** Apply authoritative removed list for a whole chunk (supports respawn). */
+  applyChunkState(chunkX, chunkZ, removedTrees) {
+    const ck = `${Number(chunkX)}:${Number(chunkZ)}`
+    const ids = this._treesByChunk.get(ck)
+    if (!ids) return
+
+    const removed = new Set((removedTrees || []).map((id) => String(id)))
+
+    for (const id of ids) {
+      if (removed.has(String(id))) this.markWorldRemoved(id)
+      else this.respawnWorld(id)
+    }
   }
 
   resetAll() {
