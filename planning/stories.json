@@ -194,7 +194,7 @@
     {
       "id": "P3",
       "title": "Melhorias fáceis de gameplay (client-only, não quebrar multiplayer)",
-      "status": "doing",
+      "status": "done",
       "stories": [
         {
           "id": "P3-S1",
@@ -233,7 +233,7 @@
         {
           "id": "P3-S3",
           "title": "Sway/bobbing e animação da ferramenta na mão (com opção de desligar)",
-          "status": "todo",
+          "status": "done",
           "objective": "Dar sensação de FPS mais ‘vivo’ sem tocar em física/posicionamento authoritative.",
           "description": "Adicionar sway (resposta ao mouse) e bobbing (passos) no modelo da ferramenta/mão e/ou na câmera, com amplitude pequena e opção de desligar no menu.\n\nGarantir que raycasts e lógica de impacto continuem baseados na câmera real e no timing do swing, para não impactar o multiplayer.",
           "acceptanceCriteria": [

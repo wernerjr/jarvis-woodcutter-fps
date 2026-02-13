@@ -258,6 +258,7 @@ $('#btnRestart').addEventListener('click', () => game.restart())
 $('#btnPauseControls').addEventListener('click', () => game.openControls('pause'))
 $('#btnQuit').addEventListener('click', () => game.quitToMenu())
 $('#btnPerfToggle').addEventListener('click', () => game.togglePerf())
+$('#btnViewBob').addEventListener('click', () => game.toggleViewBob())
 
 $('#btnControlsBack').addEventListener('click', () => game.closeControls())
 $('#btnInvClose').addEventListener('click', () => game.closeInventory())

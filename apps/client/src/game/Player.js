@@ -46,6 +46,10 @@ export class Player {
 
     this._bobT = 0
     this._bobFactor = 1
+    this._viewBobEnabled = true
+
+    this._swayX = 0
+    this._swayY = 0
 
     // Simple "axe" in view (Jarvis the lumberjack robot)
     this._swingT = 0
@@ -126,12 +130,58 @@ export class Player {
     this._bobFactor = v
   }
 
+  setViewBobEnabled(v) {
+    this._viewBobEnabled = !!v
+    if (!this._viewBobEnabled) {
+      this._bobT = 0
+      this._swayX = 0
+      this._swayY = 0
+      if (this._toolPivot) {
+        this._toolPivot.position.set(0.22, -0.22, -0.38)
+        this._toolPivot.rotation.set(-0.35, 0.10, -0.20)
+      }
+    }
+  }
+
   _onMouseMoveAny(e) {
     if (!this._locked) return
+
+    // Accumulate tiny sway from mouse movement (purely visual: applied to tool pivot only).
+    if (this._viewBobEnabled) {
+      this._swayX = clamp(this._swayX + e.movementX * 0.0012, -0.08, 0.08)
+      this._swayY = clamp(this._swayY + e.movementY * 0.0012, -0.08, 0.08)
+    }
 
     this.yaw.rotation.y -= e.movementX * this.lookSpeed
     this.pitch.rotation.x -= e.movementY * this.lookSpeed
     this.pitch.rotation.x = clamp(this.pitch.rotation.x, -1.25, 1.25)
+  }
+
+  _updateViewBob(dt, move01, sprint01) {
+    if (!this._toolPivot) return
+
+    const basePos = { x: 0.22, y: -0.22, z: -0.38 }
+    const baseRot = { x: -0.35, y: 0.10, z: -0.20 }
+
+    if (!this._viewBobEnabled || dt <= 0) {
+      this._toolPivot.position.set(basePos.x, basePos.y, basePos.z)
+      this._toolPivot.rotation.set(baseRot.x, baseRot.y, baseRot.z)
+      return
+    }
+
+    // decay sway
+    const decay = Math.pow(0.001, dt)
+    this._swayX *= decay
+    this._swayY *= decay
+
+    const speed = 7.0 + sprint01 * 4.0
+    this._bobT += dt * speed * Math.max(0.25, move01)
+    const bob = Math.sin(this._bobT) * 0.012 * this._bobFactor * move01
+    const bob2 = Math.sin(this._bobT * 2.0) * 0.008 * this._bobFactor * move01
+
+    // Apply to tool pivot only (camera stays authoritative for raycasts).
+    this._toolPivot.position.set(basePos.x + this._swayX * 0.35, basePos.y + bob, basePos.z + bob2)
+    this._toolPivot.rotation.set(baseRot.x + this._swayY * 0.25 + bob2 * 0.25, baseRot.y + this._swayX * 0.18, baseRot.z)
   }
 
   swing() {
@@ -238,7 +288,7 @@ export class Player {
     // Apply final position.
     this.position.copy(next)
 
-    // camera bob
+    // camera bob (authoritative for raycasts) stays as-is.
     const moving = dir.lengthSq() > 0
     if (moving) this._bobT += dt * 10
     else this._bobT = 0
@@ -246,6 +296,11 @@ export class Player {
     const bob = moving ? Math.sin(this._bobT) * 0.03 * this._bobFactor : 0
     const jumpBob = this._onGround ? 0 : -0.03
     this.pitch.position.y = bob + jumpBob
+
+    // View bob/sway for tool models only (visual).
+    const move01 = moving ? 1 : 0
+    const sprint01 = this.isSprinting ? 1 : 0
+    this._updateViewBob(dt, move01, sprint01)
 
     // swing animation (slower + easing, framerate independent)
     if (this._swingT > 0) this._swingT = Math.max(0, this._swingT - dt)

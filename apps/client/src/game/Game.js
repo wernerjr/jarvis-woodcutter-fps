@@ -224,6 +224,18 @@ export class Game {
 
     this._ensureFadeOverlay()
 
+    // Accessibility: view bob/sway toggle (visual-only; does not affect raycasts)
+    this._viewBobEnabled = true
+    try {
+      const v = localStorage.getItem('woodcutter_view_bob')
+      if (v === '0') this._viewBobEnabled = false
+    } catch {
+      // ignore
+    }
+    this.player.setViewBobEnabled?.(this._viewBobEnabled)
+    const btnBob = document.querySelector('#btnViewBob')
+    if (btnBob) btnBob.textContent = `View bob: ${this._viewBobEnabled ? 'ON' : 'OFF'}`
+
     // Swing impacts trigger hit detection in a narrow window.
     this.player.onImpact(() => {
       if (this.state !== 'playing') return
@@ -1262,6 +1274,19 @@ export class Game {
 
     const btn = document.querySelector('#btnPerfToggle')
     if (btn) btn.textContent = `Performance: ${this.perfEnabled ? 'ON' : 'OFF'}`
+  }
+
+  toggleViewBob() {
+    this._viewBobEnabled = !this._viewBobEnabled
+    try {
+      localStorage.setItem('woodcutter_view_bob', this._viewBobEnabled ? '1' : '0')
+    } catch {
+      // ignore
+    }
+    this.player.setViewBobEnabled?.(this._viewBobEnabled)
+
+    const btn = document.querySelector('#btnViewBob')
+    if (btn) btn.textContent = `View bob: ${this._viewBobEnabled ? 'ON' : 'OFF'}`
   }
 
   async closeInventory() {
