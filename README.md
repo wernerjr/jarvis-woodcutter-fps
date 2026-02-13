@@ -23,12 +23,17 @@ pnpm dev
 - Server: http://localhost:3023/api/health
 - Guest bootstrap: `POST /api/auth/guest`
 
-## Rodar via Docker (PROD-like, sem Caddy)
-Pré-req: a rede docker `shared` deve existir (usada pelo Caddy externo).
+## Docker (recomendado no servidor)
+Pré-req:
+- a rede docker `shared` deve existir (usada pelo Caddy externo)
+- Postgres shared rodando (container `shared-postgres`)
+- `WOODCUTTER_DATABASE_URL` injetada pelo Infisical
 
 ```bash
 docker network create shared || true
-docker compose up -d --build
+
+# recomendado: subir via Infisical
+infup -- docker compose up -d --build
 ```
 
 Isso sobe:

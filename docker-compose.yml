@@ -18,11 +18,9 @@ services:
     restart: unless-stopped
     environment:
       PORT: "3023"
-      # Uses the shared Postgres container on the shared docker network.
-      # Override via env if needed.
-      # Prefer Infisical-provided connection string.
-      # WOODCUTTER_DATABASE_URL should include user/pass/host/port/db.
-      DATABASE_URL: "${WOODCUTTER_DATABASE_URL:-${DATABASE_URL:-postgres://woodcutter:woodcutter@shared-postgres:5432/woodcutter}}"
+      # Injected by Infisical (recommended):
+      #   WOODCUTTER_DATABASE_URL=postgres://user:pass@shared-postgres:5432/woodcutter
+      DATABASE_URL: ${WOODCUTTER_DATABASE_URL}
     expose:
       - "3023"
     networks:
