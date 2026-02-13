@@ -109,6 +109,15 @@ type ServerSnapshotMsg = {
 
 type ServerWelcomeMsg = { t: 'welcome'; v: 1; id: string; worldId: string };
 
+type WorldEventResultMsg = {
+  t: 'worldEventResult';
+  v: 1;
+  kind: WorldEventMsg['kind'];
+  id: string;
+  ok: boolean;
+  reason?: 'already_removed' | 'invalid' | 'duplicate';
+};
+
 type WorldChunkMsg = {
   t: 'worldChunk';
   v: 1;
@@ -657,52 +666,88 @@ export function registerWs(app: FastifyInstance) {
               respawnTimers.set(tk, h);
             };
 
+            const t = nowMs();
+            let result: WorldEventResultMsg | null = null;
+
+            const setResult = (kind: WorldEventResultMsg['kind'], id: string, ok: boolean, reason?: WorldEventResultMsg['reason']) => {
+              result = { t: 'worldEventResult', v: 1, kind, id, ok, reason };
+            };
+
             if (msg.kind === 'treeCut') {
               const id = String((msg as any).treeId || '');
-              if (!id) return;
-
-              const until = nowMs() + TREE_RESPAWN_MS;
-              treeRespawnUntil[id] = until;
-              next.treeRespawnUntil = treeRespawnUntil;
-              next.removedTrees = [];
-              schedule('tree', id, TREE_RESPAWN_MS);
+              if (!id) {
+                setResult('treeCut', '', false, 'invalid');
+              } else if ((treeRespawnUntil[id] ?? 0) > t) {
+                setResult('treeCut', id, false, 'already_removed');
+              } else {
+                const until = t + TREE_RESPAWN_MS;
+                treeRespawnUntil[id] = until;
+                next.treeRespawnUntil = treeRespawnUntil;
+                next.removedTrees = [];
+                schedule('tree', id, TREE_RESPAWN_MS);
+                setResult('treeCut', id, true);
+              }
             } else if (msg.kind === 'rockCollect') {
               const id = String((msg as any).rockId || '');
-              if (!id) return;
-
-              const until = nowMs() + ROCK_RESPAWN_MS;
-              rockRespawnUntil[id] = until;
-              next.rockRespawnUntil = rockRespawnUntil;
-              next.removedRocks = [];
-              schedule('rock', id, ROCK_RESPAWN_MS);
+              if (!id) {
+                setResult('rockCollect', '', false, 'invalid');
+              } else if ((rockRespawnUntil[id] ?? 0) > t) {
+                setResult('rockCollect', id, false, 'already_removed');
+              } else {
+                const until = t + ROCK_RESPAWN_MS;
+                rockRespawnUntil[id] = until;
+                next.rockRespawnUntil = rockRespawnUntil;
+                next.removedRocks = [];
+                schedule('rock', id, ROCK_RESPAWN_MS);
+                setResult('rockCollect', id, true);
+              }
             } else if (msg.kind === 'stickCollect') {
               const id = String((msg as any).stickId || '');
-              if (!id) return;
-
-              const until = nowMs() + STICK_RESPAWN_MS;
-              stickRespawnUntil[id] = until;
-              next.stickRespawnUntil = stickRespawnUntil;
-              next.removedSticks = [];
-              schedule('stick', id, STICK_RESPAWN_MS);
+              if (!id) {
+                setResult('stickCollect', '', false, 'invalid');
+              } else if ((stickRespawnUntil[id] ?? 0) > t) {
+                setResult('stickCollect', id, false, 'already_removed');
+              } else {
+                const until = t + STICK_RESPAWN_MS;
+                stickRespawnUntil[id] = until;
+                next.stickRespawnUntil = stickRespawnUntil;
+                next.removedSticks = [];
+                schedule('stick', id, STICK_RESPAWN_MS);
+                setResult('stickCollect', id, true);
+              }
             } else if (msg.kind === 'oreBreak') {
               const id = String((msg as any).oreId || '');
-              if (!id) return;
-
-              const until = nowMs() + ORE_RESPAWN_MS;
-              oreRespawnUntil[id] = until;
-              next.oreRespawnUntil = oreRespawnUntil;
-              next.removedOres = [];
-              schedule('ore', id, ORE_RESPAWN_MS);
+              if (!id) {
+                setResult('oreBreak', '', false, 'invalid');
+              } else if ((oreRespawnUntil[id] ?? 0) > t) {
+                setResult('oreBreak', id, false, 'already_removed');
+              } else {
+                const until = t + ORE_RESPAWN_MS;
+                oreRespawnUntil[id] = until;
+                next.oreRespawnUntil = oreRespawnUntil;
+                next.removedOres = [];
+                schedule('ore', id, ORE_RESPAWN_MS);
+                setResult('oreBreak', id, true);
+              }
             } else if (msg.kind === 'place') {
               const id = String((msg as any).id || '');
               const placeKind = (msg as any).placeKind;
-              if (!id) return;
               const type = placeKind === 'campfire' || placeKind === 'forge' || placeKind === 'forgeTable' ? placeKind : null;
-              if (!type) return;
-              if (!next.placed.some((p: any) => String(p?.id) === id)) {
+              if (!id || !type) {
+                setResult('place', id || '', false, 'invalid');
+              } else if (next.placed.some((p: any) => String(p?.id) === id)) {
+                // Id is globally unique per player in current client; treat duplicates as no-op.
+                setResult('place', id, false, 'duplicate');
+              } else {
                 next.placed.push({ id, type, x, z });
+                setResult('place', id, true);
               }
             }
+
+            // Always notify the sender about accept/reject (prevents free loot on late arrival).
+            if (result && ws.readyState === ws.OPEN) ws.send(JSON.stringify(result));
+
+            if (!((result as any)?.ok)) return;
 
             const version = (chunk.version ?? 0) + 1;
             await saveChunk({ worldId: st.worldId, chunkX: cx, chunkZ: cz, version, state: next });

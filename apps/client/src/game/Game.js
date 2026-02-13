@@ -88,7 +88,8 @@ export class Game {
     this._reconCooldownUntil = 0
 
     // World persistence (F3): strict, server-confirmed events.
-    this._pendingWorldActions = new Map() // key -> fn()
+    // key -> { fn, accepted, timeoutId }
+    this._pendingWorldActions = new Map()
     this._appliedWorld = {
       trees: new Set(),
       rocks: new Set(),
@@ -775,9 +776,9 @@ export class Game {
 
     if (!r.broke) return
 
-    // Strict: wait for server confirmation to actually break/remove + grant loot.
+    // Strict: wait for server accept + chunk confirmation to actually break/remove + grant loot.
     const key = `oreBreak:${String(hit.oreId)}`
-    this._pendingWorldActions.set(key, () => {
+    this._setPendingWorldAction(key, () => {
       // Now confirmed: apply local break visual + loot.
       this.ores.confirmBreak(String(hit.oreId))
 
@@ -794,6 +795,8 @@ export class Game {
 
     const sent = this._sendWorldEvent({ kind: 'oreBreak', oreId: String(hit.oreId), x: hit.point.x, z: hit.point.z, at: Date.now() })
     if (!sent) {
+      const rec = this._pendingWorldActions.get(key)
+      if (rec?.timeoutId) clearTimeout(rec.timeoutId)
       this._pendingWorldActions.delete(key)
       this.ui.toast('Sem conexão com o servidor (WS).', 1100)
     }
@@ -842,13 +845,13 @@ export class Game {
     p.y += 0.25
     this.damageNumbers.spawn(p, `-${dmg}`)
 
-    // Only when HP reaches 0: wait for server confirmation to cut + loot.
+    // Only when HP reaches 0: wait for server accept + chunk confirmation to cut + loot.
     if (!dmgResult.cut) return
 
     const treeId = String(hit.treeId)
     const key = `treeCut:${treeId}`
 
-    this._pendingWorldActions.set(key, () => {
+    this._setPendingWorldAction(key, () => {
       // Start falling now (server confirmed removal).
       this.trees.confirmCut(treeId, this.player.position)
 
@@ -880,6 +883,8 @@ export class Game {
 
     const sent = this._sendWorldEvent({ kind: 'treeCut', treeId, x: hit.point.x, z: hit.point.z, at: Date.now() })
     if (!sent) {
+      const rec = this._pendingWorldActions.get(key)
+      if (rec?.timeoutId) clearTimeout(rec.timeoutId)
       this._pendingWorldActions.delete(key)
       this.ui.toast('Sem conexão com o servidor (WS).', 1100)
     }
@@ -1677,6 +1682,29 @@ export class Game {
       this.wsMeId = msg.id
       return
     }
+    if (msg.t === 'worldEventResult') {
+      const kind = String(msg.kind || '')
+      const id = String(msg.id || '')
+      const ok = !!msg.ok
+      const key = `${kind}:${id}`
+      const rec = this._pendingWorldActions.get(key)
+      if (!rec) return
+
+      if (!ok) {
+        if (rec.timeoutId) clearTimeout(rec.timeoutId)
+        this._pendingWorldActions.delete(key)
+
+        const reason = String(msg.reason || '')
+        if (reason === 'already_removed') this.ui.toast('Já foi coletado por outro jogador.', 1100)
+        else if (reason === 'duplicate') this.ui.toast('Já existe.', 900)
+        else this.ui.toast('Ação rejeitada pelo servidor.', 1100)
+        return
+      }
+
+      rec.accepted = true
+      // If the worldChunk already arrived (object removed), the next chunk apply will trigger fn.
+      return
+    }
     if (msg.t === 'error') {
       const code = String(msg.code || '')
       if (code === 'auth_expired' || code === 'auth_invalid' || code === 'auth_required') {
@@ -1709,6 +1737,18 @@ export class Game {
     }
   }
 
+  _setPendingWorldAction(key, fn) {
+    // If something stays pending for too long, clear it to avoid free loot on late chunk updates.
+    const timeoutId = window.setTimeout(() => {
+      const rec = this._pendingWorldActions.get(key)
+      if (!rec) return
+      this._pendingWorldActions.delete(key)
+      this.ui.toast('Servidor não confirmou a ação (timeout).', 1100)
+    }, 2500)
+
+    this._pendingWorldActions.set(key, { fn, accepted: false, timeoutId })
+  }
+
   _sendWorldEvent(ev) {
     // World events are identified server-side by the WS connection (after join).
     // Do not require wsMeId/welcome here.
@@ -1732,10 +1772,11 @@ export class Game {
     for (const id of removedTrees) {
       const sid = String(id)
       const k = `treeCut:${sid}`
-      const fn = this._pendingWorldActions.get(k)
-      if (fn) {
+      const rec = this._pendingWorldActions.get(k)
+      if (rec?.accepted) {
+        if (rec.timeoutId) clearTimeout(rec.timeoutId)
         this._pendingWorldActions.delete(k)
-        fn()
+        rec.fn()
       }
     }
 
@@ -1746,10 +1787,11 @@ export class Game {
     for (const id of removedRocks) {
       const sid = String(id)
       const k = `rockCollect:${sid}`
-      const fn = this._pendingWorldActions.get(k)
-      if (fn) {
+      const rec = this._pendingWorldActions.get(k)
+      if (rec?.accepted) {
+        if (rec.timeoutId) clearTimeout(rec.timeoutId)
         this._pendingWorldActions.delete(k)
-        fn()
+        rec.fn()
       }
     }
 
@@ -1759,10 +1801,11 @@ export class Game {
     for (const id of removedSticks) {
       const sid = String(id)
       const k = `stickCollect:${sid}`
-      const fn = this._pendingWorldActions.get(k)
-      if (fn) {
+      const rec = this._pendingWorldActions.get(k)
+      if (rec?.accepted) {
+        if (rec.timeoutId) clearTimeout(rec.timeoutId)
         this._pendingWorldActions.delete(k)
-        fn()
+        rec.fn()
       }
     }
     this.sticks.applyChunkState(msg.chunkX, msg.chunkZ, removedSticks)
@@ -1771,10 +1814,11 @@ export class Game {
     for (const id of removedOres) {
       const sid = String(id)
       const k = `oreBreak:${sid}`
-      const fn = this._pendingWorldActions.get(k)
-      if (fn) {
+      const rec = this._pendingWorldActions.get(k)
+      if (rec?.accepted) {
+        if (rec.timeoutId) clearTimeout(rec.timeoutId)
         this._pendingWorldActions.delete(k)
-        fn()
+        rec.fn()
       }
     }
 
@@ -1803,10 +1847,11 @@ export class Game {
       }
 
       const k = `place:${id}`
-      const fn = this._pendingWorldActions.get(k)
-      if (fn) {
+      const rec = this._pendingWorldActions.get(k)
+      if (rec?.accepted) {
+        if (rec.timeoutId) clearTimeout(rec.timeoutId)
         this._pendingWorldActions.delete(k)
-        fn()
+        rec.fn()
       }
     }
   }
@@ -2004,7 +2049,7 @@ export class Game {
     const placeId = crypto.randomUUID?.() ?? String(Math.random()).slice(2)
     const key = `place:${placeId}`
 
-    this._pendingWorldActions.set(key, () => {
+    this._setPendingWorldAction(key, () => {
       this.forgeTables.place({ x: this._ghostX, z: this._ghostZ }, placeId)
 
       // Consume current hotbar stack
@@ -2022,6 +2067,8 @@ export class Game {
 
     const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'forgeTable', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
     if (!sent) {
+      const rec = this._pendingWorldActions.get(key)
+      if (rec?.timeoutId) clearTimeout(rec.timeoutId)
       this._pendingWorldActions.delete(key)
       this.ui.toast('Sem conexão com o servidor (WS).', 1100)
     }
@@ -2034,7 +2081,7 @@ export class Game {
     const placeId = crypto.randomUUID?.() ?? String(Math.random()).slice(2)
     const key = `place:${placeId}`
 
-    this._pendingWorldActions.set(key, () => {
+    this._setPendingWorldAction(key, () => {
       this.forges.place({ x: this._ghostX, z: this._ghostZ }, placeId)
 
       // Consume current hotbar stack
@@ -2049,6 +2096,8 @@ export class Game {
 
     const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'forge', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
     if (!sent) {
+      const rec = this._pendingWorldActions.get(key)
+      if (rec?.timeoutId) clearTimeout(rec.timeoutId)
       this._pendingWorldActions.delete(key)
       this.ui.toast('Sem conexão com o servidor (WS).', 1100)
     }
@@ -2061,7 +2110,7 @@ export class Game {
     const placeId = crypto.randomUUID?.() ?? String(Math.random()).slice(2)
     const key = `place:${placeId}`
 
-    this._pendingWorldActions.set(key, () => {
+    this._setPendingWorldAction(key, () => {
       this.fires.place({ x: this._ghostX, y: 0, z: this._ghostZ }, placeId)
 
       // Consume only the currently selected hotbar stack.
@@ -2077,6 +2126,8 @@ export class Game {
 
     const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'campfire', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
     if (!sent) {
+      const rec = this._pendingWorldActions.get(key)
+      if (rec?.timeoutId) clearTimeout(rec.timeoutId)
       this._pendingWorldActions.delete(key)
       this.ui.toast('Sem conexão com o servidor (WS).', 1100)
     }
@@ -2118,10 +2169,10 @@ export class Game {
     }
 
     if (hit.kind === 'rock') {
-      // Strict: wait for server confirmation to remove + grant item.
+      // Strict: wait for server accept + chunk confirmation to remove + grant item.
       const rockId = String(hit.rockId)
       const key = `rockCollect:${rockId}`
-      this._pendingWorldActions.set(key, () => {
+      this._setPendingWorldAction(key, () => {
         const ok = this.rocks.collect(rockId, { world: true })
         if (!ok) return
 
@@ -2140,6 +2191,8 @@ export class Game {
       const pz = hit.point?.z ?? this.player.position.z
       const sent = this._sendWorldEvent({ kind: 'rockCollect', rockId, x: px, z: pz, at: Date.now() })
       if (!sent) {
+        const rec = this._pendingWorldActions.get(key)
+        if (rec?.timeoutId) clearTimeout(rec.timeoutId)
         this._pendingWorldActions.delete(key)
         this.ui.toast('Sem conexão com o servidor (WS).', 1100)
       }
@@ -2150,7 +2203,7 @@ export class Game {
     // stick
     const stickId = String(hit.stickId)
     const key = `stickCollect:${stickId}`
-    this._pendingWorldActions.set(key, () => {
+    this._setPendingWorldAction(key, () => {
       const ok = this.sticks.collect(stickId, { world: true })
       if (!ok) return
 
@@ -2169,6 +2222,8 @@ export class Game {
     const pz = hit.point?.z ?? this.player.position.z
     const sent = this._sendWorldEvent({ kind: 'stickCollect', stickId, x: px, z: pz, at: Date.now() })
     if (!sent) {
+      const rec = this._pendingWorldActions.get(key)
+      if (rec?.timeoutId) clearTimeout(rec.timeoutId)
       this._pendingWorldActions.delete(key)
       this.ui.toast('Sem conexão com o servidor (WS).', 1100)
     }

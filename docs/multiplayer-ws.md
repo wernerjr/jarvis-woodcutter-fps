@@ -54,7 +54,9 @@
 ### Client → Server (eventos do mundo)
 
 #### `worldEvent`
-Evento "estrito": o client solicita uma mudança no mundo, mas **só aplica loot/remoção** quando o servidor confirmar via `worldChunk`.
+Evento "estrito": o client solicita uma mudança no mundo, mas **só aplica loot/remoção** quando o servidor:
+1) aceitar via `worldEventResult` (ack) e
+2) confirmar via `worldChunk` (estado authoritative do chunk).
 
 Tipos atuais (`kind`):
 - `treeCut` → `{ treeId, x, z, at }`
@@ -69,6 +71,17 @@ Exemplo:
 ```
 
 ### Server → Client
+
+#### `worldEventResult`
+Ack do servidor para um `worldEvent`. O client usa isso para evitar dar loot/remoção quando o evento foi rejeitado (ex.: outro player já coletou).
+
+```json
+{ "t": "worldEventResult", "v": 1, "kind": "rockCollect", "id": "12", "ok": true }
+```
+Exemplos de rejeição:
+```json
+{ "t": "worldEventResult", "v": 1, "kind": "rockCollect", "id": "12", "ok": false, "reason": "already_removed" }
+```
 
 #### `welcome`
 ```json

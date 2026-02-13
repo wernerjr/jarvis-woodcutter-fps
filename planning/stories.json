@@ -54,7 +54,7 @@
         {
           "id": "P0-S3",
           "title": "Mundo server-authoritative para coletas/cortes (worldEvent estrito + worldChunk confirmação)",
-          "status": "todo",
+          "status": "done",
           "objective": "Evitar desync e duplicação de loot garantindo que remoções/loot só aconteçam quando o server confirmar.",
           "description": "O doc já define `worldEvent` (client→server) e `worldChunk` (server→client) com listas `removed*` e `placed`. A história é implementar o fluxo completo no client e server: client envia eventos (treeCut, rockCollect, stickCollect, oreBreak, place) e dá feedback local apenas ‘cosmético’/temporário; o server valida (mínimo) e emite `worldChunk` atualizado; o client aplica o estado authoritative ao mundo.\n\nIsso habilita multiplayer real para recursos compartilhados.",
           "acceptanceCriteria": [
