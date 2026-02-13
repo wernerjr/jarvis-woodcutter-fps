@@ -60,6 +60,7 @@ docker compose up -d --build
 ## Docs
 - [Arquitetura](docs/architecture.md)
 - [Gameplay loop](docs/gameplay-loop.md)
+- [Gameplay feedback (hitmarker)](docs/gameplay-feedback.md)
 - [Interação (F tap/hold)](docs/interaction.md)
 - [Inventário/hotbar](docs/systems-inventory.md)
 - [Forja & Mesa de Forja](docs/systems-forge.md)

@@ -33,6 +33,7 @@ const ui = new UI({
   perfMsEl: document.querySelector('#perfMs'),
   perfMemRowEl: document.querySelector('#perfMemRow'),
   perfMemEl: document.querySelector('#perfMem'),
+  hitmarkerEl: document.querySelector('#hitmarker'),
 })
 
 const game = new Game({ canvas, ui })

@@ -165,10 +165,19 @@ export class UI {
     return `Dur: ${dur ?? '-'}`
   }
 
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement, hitmarkerEl?: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
+    this._hitUntil = 0
+  }
+
+  hitmarker(ms = 120) {
+    const el = this.els.hitmarkerEl
+    if (!el) return
+    el.classList.remove('hidden')
+    el.classList.add('show')
+    this._hitUntil = performance.now() + ms
   }
 
   setScore(n) {
@@ -183,9 +192,16 @@ export class UI {
   }
 
   update() {
-    if (this._toastUntil && performance.now() > this._toastUntil) {
+    const now = performance.now()
+    if (this._toastUntil && now > this._toastUntil) {
       this._toastUntil = 0
       this.els.toastEl.classList.remove('show')
+    }
+
+    if (this._hitUntil && now > this._hitUntil) {
+      this._hitUntil = 0
+      const el = this.els.hitmarkerEl
+      if (el) el.classList.remove('show')
     }
   }
 

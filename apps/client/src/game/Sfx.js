@@ -59,6 +59,13 @@ export class Sfx {
     this._beep({ freq: 620, bendTo: 360, dur: 0.05, type: 'triangle', gain: 0.12 })
   }
 
+  hit(kind = 'generic') {
+    // tiny tick; keep it subtle (client-only feedback)
+    if (kind === 'wood') this._beep({ freq: 760, bendTo: 520, dur: 0.035, type: 'triangle', gain: 0.07 })
+    else if (kind === 'ore' || kind === 'stone') this._beep({ freq: 520, bendTo: 410, dur: 0.035, type: 'square', gain: 0.06 })
+    else this._beep({ freq: 660, bendTo: 520, dur: 0.03, type: 'sine', gain: 0.06 })
+  }
+
   click() {
     this._beep({ freq: 260, bendTo: 200, dur: 0.045, type: 'sine', gain: 0.12 })
   }

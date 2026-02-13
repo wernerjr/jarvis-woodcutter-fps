@@ -740,6 +740,11 @@ export class Game {
       return
     }
 
+    // Feedback: show hitmarker when there is a valid target under crosshair.
+    this.ui.hitmarker?.(120)
+    this.sfx.hit?.('ore')
+
+
     if (hit.distance > 3.0) {
       this.ui.toast('Muito longe.')
       this.sfx.click()
@@ -773,6 +778,7 @@ export class Game {
     this.damageNumbers.spawn(p, `-${dmg}`)
 
     this.sfx.mine()
+    this.ui.hitmarker?.(120)
 
     if (!r.broke) return
 
@@ -808,6 +814,11 @@ export class Game {
       this.sfx.click()
       return
     }
+
+    // Feedback: show hitmarker when there is a valid target under crosshair.
+    this.ui.hitmarker?.(120)
+    this.sfx.hit?.('wood')
+
 
     const dist = hit.distance
     if (dist > 3.0) {

@@ -194,12 +194,12 @@
     {
       "id": "P3",
       "title": "Melhorias fáceis de gameplay (client-only, não quebrar multiplayer)",
-      "status": "todo",
+      "status": "doing",
       "stories": [
         {
           "id": "P3-S1",
           "title": "Feedback de hit/impacto (hitmarker + som por material + micro recoil visual)",
-          "status": "todo",
+          "status": "done",
           "objective": "Melhorar a sensação de ‘peso’ e clareza de acerto sem alterar regras de dano/loot.",
           "description": "Adicionar feedback visual e sonoro ao acertar: hitmarker discreto no centro, som diferente por alvo (madeira/pedra/minério) e micro-animação da mão/arma. Tudo local e acionado no momento em que o client detecta o impacto (janela de swing existente).\n\nNão altera `worldEvent` nem o timing server-authoritative.",
           "acceptanceCriteria": [

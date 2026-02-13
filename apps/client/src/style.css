@@ -64,6 +64,12 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 .hidden{display:none !important;}
 
 /* Overlays */
+.hitmarker{position:fixed; left:50%; top:50%; width:14px; height:14px; transform: translate(-50%, -50%); pointer-events:none; z-index:25; opacity:0.0;}
+.hitmarker::before,.hitmarker::after{content:""; position:absolute; left:50%; top:50%; width:14px; height:2px; background: rgba(255,255,255,0.86); border-radius:2px; transform: translate(-50%,-50%) rotate(45deg); box-shadow:0 0 8px rgba(0,0,0,0.45)}
+.hitmarker::after{transform: translate(-50%,-50%) rotate(-45deg)}
+.hitmarker.show{opacity:1.0; animation: hitpop 130ms ease-out;}
+@keyframes hitpop{0%{transform:translate(-50%,-50%) scale(0.65)} 100%{transform:translate(-50%,-50%) scale(1.0)}}
+
 .overlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:24px; background: radial-gradient(1000px 600px at 50% 40%, rgba(10,18,10,0.72), rgba(0,0,0,0.80)); pointer-events:none; z-index: 20;}
 .overlay.block{pointer-events:auto;}
 .overlay.hidden{display:none;}
