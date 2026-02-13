@@ -50,5 +50,7 @@ O Caddy do servidor deve fazer proxy para:
 - `/api/*` → `jarvis-woodcutter-server:3023`
 - `/ws` (upgrade websocket) → `jarvis-woodcutter-server:3023`
 
+Checklist: ver `docs/deploy-checklist.md`.
+
 ## Documentação do jogo
 Veja `apps/client/README.md` e `apps/client/docs/`.

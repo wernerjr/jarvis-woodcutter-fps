@@ -95,7 +95,7 @@
     {
       "id": "P1",
       "title": "Publicável (deploy robusto + observabilidade + validações básicas)",
-      "status": "doing",
+      "status": "done",
       "stories": [
         {
           "id": "P1-S1",
@@ -136,7 +136,7 @@
         {
           "id": "P1-S3",
           "title": "Checklist de deploy (Caddy + WS upgrade) e smoke test reproduzível",
-          "status": "todo",
+          "status": "done",
           "objective": "Reduzir ‘funciona local mas não no servidor’ garantindo proxy correto de /ws e um smoke test de saúde.",
           "description": "Consolidar no repo um checklist de deploy: rotas do Caddy (`/`, `/api/*`, `/ws` com upgrade), portas, envs necessárias (DATABASE_URL/WOODCUTTER_DATABASE_URL etc). Criar um smoke test manual: abrir client, gerar guest, conectar WS, ver outro player.\n\nNão é automação pesada; é doc+passo-a-passo.",
           "acceptanceCriteria": [
