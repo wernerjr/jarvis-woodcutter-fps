@@ -7,18 +7,21 @@ FPS low‑poly em Three.js/WebGL (client) com backend (Fastify/TS) para persist�
 - `apps/server`: backend (Fastify + TypeScript + Postgres/Drizzle) → porta **3023**
 
 ## Rodar local (DEV)
-Pré-req: Node 22+ e **pnpm** (via corepack).
+Pré-req: Node 22+ e **pnpm**.
+
+> Importante: o backend precisa de acesso ao Postgres shared (`shared-postgres`) e a `DATABASE_URL` deve usar as credenciais corretas desse Postgres.
 
 ```bash
-corepack enable
 pnpm install
 
-# DB: usa o Postgres **shared** (container `shared-postgres`).
-# Se for rodar fora do docker, ajuste DATABASE_URL.
+# Ajuste se necessário (credenciais do shared-postgres)
+export DATABASE_URL='postgres://USER:PASS@shared-postgres:5432/DB'
+
 pnpm dev
 ```
 - Client: Vite imprime a URL
 - Server: http://localhost:3023/api/health
+- Guest bootstrap: `POST /api/auth/guest`
 
 ## Rodar via Docker (PROD-like, sem Caddy)
 Pré-req: a rede docker `shared` deve existir (usada pelo Caddy externo).

@@ -8,6 +8,13 @@
       "when": 1770943492343,
       "tag": "0000_steep_payback",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770944141753,
+      "tag": "0001_perpetual_xorn",
+      "breakpoints": true
     }
   ]
 }

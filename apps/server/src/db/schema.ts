@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, jsonb, primaryKey } from 'drizzle-orm/pg-core';
 
 export const guests = pgTable('guests', {
   id: text('id').primaryKey(),
@@ -12,13 +12,19 @@ export const worlds = pgTable('worlds', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const playerState = pgTable('player_state', {
-  guestId: text('guest_id')
-    .notNull()
-    .references(() => guests.id),
-  worldId: text('world_id')
-    .notNull()
-    .references(() => worlds.id),
-  state: jsonb('state').notNull().default({}),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const playerState = pgTable(
+  'player_state',
+  {
+    guestId: text('guest_id')
+      .notNull()
+      .references(() => guests.id),
+    worldId: text('world_id')
+      .notNull()
+      .references(() => worlds.id),
+    state: jsonb('state').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.guestId, t.worldId] }),
+  })
+);
