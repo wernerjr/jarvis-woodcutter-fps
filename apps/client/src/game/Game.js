@@ -1618,21 +1618,34 @@ export class Game {
     }
     if (msg.t === 'snapshot') {
       this.remotePlayers.applySnapshot({ meId: this.wsMeId, players: msg.players })
+
+      // Apply server-authoritative pose to local player
+      const me = (msg.players || []).find((p) => p.id === this.wsMeId)
+      if (me) {
+        this.player.position.set(me.x || 0, me.y || this.player.eyeHeight, me.z || 0)
+        this.player.velocity.set(0, 0, 0)
+        this.player.yaw.rotation.y = me.yaw || 0
+      }
     }
   }
 
-  _sendWsPose() {
+  _sendWsInput(dt) {
     if (!this.ws || !this.wsMeId) return
     const now = performance.now()
-    if (now - (this._wsPoseAt || 0) < 100) return // 10Hz
+    if (now - (this._wsPoseAt || 0) < 50) return // 20Hz
     this._wsPoseAt = now
 
+    this._wsSeq = (this._wsSeq || 0) + 1
+    const inp = this.player.getNetInput()
+
     this.ws.send({
-      t: 'pose',
-      x: this.player.position.x,
-      y: this.player.position.y,
-      z: this.player.position.z,
-      yaw: this.player.yaw.rotation.y,
+      t: 'input',
+      v: 1,
+      seq: this._wsSeq,
+      dt,
+      keys: inp.keys,
+      yaw: inp.yaw,
+      pitch: inp.pitch,
       at: Date.now(),
     })
   }
@@ -1875,7 +1888,9 @@ export class Game {
       this._updateForgeTableGhost()
     }
 
-    const colliders = this.state === 'playing'
+    const authoritative = !!(this._wsConnected && this.wsMeId)
+
+    const colliders = this.state === 'playing' && !authoritative
       ? this.trees
           .getTrunkColliders()
           .concat(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
@@ -1886,9 +1901,13 @@ export class Game {
       : []
 
     const groundY = this._inMine ? this.mine.getFloorYAt(this.player.position.x, this.player.position.z) : 0
-    this.player.update(simDt, colliders, groundY)
-
-    if (simDt > 0) this._sendWsPose()
+    if (authoritative) {
+      this.player.updateVisual(simDt)
+      if (simDt > 0) this._sendWsInput(simDt)
+    } else {
+      this.player.update(simDt, colliders, groundY)
+      if (simDt > 0) this._sendWsInput(simDt)
+    }
 
     // Torch durability + light intensity (mainly useful at night)
     const night = 1 - this.time.getDayFactor()

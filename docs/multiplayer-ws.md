@@ -9,8 +9,8 @@
 ## Visão geral
 - O client conecta ao WS ao entrar em **Play**.
 - Se cair, o client tenta **reconectar automaticamente** (backoff).
-- O client envia `join` e depois envia `pose` periodicamente.
-- O server responde com `welcome` e publica `snapshot` (10Hz) com todos players na sala.
+- O client envia `join` e depois envia `input` periodicamente.
+- O server simula movimento (20Hz) e publica `snapshot` (10Hz) com todos players na sala.
 
 ## Mensagens (JSON)
 
@@ -21,11 +21,21 @@
 { "t": "join", "v": 1, "guestId": "<uuid>", "worldId": "world-1" }
 ```
 
-#### `pose`
+#### `input`
 ```json
-{ "t": "pose", "x": 0, "y": 1.65, "z": 0, "yaw": 0, "at": 1700000000000 }
+{
+  "t": "input",
+  "v": 1,
+  "seq": 1,
+  "dt": 0.05,
+  "keys": { "w": true, "a": false, "s": false, "d": false, "sprint": false, "jump": false },
+  "yaw": 0,
+  "pitch": 0,
+  "at": 1700000000000
+}
 ```
-- `at`: epoch ms (usado para cálculo de dt no anti-teleporte leve)
+- `seq`: sequência monotônica (anti re-order)
+- `at`: epoch ms (telemetria/diagnóstico)
 
 ### Server → Client
 
@@ -48,7 +58,8 @@
 
 ## Regras do servidor (MVP)
 - Rooms são separadas por `worldId`.
-- Validação simples: updates com velocidade muito alta são ignorados (anti-teleporte leve).
+- Server-authoritative: o servidor simula com física simples (gravidade + pulo + movimento no plano).
+- `pose` foi removido; o client não manda posição.
 
 ## Próximos passos (planejado)
 - Autenticação do WS via token/assinatura (ou reaproveitar guest + sessão).

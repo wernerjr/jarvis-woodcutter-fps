@@ -3,8 +3,18 @@ import type { WebSocket } from 'ws';
 import type { FastifyInstance } from 'fastify';
 
 type JoinMsg = { t: 'join'; v: 1; guestId: string; worldId: string };
-type PoseMsg = { t: 'pose'; x: number; y: number; z: number; yaw: number; at: number };
-type ClientMsg = JoinMsg | PoseMsg;
+type InputMsg = {
+  t: 'input';
+  v: 1;
+  seq: number;
+  dt: number;
+  keys: { w: boolean; a: boolean; s: boolean; d: boolean; sprint: boolean; jump: boolean };
+  yaw: number;
+  pitch: number;
+  at: number;
+};
+
+type ClientMsg = JoinMsg | InputMsg;
 
 type PlayerState = {
   id: string;
@@ -14,7 +24,13 @@ type PlayerState = {
   y: number;
   z: number;
   yaw: number;
+  pitch: number;
+  vy: number;
+  onGround: boolean;
+
   lastAtMs: number;
+  lastSeq: number;
+  input?: InputMsg;
 };
 
 type ServerSnapshotMsg = {
@@ -75,10 +91,88 @@ export function registerWs(app: FastifyInstance) {
     }
   }
 
-  // Tick snapshots (low frequency MVP)
+  function stepPlayer(st: PlayerState, dt: number) {
+    const eyeHeight = 1.65;
+    const groundY = 0;
+    const gravity = -18;
+    const jumpSpeed = 6.4;
+    const baseSpeed = 6.0;
+    const sprintMult = 1.65;
+
+    const inp = st.input;
+    if (inp) {
+      st.yaw = inp.yaw;
+      st.pitch = inp.pitch;
+
+      const forward = Number(inp.keys.s) - Number(inp.keys.w);
+      const strafe = Number(inp.keys.d) - Number(inp.keys.a);
+
+      // normalize
+      let dx = strafe;
+      let dz = forward;
+      const len = Math.hypot(dx, dz);
+      if (len > 0.001) {
+        dx /= len;
+        dz /= len;
+      }
+
+      // rotate by yaw
+      const cy = Math.cos(st.yaw);
+      const sy = Math.sin(st.yaw);
+      const rx = dx * cy - dz * sy;
+      const rz = dx * sy + dz * cy;
+
+      const moving = len > 0.001;
+      const speed = baseSpeed * (inp.keys.sprint && moving ? sprintMult : 1.0);
+
+      st.x += rx * speed * dt;
+      st.z += rz * speed * dt;
+
+      // jump (edge on client; server trusts boolean)
+      if (inp.keys.jump && st.onGround) {
+        st.vy = jumpSpeed;
+        st.onGround = false;
+      }
+    }
+
+    st.vy += gravity * dt;
+    st.y += st.vy * dt;
+
+    const minY = groundY + eyeHeight;
+    if (st.y <= minY) {
+      st.y = minY;
+      st.vy = 0;
+      st.onGround = true;
+    } else {
+      st.onGround = false;
+    }
+  }
+
+  // Tick: simulate + snapshots (20Hz sim, 10Hz snapshot)
+  let acc = 0;
+  const simHz = 20;
+  const simDt = 1 / simHz;
+
+  let snapAcc = 0;
+  const snapHz = 10;
+  const snapDt = 1 / snapHz;
+
   const interval = setInterval(() => {
-    for (const worldId of rooms.keys()) broadcastSnapshot(worldId);
-  }, 100);
+    const dt = simDt;
+    acc += dt;
+    snapAcc += dt;
+
+    // Sim step
+    for (const st of players.values()) {
+      stepPlayer(st, dt);
+    }
+
+    // Snapshot step
+    if (snapAcc >= snapDt) {
+      snapAcc = 0;
+      for (const worldId of rooms.keys()) broadcastSnapshot(worldId);
+    }
+  }, Math.floor(1000 / simHz));
 
   app.addHook('onClose', async () => {
     clearInterval(interval);
@@ -106,7 +200,11 @@ export function registerWs(app: FastifyInstance) {
           y: 1.65,
           z: 6,
           yaw: 0,
+          pitch: 0,
+          vy: 0,
+          onGround: true,
           lastAtMs: nowMs(),
+          lastSeq: 0,
         };
         st.worldId = msg.worldId;
         st.lastAtMs = nowMs();
@@ -120,31 +218,23 @@ export function registerWs(app: FastifyInstance) {
         return;
       }
 
-      if (msg.t === 'pose') {
+      if (msg.t === 'input') {
         const pid = ws.__playerId;
         if (!pid) return;
 
         const st = players.get(pid);
         if (!st) return;
 
+        if (msg.v !== 1) return;
+        if (typeof msg.seq !== 'number') return;
+        if (msg.seq <= st.lastSeq) return;
+
+        // Clamp client-provided dt, but sim uses fixed dt anyway.
         const at = typeof msg.at === 'number' ? msg.at : nowMs();
-        const dt = Math.max(0.016, Math.min(0.25, (at - st.lastAtMs) / 1000));
-
-        // Validate max speed (anti-teleport light)
-        const dx = msg.x - st.x;
-        const dz = msg.z - st.z;
-        const dist = Math.hypot(dx, dz);
-        const maxSpeed = 12; // m/s (generous)
-        if (dist / dt > maxSpeed) {
-          // ignore update
-          return;
-        }
-
-        st.x = msg.x;
-        st.y = msg.y;
-        st.z = msg.z;
-        st.yaw = msg.yaw;
         st.lastAtMs = at;
+        st.lastSeq = msg.seq;
+
+        st.input = msg;
         return;
       }
     });

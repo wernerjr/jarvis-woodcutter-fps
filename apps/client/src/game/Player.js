@@ -84,7 +84,11 @@ export class Player {
     this.camera.add(this._torch)
     this._torch.visible = false
 
-    this._onKeyDown = (e) => this._keys.add(e.code)
+    this._jumpQueued = false
+    this._onKeyDown = (e) => {
+      this._keys.add(e.code)
+      if (e.code === 'Space') this._jumpQueued = true
+    }
     this._onKeyUp = (e) => this._keys.delete(e.code)
     this._onMouseMove = (e) => this._onMouseMoveAny(e)
 
@@ -559,7 +563,80 @@ export class Player {
     }
   }
 
+  getNetInput() {
+    const w = this._keys.has('KeyW')
+    const a = this._keys.has('KeyA')
+    const s = this._keys.has('KeyS')
+    const d = this._keys.has('KeyD')
+    const sprint = this._keys.has('ShiftLeft') || this._keys.has('ShiftRight')
+    const jump = !!this._jumpQueued
+    this._jumpQueued = false
+
+    return {
+      keys: { w, a, s, d, sprint, jump },
+      yaw: this.yaw.rotation.y,
+      pitch: this.pitch.rotation.x,
+    }
+  }
+
+  updateVisual(dt) {
+    // swing animation (slower + easing, framerate independent)
+    if (this._swingT > 0) this._swingT = Math.max(0, this._swingT - dt)
+
+    const dur = this._swingDuration
+    const p = this._swingT > 0 ? (1 - this._swingT / dur) : 0
+
+    // Impact window: call once around the peak.
+    if (this._swingActive) {
+      const impactP = 0.58
+      if (!this._impactDone && p >= impactP) {
+        this._impactDone = true
+        this._onImpact?.()
+      }
+      if (p >= 1) this._swingActive = false
+    }
+
+    // easeInOutCubic
+    const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
+    const swing = Math.sin(ease * Math.PI)
+
+    // Rotate around a plausible hand/grip pivot.
+    this._axePivot.rotation.z = -0.20 - swing * 0.95
+    this._axePivot.rotation.x = -0.35 + swing * 0.55
+    this._axePivot.rotation.y = 0.10 + swing * 0.10
+
+    // Hand action animation
+    if (this._handT > 0) this._handT = Math.max(0, this._handT - dt)
+    const hp = this._handT > 0 ? 1 - this._handT / 0.16 : 0
+    const hSwing = hp > 0 ? Math.sin(hp * Math.PI) : 0
+    if (this._hand) {
+      this._hand.position.z = -0.42 - hSwing * 0.06
+      this._hand.rotation.x = -0.05 - hSwing * 0.30
+    }
+
+    // Torch action (small bob) + flame flicker
+    if (this._torchT > 0) this._torchT = Math.max(0, this._torchT - dt)
+    const tp = this._torchT > 0 ? 1 - this._torchT / 0.18 : 0
+    const tBob = tp > 0 ? Math.sin(tp * Math.PI) : 0
+    if (this._torch) {
+      this._torch.position.y = 0 + tBob * 0.02
+      this._torch.rotation.z = 0.05 - tBob * 0.15
+    }
+
+    if (this._torchFlame) {
+      const f = this._torchFlicker || 1
+      const heat = this._torchHeat || 0
+      const s = 0.85 + 0.35 * (f - 0.9) + heat * 0.25
+      this._torchFlame.scale.set(1, 1.1 + (s - 0.85), 1)
+      this._torchFlame.material.opacity = 0.55 + heat * 0.35
+      this._torchFlame.material.emissiveIntensity = 0.9 + heat * 1.8 + (f - 0.9) * 2.2
+    }
+
+    this._applyTransforms()
+  }
+
   _applyTransforms() {
     this.yaw.position.copy(this.position)
   }
 }
+
