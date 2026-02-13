@@ -116,11 +116,13 @@ export function registerWs(app: FastifyInstance) {
         dz /= len;
       }
 
-      // rotate by yaw
+      // rotate by yaw (match Three.js Matrix4 RotationY)
+      // x' = x*cos + z*sin
+      // z' = -x*sin + z*cos
       const cy = Math.cos(st.yaw);
       const sy = Math.sin(st.yaw);
-      const rx = dx * cy - dz * sy;
-      const rz = dx * sy + dz * cy;
+      const rx = dx * cy + dz * sy;
+      const rz = -dx * sy + dz * cy;
 
       const moving = len > 0.001;
       const speed = baseSpeed * (inp.keys.sprint && moving ? sprintMult : 1.0);
@@ -154,7 +156,7 @@ export function registerWs(app: FastifyInstance) {
   const simDt = 1 / simHz;
 
   let snapAcc = 0;
-  const snapHz = 10;
+  const snapHz = 20;
   const snapDt = 1 / snapHz;
 
   const interval = setInterval(() => {

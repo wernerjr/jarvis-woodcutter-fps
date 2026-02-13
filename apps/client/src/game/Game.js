@@ -1622,9 +1622,19 @@ export class Game {
       // Apply server-authoritative pose to local player
       const me = (msg.players || []).find((p) => p.id === this.wsMeId)
       if (me) {
-        this.player.position.set(me.x || 0, me.y || this.player.eyeHeight, me.z || 0)
+        // Smooth corrections to reduce jitter (authoritative snapshots).
+        const tx = me.x || 0
+        const ty = me.y || this.player.eyeHeight
+        const tz = me.z || 0
+        const a = 0.35
+        this.player.position.x += (tx - this.player.position.x) * a
+        this.player.position.y += (ty - this.player.position.y) * a
+        this.player.position.z += (tz - this.player.position.z) * a
         this.player.velocity.set(0, 0, 0)
-        this.player.yaw.rotation.y = me.yaw || 0
+
+        const yawT = me.yaw || 0
+        const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+        this.player.yaw.rotation.y += dy * 0.35
       }
     }
   }
