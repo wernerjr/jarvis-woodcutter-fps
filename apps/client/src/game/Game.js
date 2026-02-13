@@ -2185,7 +2185,8 @@ export class Game {
 
     const remoteCount = this.remotePlayers?.players?.size ?? 0
     const wsStatus = this.ws?.status || (this._wsConnected ? 'ok' : 'off')
-    const netLine = `NET: WS ${wsStatus} • remote: ${remoteCount}${this.wsMeId ? ` • me: ${String(this.wsMeId).slice(0, 8)}` : ''}`
+    const extra = this.remotePlayers?.getDebugLine?.()
+    const netLine = `NET: WS ${wsStatus} • remote: ${remoteCount}${this.wsMeId ? ` • me: ${String(this.wsMeId).slice(0, 8)}` : ''}${extra ? ` • ${extra}` : ''}`
     this.ui.setNetDebug?.(this.perfEnabled ? netLine : null)
 
     // Contextual interaction hint (only when playing + locked).
@@ -2234,6 +2235,9 @@ export class Game {
 
     this._lastColliders = colliders
     this._lastGroundY = groundY
+
+    // Remote players are purely visual; update even when paused/menus.
+    this.remotePlayers?.update?.(dt)
 
     // Always run local movement + collision (prediction).
     this.player.update(simDt, colliders, groundY)

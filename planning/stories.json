@@ -35,7 +35,7 @@
         {
           "id": "P0-S2",
           "title": "Suavização de players remotos (interpolação bufferizada no client)",
-          "status": "todo",
+          "status": "done",
           "objective": "Fazer o multiplayer parecer jogável (sem teleporte/engasgos) com snapshots 10Hz, sem mudar o protocolo.",
           "description": "O server publica `snapshot` (10Hz) com posição/yaw dos players. No client, a renderização de players remotos deve usar um buffer de snapshots (100–200ms) e interpolar para o tempo atual. Em caso de atraso, extrapolar levemente com clamps para evitar saltos grandes.\n\nIsso é puramente client-side: não altera simulação do server, só a apresentação.",
           "acceptanceCriteria": [

@@ -12,6 +12,7 @@
 - Se cair, o client tenta **reconectar automaticamente** (backoff).
 - O client envia `join` e depois envia `input` periodicamente.
 - O server simula movimento (20Hz) e publica `snapshot` (10Hz) com todos players na sala.
+- O client renderiza players remotos com **interpolação bufferizada** (ex.: 150ms) para suavizar jitter (client-only).
 
 ## Mensagens (JSON)
 
