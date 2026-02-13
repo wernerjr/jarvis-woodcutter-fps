@@ -70,6 +70,7 @@
 ## Regras do servidor (MVP)
 - Rooms são separadas por `worldId`.
 - Server-authoritative: o servidor simula com física simples (gravidade + pulo + movimento no plano).
+- Colisão no servidor (MVP): **macro boundary** para não sair do mapa (não cobre árvores/props ainda).
 - `pose` foi removido; o client não manda posição.
 
 ## Próximos passos (planejado)

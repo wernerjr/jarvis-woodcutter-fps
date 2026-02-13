@@ -100,6 +100,52 @@ export function registerWs(app: FastifyInstance) {
     }
   }
 
+  type Collider = { x: number; z: number; r: number };
+
+  function buildWorldBoundaryColliders(): Collider[] {
+    // Macro collision only: prevents leaving the map area.
+    // Matches client river boundary roughly: radius ~96.
+    const out: Collider[] = [];
+    const radius = 96;
+    const n = 220;
+    const bandA = { off: -1.4, r: 1.35 };
+    const bandB = { off: -2.8, r: 1.05 };
+
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const nx = Math.cos(a);
+      const nz = Math.sin(a);
+      const x = nx * radius;
+      const z = nz * radius;
+      out.push({ x: x + nx * bandA.off, z: z + nz * bandA.off, r: bandA.r });
+      out.push({ x: x + nx * bandB.off, z: z + nz * bandB.off, r: bandB.r });
+    }
+    return out;
+  }
+
+  const worldBoundaryColliders = buildWorldBoundaryColliders();
+
+  function resolveCollisionsXZ(next: { x: number; z: number }, colliders: Collider[], radius: number) {
+    for (let iter = 0; iter < 6; iter++) {
+      let any = false;
+      for (const c of colliders) {
+        const dx = next.x - c.x;
+        const dz = next.z - c.z;
+        const rr = radius + c.r;
+        const d2 = dx * dx + dz * dz;
+        if (d2 >= rr * rr || d2 === 0) continue;
+        const d = Math.sqrt(d2);
+        const pen = rr - d;
+        const nx = dx / d;
+        const nz = dz / d;
+        next.x += nx * pen;
+        next.z += nz * pen;
+        any = true;
+      }
+      if (!any) break;
+    }
+  }
+
   function stepPlayer(st: PlayerState, dt: number) {
     const eyeHeight = 1.65;
     const groundY = 0;
@@ -107,6 +153,7 @@ export function registerWs(app: FastifyInstance) {
     const jumpSpeed = 6.4;
     const baseSpeed = 6.0;
     const sprintMult = 1.65;
+    const capsuleR = 0.35;
 
     const inp = st.input;
     // If no fresh input recently, treat as idle (prevents drifting/stuck keys on reconnect).
@@ -144,6 +191,9 @@ export function registerWs(app: FastifyInstance) {
 
       st.x += rx * speed * dt;
       st.z += rz * speed * dt;
+
+      // Macro collision: keep within boundary.
+      resolveCollisionsXZ(st, worldBoundaryColliders, capsuleR);
 
       // jump (edge on client; server trusts boolean)
       if (inp2!.keys.jump && st.onGround) {
