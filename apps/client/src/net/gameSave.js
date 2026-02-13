@@ -1,4 +1,4 @@
-import { ITEMS } from '../game/items.js';
+import { ITEMS } from '../game/items.js'
 
 /**
  * Minimal save payload (player only).
@@ -6,9 +6,10 @@ import { ITEMS } from '../game/items.js';
  */
 export function exportGameSave(game) {
   return {
-    v: 1,
+    v: 2,
     score: game.score ?? 0,
     player: {
+      inMine: !!game._inMine,
       position: {
         x: game.player?.position?.x ?? 0,
         y: game.player?.position?.y ?? 0,
@@ -23,15 +24,15 @@ export function exportGameSave(game) {
 }
 
 export function isValidSave(save) {
-  return save && typeof save === 'object' && save.v === 1;
+  return save && typeof save === 'object' && (save.v === 1 || save.v === 2)
 }
 
 export function applyGameSave(game, save) {
-  if (!isValidSave(save)) return false;
+  if (!isValidSave(save)) return false
 
   // score
-  game.score = Number(save.score ?? 0);
-  game.ui?.setScore?.(game.score);
+  game.score = Number(save.score ?? 0)
+  game.ui?.setScore?.(game.score)
 
   // inventory
   const slots = Array.isArray(save.inventory?.slots) ? save.inventory.slots : [];
@@ -58,6 +59,34 @@ export function applyGameSave(game, save) {
   if (p && typeof p.x === 'number' && typeof p.y === 'number' && typeof p.z === 'number') {
     game.player.position.set(p.x, p.y, p.z);
     game.player.velocity?.set?.(0, 0, 0);
+  }
+
+  // mine visibility: v2 has explicit flag; v1 we infer by proximity.
+  let inMine = false;
+  if (save.v === 2 && typeof save.player?.inMine === 'boolean') {
+    inMine = save.player.inMine;
+  } else if (p && game.mine?.mineOrigin && game.mine?.entrance) {
+    const dxMine = p.x - game.mine.mineOrigin.x;
+    const dzMine = p.z - game.mine.mineOrigin.z;
+    const d2Mine = dxMine * dxMine + dzMine * dzMine;
+
+    const dxWorld = p.x - game.mine.entrance.x;
+    const dzWorld = p.z - game.mine.entrance.z;
+    const d2World = dxWorld * dxWorld + dzWorld * dzWorld;
+
+    // Mine interior lives far away; proximity to mineOrigin is a strong signal.
+    inMine = d2Mine < d2World;
+  }
+
+  game._inMine = inMine;
+  if (inMine) {
+    game.world?.setGroundVisible?.(false);
+    game.mine?.setInteriorVisible?.(true);
+    game.ores?.setVisible?.(true);
+  } else {
+    game.world?.setGroundVisible?.(true);
+    game.mine?.setInteriorVisible?.(false);
+    game.ores?.setVisible?.(false);
   }
 
   return true;
