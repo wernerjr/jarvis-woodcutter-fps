@@ -216,7 +216,7 @@
         {
           "id": "P3-S2",
           "title": "Realce de alvo interagível (outline/emissive) + prompt contextual mais legível",
-          "status": "todo",
+          "status": "done",
           "objective": "Aumentar a legibilidade do que pode ser interagido sob a mira, reduzindo frustração.",
           "description": "Quando o raycast encontra um alvo válido em alcance (mesma regra do prompt `F:`), aplicar um realce visual sutil no alvo (ex.: material emissive/scale pequeno ou outline simples). Atualizar o prompt para incluir nome do alvo e ação principal (ex.: `F: Abrir Forja`).\n\nTudo client-only.",
           "acceptanceCriteria": [

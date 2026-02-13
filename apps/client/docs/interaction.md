@@ -11,7 +11,12 @@ Interação com **estruturas colocadas** é sempre via **F** (nada de clicar nos
 
 ## Prompt
 Só aparece quando existe um alvo válido em alcance (mesmo raycast/alcance da interação) e some imediatamente sem alvo:
-- `F: <AçãoPrincipal> • Segure F: mais opções`
+- `F: <AçãoPrincipal> <NomeDoAlvo> • Segure F: mais opções`
+
+## Realce visual (client-only)
+Quando existe alvo válido sob a mira, o client aplica um realce emissivo leve no mesh do alvo.
+- Barato (sem pós-process)
+- Não altera multiplayer (apenas apresentação)
 
 ## Ações por estrutura
 ### Fogueira (campfire)

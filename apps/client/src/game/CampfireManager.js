@@ -192,6 +192,10 @@ export class CampfireManager {
     return { campfireId: String(campfireId), point: hits[0].point, distance: hits[0].distance }
   }
 
+  get(id) {
+    return this._fires.get(String(id))
+  }
+
   remove(id) {
     const f = this._fires.get(String(id))
     if (!f) return false

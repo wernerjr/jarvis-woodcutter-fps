@@ -553,27 +553,73 @@ export class Game {
     // Prefer raycast under reticle.
     let best = null
 
-    const trySet = (kind, id, dist, primaryLabel) => {
+    const trySet = (kind, id, dist, primaryLabel, name) => {
       if (!id) return
-      if (!best || dist < best.dist) best = { kind, id, dist, primaryLabel }
+      if (!best || dist < best.dist) best = { kind, id, dist, primaryLabel, name }
     }
 
     // Forge table
     if (!this._inMine) {
       const ft = this.forgeTables.raycastFromCamera(this.camera)
-      if (ft && ft.distance <= 2.8) trySet('forgeTable', ft.forgeTableId, ft.distance, 'Abrir')
+      if (ft && ft.distance <= 2.8) trySet('forgeTable', ft.forgeTableId, ft.distance, 'Abrir', 'Mesa de Forja')
 
       const f = this.forges.raycastFromCamera(this.camera)
-      if (f && f.distance <= 2.6) trySet('forge', f.forgeId, f.distance, 'Abrir')
+      if (f && f.distance <= 2.6) trySet('forge', f.forgeId, f.distance, 'Abrir', 'Forja')
 
       const c = this.fires.raycastFromCamera?.(this.camera)
       if (c && c.distance <= 2.6) {
         const lit = this.fires.isLit(c.campfireId)
-        trySet('campfire', c.campfireId, c.distance, lit ? 'Apagar' : 'Acender')
+        trySet('campfire', c.campfireId, c.distance, lit ? 'Apagar' : 'Acender', 'Fogueira')
       }
     }
 
-    return best ? { kind: best.kind, id: best.id, primaryLabel: best.primaryLabel } : null
+    return best ? { kind: best.kind, id: best.id, primaryLabel: best.primaryLabel, name: best.name } : null
+  }
+
+  _updateTargetHighlight(t) {
+    const nextKey = t ? `${t.kind}:${t.id}` : null
+    if (nextKey === this._hlKey) return
+
+    // clear previous
+    if (this._hlMeshes?.length) {
+      for (const m of this._hlMeshes) {
+        m.material.emissiveIntensity = m.userData.__hlPrevEmi ?? m.material.emissiveIntensity
+        m.material.emissive = m.userData.__hlPrevEmiColor ?? m.material.emissive
+        delete m.userData.__hlPrevEmi
+        delete m.userData.__hlPrevEmiColor
+      }
+    }
+    this._hlMeshes = []
+    this._hlKey = nextKey
+
+    if (!t) return
+
+    let root = null
+    if (t.kind === 'forge') root = this.forges.get(t.id)?.mesh
+    else if (t.kind === 'forgeTable') root = this.forgeTables.get(t.id)?.mesh
+    else if (t.kind === 'campfire') root = this.fires.get(t.id)?.mesh
+
+    if (!root) return
+
+    // Emissive highlight (cheap): bump emissiveIntensity on meshes that support it.
+    const meshes = []
+    root.traverse?.((obj) => {
+      if (!obj?.isMesh) return
+      const mat = obj.material
+      if (!mat || typeof mat !== 'object') return
+      if (!('emissiveIntensity' in mat)) return
+      meshes.push(obj)
+    })
+
+    for (const m of meshes) {
+      const mat = m.material
+      m.userData.__hlPrevEmi = mat.emissiveIntensity
+      m.userData.__hlPrevEmiColor = mat.emissive
+      try { mat.emissive?.setHex?.(0x9ff5a8) } catch {}
+      mat.emissiveIntensity = Math.max(mat.emissiveIntensity ?? 0, 0.55)
+    }
+
+    this._hlMeshes = meshes
   }
 
   _interactPrimary(t) {
@@ -2295,10 +2341,12 @@ export class Game {
     // Contextual interaction hint (only when playing + locked).
     if (this.state === 'playing' && document.pointerLockElement === this.canvas) {
       const t = this._getInteractTarget()
-      if (t) this.ui.setInteractHint(`F: ${t.primaryLabel} • Segure F: mais opções`)
+      if (t) this.ui.setInteractHint(`F: ${t.primaryLabel} ${t.name ? t.name : ''} • Segure F: mais opções`)
       else this.ui.setInteractHint(null)
+      this._updateTargetHighlight(t)
     } else if (this.state !== 'wheel') {
       this.ui.setInteractHint(null)
+      this._updateTargetHighlight(null)
     }
 
     // Hard-guard: never leave wheel visuals around unless the wheel is actually open.
