@@ -10,7 +10,7 @@
     {
       "id": "P4",
       "title": "Fixes de UX + persistência (highlight, autosave em menus, forja persistente)",
-      "status": "doing",
+      "status": "done",
       "stories": [
         {
           "id": "P4-S1",
@@ -52,7 +52,7 @@
         {
           "id": "P4-S3",
           "title": "Forja server-side: estado persistente + progresso offline (sem player online)",
-          "status": "todo",
+          "status": "done",
           "objective": "Garantir que o estado da forja seja persistido no backend e que a fundição continue ‘offline’ (server-authoritative), consumindo combustível e parando quando input/combustível acabar.",
           "description": "Hoje, ao dar F5 com itens dentro da forja UI, os itens são perdidos porque o estado da forja é client-only. Além disso, você quer que a forja continue processando mesmo sem o player online.\n\nSolução MVP recomendada: persistir o estado da forja no server (DB) por `worldId+forgeId` e aplicar um ‘catch-up’ por tempo decorrido (`now - updatedAt`) quando a forja for consultada/aberta. Esse catch-up consome combustível, consome input, produz output (se houver espaço) e para automaticamente se combustível ou input acabar.",
           "acceptanceCriteria": [

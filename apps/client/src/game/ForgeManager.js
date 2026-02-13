@@ -236,6 +236,37 @@ export class ForgeManager {
   }
 
   /** @param {string} id */
+  exportState(id) {
+    const f = this._forges.get(String(id))
+    if (!f) return null
+    return {
+      enabled: !!f.enabled,
+      burn: Number(f.burn || 0),
+      prog: Number(f.prog || 0),
+      fuel: structuredClone(f.fuel || [null, null]),
+      input: structuredClone(f.input || [null, null]),
+      output: structuredClone(f.output || [null, null]),
+    }
+  }
+
+  applyState(id, st) {
+    const f = this._forges.get(String(id))
+    if (!f || !st) return false
+
+    f.enabled = !!st.enabled
+    f.burn = Number(st.burn || 0)
+    f.prog = Number(st.prog || 0)
+    f.fuel = Array.isArray(st.fuel) ? st.fuel.slice(0, 2) : [null, null]
+    f.input = Array.isArray(st.input) ? st.input.slice(0, 2) : [null, null]
+    f.output = Array.isArray(st.output) ? st.output.slice(0, 2) : [null, null]
+    while (f.fuel.length < 2) f.fuel.push(null)
+    while (f.input.length < 2) f.input.push(null)
+    while (f.output.length < 2) f.output.push(null)
+
+    f.dirty = true
+    return true
+  }
+
   get(id) {
     return this._forges.get(String(id))
   }

@@ -29,6 +29,21 @@ export const worldChunkState = pgTable(
   })
 );
 
+export const forgeState = pgTable(
+  'forge_state',
+  {
+    worldId: text('world_id')
+      .notNull()
+      .references(() => worlds.id),
+    forgeId: text('forge_id').notNull(),
+    state: jsonb('state').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.worldId, t.forgeId] }),
+  })
+);
+
 export const playerState = pgTable(
   'player_state',
   {

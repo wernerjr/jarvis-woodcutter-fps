@@ -6,6 +6,10 @@
 - URL: `/ws`
 - Transporte: WebSocket (ws/wss via Caddy)
 
+## Forja (server-side / offline)
+- Estado interno: `GET/PUT /api/forge/state` (por `worldId+forgeId`).
+- O server aplica catch-up offline ao carregar/consultar a forja.
+
 ## Observabilidade (P1)
 - Stats (HTTP): `GET /api/mp/stats`
   - Opcionalmente protegido por header `x-mp-token: <WOODCUTTER_MP_STATS_TOKEN>`

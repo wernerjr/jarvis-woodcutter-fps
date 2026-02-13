@@ -4,6 +4,7 @@ import { assertDbConnectionReady } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
 import { registerAuthGuestRoutes } from './routes/authGuest.js';
 import { registerPlayerStateRoutes } from './routes/playerState.js';
+import { registerForgeStateRoutes } from './routes/forgeState.js';
 import { registerWs } from './ws/wsServer.js';
 import { createMpStats, registerMpStatsRoute } from './mp/stats.js';
 
@@ -34,6 +35,7 @@ app.get('/api/health', async () => {
 
 await registerAuthGuestRoutes(app);
 await registerPlayerStateRoutes(app);
+await registerForgeStateRoutes(app);
 
 const mpStats = createMpStats();
 await registerMpStatsRoute(app, mpStats, { token: env.WOODCUTTER_MP_STATS_TOKEN });

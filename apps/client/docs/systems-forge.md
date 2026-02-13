@@ -1,5 +1,14 @@
 # Forja (Fornalha) e Mesa de Forja
 
+## Persistência (server-side)
+- O estado interno da forja (fuel/input/output + enabled/burn/prog) é salvo no backend por `worldId+forgeId`.
+- Ao abrir a forja, o server aplica um **catch-up** pelo tempo decorrido (offline):
+  - consome combustível
+  - consome minério
+  - produz barras se houver espaço
+  - para se combustível ou input acabar (ou se output estiver cheio)
+- Esse catch-up é **sob demanda** (sem cron) quando a forja é consultada/aberta.
+
 ## Forja (Fornalha) — smelting
 - Código: `src/game/ForgeManager.js`, UI em `src/game/UI.js` (modal #forge).
 - Entrada:

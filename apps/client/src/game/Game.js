@@ -1161,7 +1161,7 @@ export class Game {
     this.ui.showInventory()
   }
 
-  openForge(forgeId) {
+  async openForge(forgeId) {
     if (this.state !== 'playing') return
     const f = this.forges.get(forgeId)
     if (!f) return
@@ -1171,6 +1171,17 @@ export class Game {
 
     this.player.setLocked(false)
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+
+    // Load server-side forge state (offline catch-up) best-effort.
+    if (this._persistCtx?.worldId) {
+      try {
+        const { loadForgeState } = await import('../net/forgeState.js')
+        const st = await loadForgeState({ worldId: this._persistCtx.worldId, forgeId })
+        this.forges.applyState?.(forgeId, st)
+      } catch {
+        // keep local state if backend is unavailable
+      }
+    }
 
     this.ui.showForge()
     this.ui.renderForgeInventory(this.inventory.slots, (id) => ITEMS[id])
@@ -1317,6 +1328,20 @@ export class Game {
 
   async closeForge() {
     if (this.state !== 'forge') return
+
+    const fid = this._activeForgeId
+
+    // Flush forge save best-effort before closing.
+    try {
+      if (this._forgeSaveTimer) {
+        clearTimeout(this._forgeSaveTimer)
+        this._forgeSaveTimer = 0
+      }
+      this._queueForgeSave(fid)
+    } catch {
+      // ignore
+    }
+
     this._activeForgeId = null
     await this.returnToGameMode()
   }
@@ -1351,6 +1376,7 @@ export class Game {
       f.enabled = false
       this.ui.toast('Forja desligada.', 900)
       this._postMoveUpdate()
+      this._queueForgeSave(this._activeForgeId)
       return
     }
 
@@ -1366,6 +1392,7 @@ export class Game {
     f.enabled = true
     this.ui.toast('Forja ligada.', 900)
     this._postMoveUpdate()
+    this._queueForgeSave(this._activeForgeId)
   }
 
   forgeSlotClick(kind, idx) {
@@ -1384,6 +1411,7 @@ export class Game {
         if (s.qty <= 0) f.output[idx] = null
         this.ui.toast(`Coletou: +${moved} ${ITEMS[s.id]?.name ?? s.id}`, 900)
         this._postMoveUpdate()
+        this._queueForgeSave(this._activeForgeId)
       } else {
         this.ui.toast('Inventário cheio.', 900)
       }
@@ -1401,6 +1429,7 @@ export class Game {
       s.qty -= moved
       if (s.qty <= 0) arr[idx] = null
       this._postMoveUpdate()
+      this._queueForgeSave(this._activeForgeId)
     } else {
       this.ui.toast('Inventário cheio.', 900)
     }
@@ -1425,6 +1454,7 @@ export class Game {
     }
 
     this._postMoveUpdate()
+    this._queueForgeSave(this._activeForgeId)
     if (total > 0) this.ui.toast(`Coletou: +${total} barras`, 1000)
     else this.ui.toast('Nada para coletar (ou inventário cheio).', 1000)
   }
@@ -1693,6 +1723,28 @@ export class Game {
     this._postMoveUpdate(sIdx, dIdx)
   }
 
+  _queueForgeSave(forgeId = null) {
+    if (this.state !== 'forge') return
+    const fid = String(forgeId || this._activeForgeId || '')
+    if (!fid) return
+    if (!this._persistCtx?.worldId) return
+
+    const worldId = this._persistCtx.worldId
+
+    if (this._forgeSaveTimer) clearTimeout(this._forgeSaveTimer)
+    this._forgeSaveTimer = window.setTimeout(async () => {
+      this._forgeSaveTimer = 0
+      try {
+        const st = this.forges.exportState?.(fid)
+        if (!st) return
+        const { saveForgeState } = await import('../net/forgeState.js')
+        await saveForgeState({ worldId, forgeId: fid, state: st })
+      } catch {
+        // silent
+      }
+    }, 600)
+  }
+
   _postMoveUpdate() {
     // Keep hand fixed.
     this.hotbar[0] = { id: 'hand', qty: 1 }
@@ -1720,6 +1772,9 @@ export class Game {
     } else {
       this.selectHotbar(this.hotbarActive)
     }
+
+    // Persist forge state server-side (debounced)
+    if (this.state === 'forge') this._queueForgeSave(this._activeForgeId)
   }
 
   // ----------------- persistence -----------------
