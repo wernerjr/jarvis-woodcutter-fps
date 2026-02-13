@@ -83,6 +83,7 @@ export class Game {
     this._wsConnected = false
     this._lastColliders = []
     this._lastGroundY = 0
+    this._reconCooldownUntil = 0
 
     this._inMine = false
     this._fadeEl = null
@@ -1665,6 +1666,15 @@ export class Game {
   }
 
   _applyServerCorrection(me) {
+    const now = Date.now()
+    if (now < (this._reconCooldownUntil || 0)) {
+      // When pressed against geometry, reconciliation tends to jitter.
+      // Keep yaw gently aligned but avoid positional corrections for a short cooldown.
+      const yawT = me.yaw || 0
+      const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+      this.player.yaw.rotation.y += dy * 0.10
+      return
+    }
     const tx = me.x || 0
     const ty = me.y || this.player.eyeHeight
     const tz = me.z || 0
@@ -1674,7 +1684,7 @@ export class Game {
     const dist = Math.hypot(dx, dz)
 
     // Deadzone avoids micro-jitter when close enough.
-    const deadzone = 0.15
+    const deadzone = 0.18
     if (dist < deadzone) {
       // still align yaw a bit
       const yawT = me.yaw || 0
@@ -1689,6 +1699,9 @@ export class Game {
     const nx = dx / (dist || 1)
     const nz = dz / (dist || 1)
 
+    const beforeX = this.player.position.x
+    const beforeZ = this.player.position.z
+
     const next = this.player.position.clone()
     next.x += nx * step
     next.z += nz * step
@@ -1700,6 +1713,14 @@ export class Game {
 
     // Apply collision-aware correction
     this.player.resolveCollisions(next, this._lastColliders || [])
+
+    const moved = Math.hypot(next.x - beforeX, next.z - beforeZ)
+    // If collision resolution prevented most of our intended correction step,
+    // we are likely pressed against geometry: back off reconciliation briefly.
+    if (moved < step * 0.65) {
+      this._reconCooldownUntil = now + 220
+    }
+
     this.player.position.copy(next)
     this.player.velocity.set(0, 0, 0)
 
