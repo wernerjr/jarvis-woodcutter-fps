@@ -55,6 +55,7 @@ export class RockManager {
 
   resetAll() {
     for (const mesh of this._rocks.values()) {
+      mesh.userData.worldRemoved = false
       mesh.userData.collected = false
       mesh.userData.respawnRemaining = 0
       mesh.visible = true
@@ -79,12 +80,23 @@ export class RockManager {
     return { rockId, distance: hit.distance }
   }
 
-  collect(rockId) {
+  collect(rockId, { world = false } = {}) {
     const mesh = this._rocks.get(String(rockId))
-    if (!mesh || !mesh.visible || mesh.userData.collected) return false
+    if (!mesh || !mesh.visible || mesh.userData.collected || mesh.userData.worldRemoved) return false
 
     mesh.userData.collected = true
-    mesh.userData.respawnRemaining = this._respawnSec
+    mesh.userData.respawnRemaining = world ? 0 : this._respawnSec
+    mesh.visible = false
+    if (world) mesh.userData.worldRemoved = true
+    return true
+  }
+
+  markWorldRemoved(rockId) {
+    const mesh = this._rocks.get(String(rockId))
+    if (!mesh) return false
+    mesh.userData.worldRemoved = true
+    mesh.userData.collected = true
+    mesh.userData.respawnRemaining = 0
     mesh.visible = false
     return true
   }

@@ -205,20 +205,48 @@ export class TreeManager {
     if (!item) return null
     const { mesh } = item
 
-    if (mesh.userData.cut || mesh.userData.falling) return null
+    if (mesh.userData.cut || mesh.userData.falling || mesh.userData.pendingCut || mesh.userData.worldRemoved) return null
 
     mesh.userData.hp = Math.max(-9999, (mesh.userData.hp ?? mesh.userData.maxHp) - dmg)
 
     const cutNow = mesh.userData.hp <= 0
     if (cutNow) {
-      const ok = this.chop(treeId, playerPos)
-      return { cut: ok, hp: 0, maxHp: mesh.userData.maxHp }
+      // Strict mode: do NOT start falling until the server confirms the world event.
+      mesh.userData.hp = 0
+      mesh.userData.pendingCut = true
+      return { cut: true, pending: true, hp: 0, maxHp: mesh.userData.maxHp }
     }
 
     // Minor feedback: tiny trunk tilt.
     mesh.rotation.x = -0.01
 
     return { cut: false, hp: mesh.userData.hp, maxHp: mesh.userData.maxHp }
+  }
+
+  confirmCut(treeId, playerPos) {
+    const item = this._trees.get(String(treeId))
+    if (!item) return false
+    const { mesh } = item
+    if (mesh.userData.worldRemoved) return false
+
+    // If already falling/cut, nothing to do.
+    if (mesh.userData.cut || mesh.userData.falling) return true
+
+    mesh.userData.pendingCut = false
+    mesh.userData.hp = 0
+    return this.chop(treeId, playerPos)
+  }
+
+  markWorldRemoved(treeId) {
+    const item = this._trees.get(String(treeId))
+    if (!item) return false
+    const { mesh } = item
+    mesh.userData.worldRemoved = true
+    mesh.userData.pendingCut = false
+    mesh.userData.cut = true
+    mesh.userData.falling = false
+    mesh.visible = false
+    return true
   }
 
   resetAll() {
@@ -228,6 +256,8 @@ export class TreeManager {
   }
 
   _respawn(mesh) {
+    mesh.userData.worldRemoved = false
+    mesh.userData.pendingCut = false
     mesh.userData.cut = false
     mesh.userData.falling = false
     mesh.userData.fallT = 0

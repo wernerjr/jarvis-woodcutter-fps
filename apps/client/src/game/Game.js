@@ -85,6 +85,17 @@ export class Game {
     this._lastGroundY = 0
     this._reconCooldownUntil = 0
 
+    // World persistence (F3): strict, server-confirmed events.
+    this._pendingWorldActions = new Map() // key -> fn()
+    this._appliedWorld = {
+      trees: new Set(),
+      rocks: new Set(),
+      ores: new Set(),
+      campfires: new Set(),
+      forges: new Set(),
+      forgeTables: new Set(),
+    }
+
     this._inMine = false
     this._fadeEl = null
     this._fade = { active: false, t: 0, dur: 0.22, phase: 'in' }
@@ -761,15 +772,24 @@ export class Game {
 
     if (!r.broke) return
 
-    const overflow = this.inventory.add(ItemId.IRON_ORE, 2)
-    if (overflow) {
-      this.ui.toast('Inventário cheio: minério descartado.', 1200)
-      this.sfx.click()
-    } else {
-      this.ui.toast('Loot: +2 minério de ferro', 1100)
-      this.sfx.pickup()
-      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
-    }
+    // Strict: wait for server confirmation to actually break/remove + grant loot.
+    const key = `oreBreak:${String(hit.oreId)}`
+    this._pendingWorldActions.set(key, () => {
+      // Now confirmed: apply local break visual + loot.
+      this.ores.confirmBreak(String(hit.oreId))
+
+      const overflow = this.inventory.add(ItemId.IRON_ORE, 2)
+      if (overflow) {
+        this.ui.toast('Inventário cheio: minério descartado.', 1200)
+        this.sfx.click()
+      } else {
+        this.ui.toast('Loot: +2 minério de ferro', 1100)
+        this.sfx.pickup()
+        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      }
+    })
+
+    this._sendWorldEvent({ kind: 'oreBreak', oreId: String(hit.oreId), x: hit.point.x, z: hit.point.z, at: Date.now() })
   }
 
   _tryChop() {
@@ -815,33 +835,43 @@ export class Game {
     p.y += 0.25
     this.damageNumbers.spawn(p, `-${dmg}`)
 
-    // Only when HP reaches 0: count as cut + loot.
+    // Only when HP reaches 0: wait for server confirmation to cut + loot.
     if (!dmgResult.cut) return
 
-    this.score += 1
-    this.ui.setScore(this.score)
+    const treeId = String(hit.treeId)
+    const key = `treeCut:${treeId}`
 
-    // Loot rule (fixed): 1 log, 2–5 sticks, 10–20 leaves.
-    const sticks = this._randInt(2, 5)
-    const leaves = this._randInt(10, 20)
+    this._pendingWorldActions.set(key, () => {
+      // Start falling now (server confirmed removal).
+      this.trees.confirmCut(treeId, this.player.position)
 
-    const dropped = []
-    const overflowLog = this.inventory.add(ItemId.LOG, 1)
-    const overflowStick = this.inventory.add(ItemId.STICK, sticks)
-    const overflowLeaf = this.inventory.add(ItemId.LEAF, leaves)
+      this.score += 1
+      this.ui.setScore(this.score)
 
-    if (overflowLog) dropped.push(`${overflowLog} ${ITEMS[ItemId.LOG].name}`)
-    if (overflowStick) dropped.push(`${overflowStick} ${ITEMS[ItemId.STICK].name}`)
-    if (overflowLeaf) dropped.push(`${overflowLeaf} ${ITEMS[ItemId.LEAF].name}`)
+      // Loot rule (fixed): 1 log, 2–5 sticks, 10–20 leaves.
+      const sticks = this._randInt(2, 5)
+      const leaves = this._randInt(10, 20)
 
-    const msg = dropped.length
-      ? `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas (excedente descartado)`
-      : `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas`
+      const dropped = []
+      const overflowLog = this.inventory.add(ItemId.LOG, 1)
+      const overflowStick = this.inventory.add(ItemId.STICK, sticks)
+      const overflowLeaf = this.inventory.add(ItemId.LEAF, leaves)
 
-    this.sfx.chop()
-    this.ui.toast(msg, 1400)
+      if (overflowLog) dropped.push(`${overflowLog} ${ITEMS[ItemId.LOG].name}`)
+      if (overflowStick) dropped.push(`${overflowStick} ${ITEMS[ItemId.STICK].name}`)
+      if (overflowLeaf) dropped.push(`${overflowLeaf} ${ITEMS[ItemId.LEAF].name}`)
 
-    if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      const m = dropped.length
+        ? `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas (excedente descartado)`
+        : `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas`
+
+      this.sfx.chop()
+      this.ui.toast(m, 1400)
+
+      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    })
+
+    this._sendWorldEvent({ kind: 'treeCut', treeId, x: hit.point.x, z: hit.point.z, at: Date.now() })
   }
 
   _randInt(min, max) {
@@ -1634,12 +1664,99 @@ export class Game {
       this.wsMeId = msg.id
       return
     }
+    if (msg.t === 'worldChunk') {
+      this._applyWorldChunk(msg)
+      return
+    }
     if (msg.t === 'snapshot') {
       this.remotePlayers.applySnapshot({ meId: this.wsMeId, players: msg.players })
 
       const me = (msg.players || []).find((p) => p.id === this.wsMeId)
       if (me && this.state === 'playing') {
         this._applyServerCorrection(me)
+      }
+    }
+  }
+
+  _sendWorldEvent(ev) {
+    if (!this.ws || !this.wsMeId) return false
+    this.ws.send({ t: 'worldEvent', v: 1, ...ev })
+    return true
+  }
+
+  _applyWorldChunk(msg) {
+    if (!msg?.state || typeof msg.state !== 'object') return
+
+    const st = msg.state
+
+    const removedTrees = Array.isArray(st.removedTrees) ? st.removedTrees : []
+    const removedRocks = Array.isArray(st.removedRocks) ? st.removedRocks : []
+    const removedOres = Array.isArray(st.removedOres) ? st.removedOres : []
+    const placed = Array.isArray(st.placed) ? st.placed : []
+
+    for (const id of removedTrees) {
+      if (this._appliedWorld.trees.has(String(id))) continue
+      this._appliedWorld.trees.add(String(id))
+      this.trees.markWorldRemoved(String(id))
+      const k = `treeCut:${String(id)}`
+      const fn = this._pendingWorldActions.get(k)
+      if (fn) {
+        this._pendingWorldActions.delete(k)
+        fn()
+      }
+    }
+
+    for (const id of removedRocks) {
+      if (this._appliedWorld.rocks.has(String(id))) continue
+      this._appliedWorld.rocks.add(String(id))
+      this.rocks.markWorldRemoved(String(id))
+      const k = `rockCollect:${String(id)}`
+      const fn = this._pendingWorldActions.get(k)
+      if (fn) {
+        this._pendingWorldActions.delete(k)
+        fn()
+      }
+    }
+
+    for (const id of removedOres) {
+      if (this._appliedWorld.ores.has(String(id))) continue
+      this._appliedWorld.ores.add(String(id))
+      this.ores.markWorldRemoved(String(id))
+      const k = `oreBreak:${String(id)}`
+      const fn = this._pendingWorldActions.get(k)
+      if (fn) {
+        this._pendingWorldActions.delete(k)
+        fn()
+      }
+    }
+
+    for (const p of placed) {
+      const type = String(p?.type || '')
+      const id = String(p?.id || '')
+      const x = Number(p?.x)
+      const z = Number(p?.z)
+      if (!type || !id || !Number.isFinite(x) || !Number.isFinite(z)) continue
+
+      if (type === 'campfire') {
+        if (this._appliedWorld.campfires.has(id)) continue
+        this._appliedWorld.campfires.add(id)
+        this.fires.place({ x, y: 0, z }, id)
+      } else if (type === 'forge') {
+        if (this._appliedWorld.forges.has(id)) continue
+        this._appliedWorld.forges.add(id)
+        this.forges.place({ x, z }, id)
+      } else if (type === 'forgeTable') {
+        if (this._appliedWorld.forgeTables.has(id)) continue
+        this._appliedWorld.forgeTables.add(id)
+        this.forgeTables.place({ x, z }, id)
+        this._hasForgeTableBuilt = true
+      }
+
+      const k = `place:${id}`
+      const fn = this._pendingWorldActions.get(k)
+      if (fn) {
+        this._pendingWorldActions.delete(k)
+        fn()
       }
     }
   }
@@ -1834,52 +1951,73 @@ export class Game {
     const slot = this.hotbar[this.hotbarActive]
     if (!slot || slot.id !== ItemId.FORGE_TABLE) return
 
-    this.forgeTables.place({ x: this._ghostX, z: this._ghostZ })
+    const placeId = crypto.randomUUID?.() ?? String(Math.random()).slice(2)
+    const key = `place:${placeId}`
 
-    // Consume current hotbar stack
-    slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
-    if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+    this._pendingWorldActions.set(key, () => {
+      this.forgeTables.place({ x: this._ghostX, z: this._ghostZ }, placeId)
 
-    // Unlock metal recipes in UI sense (station gating).
-    this._hasForgeTableBuilt = true
+      // Consume current hotbar stack
+      slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
+      if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
 
-    this.ui.toast('Mesa de forja colocada.', 900)
-    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+      // Unlock metal recipes in UI sense (station gating).
+      this._hasForgeTableBuilt = true
 
-    if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+      this.ui.toast('Mesa de forja colocada.', 900)
+      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+
+      if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+    })
+
+    this._sendWorldEvent({ kind: 'place', placeKind: 'forgeTable', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
   }
 
   _placeForgeAtGhost() {
     const slot = this.hotbar[this.hotbarActive]
     if (!slot || slot.id !== ItemId.FORGE) return
 
-    this.forges.place({ x: this._ghostX, z: this._ghostZ })
+    const placeId = crypto.randomUUID?.() ?? String(Math.random()).slice(2)
+    const key = `place:${placeId}`
 
-    // Consume current hotbar stack
-    slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
-    if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+    this._pendingWorldActions.set(key, () => {
+      this.forges.place({ x: this._ghostX, z: this._ghostZ }, placeId)
 
-    this.ui.toast('Forja colocada.', 900)
-    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+      // Consume current hotbar stack
+      slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
+      if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
 
-    if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+      this.ui.toast('Forja colocada.', 900)
+      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+
+      if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+    })
+
+    this._sendWorldEvent({ kind: 'place', placeKind: 'forge', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
   }
 
   _placeCampfireAtGhost() {
     const slot = this.hotbar[this.hotbarActive]
     if (!slot || slot.id !== ItemId.CAMPFIRE) return
 
-    this.fires.place({ x: this._ghostX, y: 0, z: this._ghostZ })
+    const placeId = crypto.randomUUID?.() ?? String(Math.random()).slice(2)
+    const key = `place:${placeId}`
 
-    // Consume only the currently selected hotbar stack.
-    slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
-    if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+    this._pendingWorldActions.set(key, () => {
+      this.fires.place({ x: this._ghostX, y: 0, z: this._ghostZ }, placeId)
 
-    this.ui.toast('Fogueira colocada.', 900)
-    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+      // Consume only the currently selected hotbar stack.
+      slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
+      if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
 
-    // Do not clear other campfires bound to other slots.
-    if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+      this.ui.toast('Fogueira colocada.', 900)
+      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+
+      // Do not clear other campfires bound to other slots.
+      if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+    })
+
+    this._sendWorldEvent({ kind: 'place', placeKind: 'campfire', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
   }
 
   _cleanupHotbarBroken(itemId, onlyIdx = null) {
@@ -1911,18 +2049,25 @@ export class Game {
       return
     }
 
-    const ok = this.rocks.collect(hit.rockId)
-    if (!ok) return
+    // Strict: wait for server confirmation to remove + grant item.
+    const rockId = String(hit.rockId)
+    const key = `rockCollect:${rockId}`
+    this._pendingWorldActions.set(key, () => {
+      const ok = this.rocks.collect(rockId, { world: true })
+      if (!ok) return
 
-    const overflow = this.inventory.add(ItemId.STONE, 1)
-    if (overflow) {
-      this.ui.toast('Inventário cheio: pedra descartada.', 1200)
-      this.sfx.click()
-    } else {
-      this.ui.toast('Pegou: +1 pedra', 900)
-      this.sfx.pickup()
-      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
-    }
+      const overflow = this.inventory.add(ItemId.STONE, 1)
+      if (overflow) {
+        this.ui.toast('Inventário cheio: pedra descartada.', 1200)
+        this.sfx.click()
+      } else {
+        this.ui.toast('Pegou: +1 pedra', 900)
+        this.sfx.pickup()
+        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      }
+    })
+
+    this._sendWorldEvent({ kind: 'rockCollect', rockId, x: this.player.position.x, z: this.player.position.z, at: Date.now() })
   }
 
   _loop = () => {

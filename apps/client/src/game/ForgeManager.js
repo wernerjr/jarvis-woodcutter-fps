@@ -143,11 +143,11 @@ export class ForgeManager {
   }
 
   /** @param {{x:number,z:number}} pos */
-  place(pos) {
-    const id = crypto.randomUUID?.() ?? String(Math.random()).slice(2)
+  place(pos, id = null) {
+    const assigned = id ? String(id) : (crypto.randomUUID?.() ?? String(Math.random()).slice(2))
     const mesh = this._makeForgeMesh()
     mesh.position.set(pos.x, 0, pos.z)
-    mesh.userData.forgeId = id
+    mesh.userData.forgeId = assigned
 
     // Light: warm point (small)
     const light = new THREE.PointLight(0xffb06a, 0.0, 10, 1.7)
@@ -156,8 +156,8 @@ export class ForgeManager {
 
     this.scene.add(mesh)
 
-    this._forges.set(id, {
-      id,
+    this._forges.set(assigned, {
+      id: assigned,
       mesh,
       light,
       // inventories
@@ -184,7 +184,7 @@ export class ForgeManager {
       },
     })
 
-    return id
+    return assigned
   }
 
   /** @returns {{x:number,z:number,r:number}[]} */

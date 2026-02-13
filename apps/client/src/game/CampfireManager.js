@@ -64,8 +64,8 @@ export class CampfireManager {
   }
 
   /** @param {{x:number,y:number,z:number}} pos */
-  place(pos) {
-    const id = String(this._idCounter++)
+  place(pos, id = null) {
+    const assigned = id ? String(id) : String(this._idCounter++)
     const mesh = makeCampfireMesh()
     mesh.position.set(pos.x, 0, pos.z)
 
@@ -74,10 +74,10 @@ export class CampfireManager {
     mesh.add(light)
 
     this.scene.add(mesh)
-    this._fires.set(id, { mesh, light, lit: false, ttl: 0 })
-    mesh.userData.id = id
+    this._fires.set(assigned, { mesh, light, lit: false, ttl: 0 })
+    mesh.userData.id = assigned
 
-    return id
+    return assigned
   }
 
   resetAll() {

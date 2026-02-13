@@ -122,6 +122,8 @@ export class OreManager {
         continue
       }
 
+      if (n.pendingBreak || n.worldRemoved) continue
+
       if (n.respawn > 0) {
         n.respawn = Math.max(0, n.respawn - dt)
         if (n.respawn <= 0) {
@@ -164,18 +166,42 @@ export class OreManager {
   damage(oreId, dmg) {
     const n = this._nodes.get(String(oreId))
     if (!n) return null
-    if (n.hp <= 0) return null
+    if (n.hp <= 0 || n.pendingBreak || n.worldRemoved) return null
 
     n.hp = Math.max(0, n.hp - dmg)
 
     if (n.hp <= 0) {
-      // "break" visual
-      n.mesh.visible = false
-      n.respawn = this._respawnSeconds
-      return { broke: true }
+      // Strict mode: keep visible until server confirms.
+      n.hp = 0
+      n.pendingBreak = true
+      n.respawn = 0
+      return { broke: true, pending: true }
     }
 
     return { broke: false }
+  }
+
+  confirmBreak(oreId) {
+    const n = this._nodes.get(String(oreId))
+    if (!n) return false
+    if (n.worldRemoved) return false
+    if (n.hp > 0) return false
+
+    n.pendingBreak = false
+    n.mesh.visible = false
+    n.respawn = this._respawnSeconds
+    return true
+  }
+
+  markWorldRemoved(oreId) {
+    const n = this._nodes.get(String(oreId))
+    if (!n) return false
+    n.worldRemoved = true
+    n.pendingBreak = false
+    n.hp = 0
+    n.respawn = 0
+    n.mesh.visible = false
+    return true
   }
 
   _randInt(min, max) {

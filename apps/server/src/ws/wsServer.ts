@@ -1,6 +1,9 @@
 import { WebSocketServer } from 'ws';
 import type { WebSocket } from 'ws';
 import type { FastifyInstance } from 'fastify';
+import { and, eq } from 'drizzle-orm';
+import { db } from '../db/client.js';
+import { worldChunkState } from '../db/schema.js';
 
 type JoinMsg = {
   t: 'join';
@@ -23,7 +26,13 @@ type InputMsg = {
 
 type TeleportMsg = { t: 'teleport'; v: 1; x: number; y: number; z: number; at: number };
 
-type ClientMsg = JoinMsg | InputMsg | TeleportMsg;
+type WorldEventMsg =
+  | { t: 'worldEvent'; v: 1; kind: 'treeCut'; treeId: string; x: number; z: number; at: number }
+  | { t: 'worldEvent'; v: 1; kind: 'rockCollect'; rockId: string; x: number; z: number; at: number }
+  | { t: 'worldEvent'; v: 1; kind: 'oreBreak'; oreId: string; x: number; z: number; at: number }
+  | { t: 'worldEvent'; v: 1; kind: 'place'; placeKind: 'campfire' | 'forge' | 'forgeTable'; id: string; x: number; z: number; at: number };
+
+type ClientMsg = JoinMsg | InputMsg | TeleportMsg | WorldEventMsg;
 
 type PlayerState = {
   id: string;
@@ -51,6 +60,21 @@ type ServerSnapshotMsg = {
 
 type ServerWelcomeMsg = { t: 'welcome'; v: 1; id: string; worldId: string };
 
+type WorldChunkMsg = {
+  t: 'worldChunk';
+  v: 1;
+  worldId: string;
+  chunkX: number;
+  chunkZ: number;
+  version: number;
+  state: {
+    removedTrees: string[];
+    removedRocks: string[];
+    removedOres: string[];
+    placed: Array<{ id: string; type: 'campfire' | 'forge' | 'forgeTable'; x: number; z: number }>;
+  };
+};
+
 type AnyWs = WebSocket & { __playerId?: string };
 
 function safeJsonParse(data: any): any {
@@ -74,6 +98,79 @@ export function registerWs(app: FastifyInstance) {
   const players = new Map<string, PlayerState>();
   /** worldId -> set(playerId) */
   const rooms = new Map<string, Set<string>>();
+
+  const chunkSize = 32;
+  const chunkOf = (x: number, z: number) => ({
+    cx: Math.floor(x / chunkSize),
+    cz: Math.floor(z / chunkSize),
+  });
+
+  async function getChunk(worldId: string, chunkX: number, chunkZ: number) {
+    const row = await db
+      .select()
+      .from(worldChunkState)
+      .where(and(eq(worldChunkState.worldId, worldId), eq(worldChunkState.chunkX, chunkX), eq(worldChunkState.chunkZ, chunkZ)))
+      .limit(1);
+
+    if (row[0]) {
+      const st = (row[0].state ?? {}) as any;
+      return {
+        worldId,
+        chunkX,
+        chunkZ,
+        version: Number(row[0].version ?? 0),
+        state: {
+          removedTrees: Array.isArray(st.removedTrees) ? st.removedTrees.map(String) : [],
+          removedRocks: Array.isArray(st.removedRocks) ? st.removedRocks.map(String) : [],
+          removedOres: Array.isArray(st.removedOres) ? st.removedOres.map(String) : [],
+          placed: Array.isArray(st.placed)
+            ? st.placed
+                .map((p: any) => ({ id: String(p?.id), type: p?.type, x: Number(p?.x), z: Number(p?.z) }))
+                .filter((p: any) => p.id && (p.type === 'campfire' || p.type === 'forge' || p.type === 'forgeTable') && Number.isFinite(p.x) && Number.isFinite(p.z))
+            : [],
+        },
+      };
+    }
+
+    // Create empty chunk row.
+    await db.insert(worldChunkState).values({ worldId, chunkX, chunkZ, version: 0, state: {} });
+    return {
+      worldId,
+      chunkX,
+      chunkZ,
+      version: 0,
+      state: { removedTrees: [], removedRocks: [], removedOres: [], placed: [] },
+    };
+  }
+
+  async function saveChunk(next: { worldId: string; chunkX: number; chunkZ: number; version: number; state: any }) {
+    await db
+      .insert(worldChunkState)
+      .values({
+        worldId: next.worldId,
+        chunkX: next.chunkX,
+        chunkZ: next.chunkZ,
+        version: next.version,
+        state: next.state,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [worldChunkState.worldId, worldChunkState.chunkX, worldChunkState.chunkZ],
+        set: { version: next.version, state: next.state, updatedAt: new Date() },
+      });
+  }
+
+  function broadcastWorldChunk(worldId: string, chunkX: number, chunkZ: number, msg: WorldChunkMsg) {
+    const txt = JSON.stringify(msg);
+    for (const client of wss.clients) {
+      const ws = client as AnyWs;
+      const pid = ws.__playerId;
+      if (!pid) continue;
+      const st = players.get(pid);
+      if (!st || st.worldId !== worldId) continue;
+      if (ws.readyState === ws.OPEN) ws.send(txt);
+    }
+  }
 
   function broadcastSnapshot(worldId: string) {
     const ids = rooms.get(worldId);
@@ -293,6 +390,102 @@ export function registerWs(app: FastifyInstance) {
 
         const welcome: ServerWelcomeMsg = { t: 'welcome', v: 1, id, worldId: msg.worldId };
         ws.send(JSON.stringify(welcome));
+
+        // Send initial world chunks around spawn.
+        const sx = msg.spawn?.x ?? st.x;
+        const sz = msg.spawn?.z ?? st.z;
+        const { cx, cz } = chunkOf(Number(sx) || 0, Number(sz) || 0);
+        const radius = 1;
+        for (let dz = -radius; dz <= radius; dz++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            getChunk(st.worldId, cx + dx, cz + dz)
+              .then((c) => {
+                const out: WorldChunkMsg = {
+                  t: 'worldChunk',
+                  v: 1,
+                  worldId: st.worldId,
+                  chunkX: c.chunkX,
+                  chunkZ: c.chunkZ,
+                  version: c.version,
+                  state: c.state,
+                };
+                if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(out));
+              })
+              .catch(() => null);
+          }
+        }
+
+        return;
+      }
+
+      if (msg.t === 'worldEvent') {
+        const pid = ws.__playerId;
+        if (!pid) return;
+        const st = players.get(pid);
+        if (!st) return;
+        if (msg.v !== 1) return;
+
+        const clampNum = (n: any) => (typeof n === 'number' && Number.isFinite(n) ? n : null);
+
+        const x = 'x' in msg ? clampNum((msg as any).x) : null;
+        const z = 'z' in msg ? clampNum((msg as any).z) : null;
+        if (x == null || z == null) return;
+
+        const { cx, cz } = chunkOf(x, z);
+
+        getChunk(st.worldId, cx, cz)
+          .then(async (chunk) => {
+            const next = structuredClone(chunk.state) as any;
+            next.removedTrees = Array.isArray(next.removedTrees) ? next.removedTrees.map(String) : [];
+            next.removedRocks = Array.isArray(next.removedRocks) ? next.removedRocks.map(String) : [];
+            next.removedOres = Array.isArray(next.removedOres) ? next.removedOres.map(String) : [];
+            next.placed = Array.isArray(next.placed) ? next.placed : [];
+
+            if (msg.kind === 'treeCut') {
+              const id = String((msg as any).treeId || '');
+              if (!id) return;
+              if (!next.removedTrees.includes(id)) next.removedTrees.push(id);
+            } else if (msg.kind === 'rockCollect') {
+              const id = String((msg as any).rockId || '');
+              if (!id) return;
+              if (!next.removedRocks.includes(id)) next.removedRocks.push(id);
+            } else if (msg.kind === 'oreBreak') {
+              const id = String((msg as any).oreId || '');
+              if (!id) return;
+              if (!next.removedOres.includes(id)) next.removedOres.push(id);
+            } else if (msg.kind === 'place') {
+              const id = String((msg as any).id || '');
+              const placeKind = (msg as any).placeKind;
+              if (!id) return;
+              const type = placeKind === 'campfire' || placeKind === 'forge' || placeKind === 'forgeTable' ? placeKind : null;
+              if (!type) return;
+              if (!next.placed.some((p: any) => String(p?.id) === id)) {
+                next.placed.push({ id, type, x, z });
+              }
+            }
+
+            const version = (chunk.version ?? 0) + 1;
+            await saveChunk({ worldId: st.worldId, chunkX: cx, chunkZ: cz, version, state: next });
+
+            const out: WorldChunkMsg = {
+              t: 'worldChunk',
+              v: 1,
+              worldId: st.worldId,
+              chunkX: cx,
+              chunkZ: cz,
+              version,
+              state: {
+                removedTrees: next.removedTrees,
+                removedRocks: next.removedRocks,
+                removedOres: next.removedOres,
+                placed: next.placed,
+              },
+            };
+
+            broadcastWorldChunk(st.worldId, cx, cz, out);
+          })
+          .catch(() => null);
+
         return;
       }
 

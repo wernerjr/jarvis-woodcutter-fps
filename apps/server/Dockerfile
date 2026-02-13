@@ -25,6 +25,7 @@ COPY apps/server/package.json ./apps/server/package.json
 RUN pnpm install --prod --filter @jarvis-woodcutter-fps/server --frozen-lockfile=false
 
 COPY --from=build /repo/apps/server/dist ./apps/server/dist
+COPY --from=build /repo/apps/server/drizzle ./apps/server/drizzle
 
 EXPOSE 3023
 CMD ["node", "apps/server/dist/index.js"]

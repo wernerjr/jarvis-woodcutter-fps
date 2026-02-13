@@ -71,15 +71,15 @@ export class ForgeTableManager {
   }
 
   /** @param {{x:number,z:number}} pos */
-  place(pos) {
-    const id = String(this._id++)
+  place(pos, id = null) {
+    const assigned = id ? String(id) : String(this._id++)
     const mesh = this._makeMesh()
     mesh.position.set(pos.x, 0, pos.z)
-    mesh.userData.forgeTableId = id
+    mesh.userData.forgeTableId = assigned
     this.scene.add(mesh)
 
-    this._tables.set(id, { id, mesh })
-    return id
+    this._tables.set(assigned, { id: assigned, mesh })
+    return assigned
   }
 
   /** @returns {{x:number,z:number,r:number}[]} */
