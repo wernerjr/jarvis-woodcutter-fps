@@ -18,7 +18,18 @@
 
 #### `join`
 ```json
-{ "t": "join", "v": 1, "guestId": "<uuid>", "worldId": "world-1" }
+{
+  "t": "join",
+  "v": 1,
+  "guestId": "<uuid>",
+  "worldId": "world-1",
+  "spawn": { "x": 0, "y": 1.65, "z": 6 }
+}
+```
+
+#### `teleport`
+```json
+{ "t": "teleport", "v": 1, "x": 0, "y": 1.65, "z": 0, "at": 1700000000000 }
 ```
 
 #### `input`

@@ -1347,6 +1347,16 @@ export class Game {
           this.player.position.copy(this.mine.spawnWorld)
           this.player.velocity.set(0, 0, 0)
         }
+
+        // Inform server about teleport target (authoritative position source).
+        this.ws?.send({
+          t: 'teleport',
+          v: 1,
+          x: this.player.position.x,
+          y: this.player.position.y,
+          z: this.player.position.z,
+          at: Date.now(),
+        })
       }
 
       if (this._fade.phase === 'in' && this._fade.t >= this._fade.dur) {
@@ -1595,6 +1605,11 @@ export class Game {
           v: 1,
           guestId: this._persistCtx.guestId,
           worldId: this._persistCtx.worldId,
+          spawn: {
+            x: this.player.position.x,
+            y: this.player.position.y,
+            z: this.player.position.z,
+          },
         })
       },
       onClose: () => {
@@ -1626,7 +1641,7 @@ export class Game {
         const tx = me.x || 0
         const ty = me.y || this.player.eyeHeight
         const tz = me.z || 0
-        const a = 0.35
+        const a = 0.55
         this.player.position.x += (tx - this.player.position.x) * a
         this.player.position.y += (ty - this.player.position.y) * a
         this.player.position.z += (tz - this.player.position.z) * a
@@ -1634,7 +1649,7 @@ export class Game {
 
         const yawT = me.yaw || 0
         const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
-        this.player.yaw.rotation.y += dy * 0.35
+        this.player.yaw.rotation.y += dy * 0.55
       }
     }
   }

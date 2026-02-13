@@ -2,7 +2,14 @@ import { WebSocketServer } from 'ws';
 import type { WebSocket } from 'ws';
 import type { FastifyInstance } from 'fastify';
 
-type JoinMsg = { t: 'join'; v: 1; guestId: string; worldId: string };
+type JoinMsg = {
+  t: 'join';
+  v: 1;
+  guestId: string;
+  worldId: string;
+  // Optional spawn hint (used to avoid snapping to default spawn after reconnect/teleport).
+  spawn?: { x: number; y: number; z: number };
+};
 type InputMsg = {
   t: 'input';
   v: 1;
@@ -14,7 +21,9 @@ type InputMsg = {
   at: number;
 };
 
-type ClientMsg = JoinMsg | InputMsg;
+type TeleportMsg = { t: 'teleport'; v: 1; x: number; y: number; z: number; at: number };
+
+type ClientMsg = JoinMsg | InputMsg | TeleportMsg;
 
 type PlayerState = {
   id: string;
@@ -100,12 +109,18 @@ export function registerWs(app: FastifyInstance) {
     const sprintMult = 1.65;
 
     const inp = st.input;
-    if (inp) {
-      st.yaw = inp.yaw;
-      st.pitch = inp.pitch;
+    // If no fresh input recently, treat as idle (prevents drifting/stuck keys on reconnect).
+    if (inp && nowMs() - st.lastAtMs > 300) {
+      st.input = undefined;
+    }
 
-      const forward = Number(inp.keys.s) - Number(inp.keys.w);
-      const strafe = Number(inp.keys.d) - Number(inp.keys.a);
+    if (st.input) {
+      const inp2 = st.input;
+      st.yaw = inp2!.yaw;
+      st.pitch = inp2!.pitch;
+
+      const forward = Number(inp2!.keys.s) - Number(inp2!.keys.w);
+      const strafe = Number(inp2!.keys.d) - Number(inp2!.keys.a);
 
       // normalize
       let dx = strafe;
@@ -125,13 +140,13 @@ export function registerWs(app: FastifyInstance) {
       const rz = -dx * sy + dz * cy;
 
       const moving = len > 0.001;
-      const speed = baseSpeed * (inp.keys.sprint && moving ? sprintMult : 1.0);
+      const speed = baseSpeed * (inp2!.keys.sprint && moving ? sprintMult : 1.0);
 
       st.x += rx * speed * dt;
       st.z += rz * speed * dt;
 
       // jump (edge on client; server trusts boolean)
-      if (inp.keys.jump && st.onGround) {
+      if (inp2!.keys.jump && st.onGround) {
         st.vy = jumpSpeed;
         st.onGround = false;
       }
@@ -210,6 +225,17 @@ export function registerWs(app: FastifyInstance) {
         };
         st.worldId = msg.worldId;
         st.lastAtMs = nowMs();
+
+        // Reset input on join (prevents "stuck running" if old input lingers).
+        st.input = undefined;
+
+        // Apply optional spawn hint.
+        if (msg.spawn && Number.isFinite(msg.spawn.x) && Number.isFinite(msg.spawn.y) && Number.isFinite(msg.spawn.z)) {
+          st.x = msg.spawn.x;
+          st.y = msg.spawn.y;
+          st.z = msg.spawn.z;
+        }
+
         players.set(id, st);
 
         if (!rooms.has(msg.worldId)) rooms.set(msg.worldId, new Set());
@@ -217,6 +243,28 @@ export function registerWs(app: FastifyInstance) {
 
         const welcome: ServerWelcomeMsg = { t: 'welcome', v: 1, id, worldId: msg.worldId };
         ws.send(JSON.stringify(welcome));
+        return;
+      }
+
+      if (msg.t === 'teleport') {
+        const pid = ws.__playerId;
+        if (!pid) return;
+
+        const st = players.get(pid);
+        if (!st) return;
+
+        if (msg.v !== 1) return;
+        if (![msg.x, msg.y, msg.z].every((n) => typeof n === 'number' && Number.isFinite(n))) return;
+
+        // Basic sanity clamp to avoid insane values.
+        const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+        st.x = clamp(msg.x, -500, 500);
+        st.y = clamp(msg.y, 0, 50);
+        st.z = clamp(msg.z, -500, 500);
+        st.vy = 0;
+        st.onGround = false;
+        st.input = undefined;
+        st.lastAtMs = typeof msg.at === 'number' ? msg.at : nowMs();
         return;
       }
 

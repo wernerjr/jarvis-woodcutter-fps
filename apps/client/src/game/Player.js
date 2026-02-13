@@ -96,6 +96,13 @@ export class Player {
     window.addEventListener('keyup', this._onKeyUp)
     window.addEventListener('mousemove', this._onMouseMove)
 
+    this._onBlur = () => {
+      this._keys.clear()
+      this._jumpQueued = false
+    }
+    window.addEventListener('blur', this._onBlur)
+    document.addEventListener('visibilitychange', this._onBlur)
+
     // seed orientation
     this.yaw.rotation.y = Math.PI
     this.pitch.rotation.x = 0
@@ -107,6 +114,8 @@ export class Player {
     window.removeEventListener('keydown', this._onKeyDown)
     window.removeEventListener('keyup', this._onKeyUp)
     window.removeEventListener('mousemove', this._onMouseMove)
+    window.removeEventListener('blur', this._onBlur)
+    document.removeEventListener('visibilitychange', this._onBlur)
   }
 
   setLocked(v) {
