@@ -789,7 +789,11 @@ export class Game {
       }
     })
 
-    this._sendWorldEvent({ kind: 'oreBreak', oreId: String(hit.oreId), x: hit.point.x, z: hit.point.z, at: Date.now() })
+    const sent = this._sendWorldEvent({ kind: 'oreBreak', oreId: String(hit.oreId), x: hit.point.x, z: hit.point.z, at: Date.now() })
+    if (!sent) {
+      this._pendingWorldActions.delete(key)
+      this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+    }
   }
 
   _tryChop() {
@@ -871,7 +875,11 @@ export class Game {
       if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     })
 
-    this._sendWorldEvent({ kind: 'treeCut', treeId, x: hit.point.x, z: hit.point.z, at: Date.now() })
+    const sent = this._sendWorldEvent({ kind: 'treeCut', treeId, x: hit.point.x, z: hit.point.z, at: Date.now() })
+    if (!sent) {
+      this._pendingWorldActions.delete(key)
+      this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+    }
   }
 
   _randInt(min, max) {
@@ -1679,7 +1687,9 @@ export class Game {
   }
 
   _sendWorldEvent(ev) {
-    if (!this.ws || !this.wsMeId) return false
+    // World events are identified server-side by the WS connection (after join).
+    // Do not require wsMeId/welcome here.
+    if (!this.ws || !this._wsConnected) return false
     this.ws.send({ t: 'worldEvent', v: 1, ...ev })
     return true
   }
@@ -1775,7 +1785,7 @@ export class Game {
   }
 
   _sendWsInput(dt) {
-    if (!this.ws || !this.wsMeId) return
+    if (!this.ws || !this._wsConnected) return
     const now = performance.now()
     if (now - (this._wsPoseAt || 0) < 50) return // 20Hz
     this._wsPoseAt = now
@@ -1983,7 +1993,11 @@ export class Game {
       if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
     })
 
-    this._sendWorldEvent({ kind: 'place', placeKind: 'forgeTable', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
+    const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'forgeTable', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
+    if (!sent) {
+      this._pendingWorldActions.delete(key)
+      this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+    }
   }
 
   _placeForgeAtGhost() {
@@ -2006,7 +2020,11 @@ export class Game {
       if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
     })
 
-    this._sendWorldEvent({ kind: 'place', placeKind: 'forge', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
+    const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'forge', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
+    if (!sent) {
+      this._pendingWorldActions.delete(key)
+      this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+    }
   }
 
   _placeCampfireAtGhost() {
@@ -2030,7 +2048,11 @@ export class Game {
       if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
     })
 
-    this._sendWorldEvent({ kind: 'place', placeKind: 'campfire', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
+    const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'campfire', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
+    if (!sent) {
+      this._pendingWorldActions.delete(key)
+      this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+    }
   }
 
   _cleanupHotbarBroken(itemId, onlyIdx = null) {
@@ -2082,7 +2104,11 @@ export class Game {
 
     const px = hit.point?.x ?? this.player.position.x
     const pz = hit.point?.z ?? this.player.position.z
-    this._sendWorldEvent({ kind: 'rockCollect', rockId, x: px, z: pz, at: Date.now() })
+    const sent = this._sendWorldEvent({ kind: 'rockCollect', rockId, x: px, z: pz, at: Date.now() })
+    if (!sent) {
+      this._pendingWorldActions.delete(key)
+      this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+    }
   }
 
   _loop = () => {
