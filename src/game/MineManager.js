@@ -654,81 +654,37 @@ export class MineManager {
       color: 0x131318,
       roughness: 1.0,
       metalness: 0.0,
-      side: THREE.DoubleSide,
+      side: THREE.BackSide,
     })
 
-    // Use simple rectangular corridor surfaces (no end-caps), segmented to follow curves.
-    // This avoids the "walls in the middle" caused by overlapping BoxGeometry end faces.
-    const makeBoxTunnel = (curve, name, w = 4.6, h = 4.0) => {
-      const g = new THREE.Group()
-      g.name = name
-
+    // Continuous corridor mesh that follows the curve (no segment seams/walls).
+    // We extrude a rectangular shape along the path.
+    const makeCorridor = (curve, name, w = 4.6, h = 4.0) => {
       const halfW = w * 0.5
       const halfH = h * 0.5
 
-      // Segment length tuned for smooth curves without gaps.
-      const segs = 18
+      const shape = new THREE.Shape()
+      shape.moveTo(-halfW, -halfH)
+      shape.lineTo(halfW, -halfH)
+      shape.lineTo(halfW, halfH)
+      shape.lineTo(-halfW, halfH)
+      shape.lineTo(-halfW, -halfH)
 
-      const up = new THREE.Vector3(0, 1, 0)
-      const center = new THREE.Vector3()
-      const dir = new THREE.Vector3()
-      const right = new THREE.Vector3()
-      const q = new THREE.Quaternion()
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        steps: 140,
+        bevelEnabled: false,
+        extrudePath: curve,
+      })
+      geo.computeVertexNormals()
+      geo.computeBoundingSphere()
 
-      for (let i = 0; i < segs; i++) {
-        const t0 = i / segs
-        const t1 = (i + 1) / segs
-
-        const p0 = curve.getPoint(t0)
-        const p1 = curve.getPoint(t1)
-
-        dir.subVectors(p1, p0)
-        const len = dir.length()
-        if (len < 0.001) continue
-        dir.normalize()
-
-        center.set((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5, (p0.z + p1.z) * 0.5)
-
-        right.crossVectors(up, dir)
-        if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
-        right.normalize()
-
-        // Build an orientation where local Z = dir and local X = right.
-        const basisZ = dir.clone()
-        const basisX = right.clone()
-        const basisY = new THREE.Vector3().crossVectors(basisZ, basisX).normalize()
-        const m4 = new THREE.Matrix4().makeBasis(basisX, basisY, basisZ)
-        q.setFromRotationMatrix(m4)
-
-        // Walls (planes), no end caps.
-        const wallGeo = new THREE.PlaneGeometry(len, h)
-        const floorGeo = new THREE.PlaneGeometry(w, len)
-
-        const mk = (geo, posLocal, rotX = 0) => {
-          const m = new THREE.Mesh(geo, mat)
-          m.position.copy(center)
-          m.quaternion.copy(q)
-          if (rotX) m.rotateX(rotX)
-          m.position.addScaledVector(basisX, posLocal.x)
-          m.position.addScaledVector(basisY, posLocal.y)
-          m.position.addScaledVector(basisZ, posLocal.z)
-          return m
-        }
-
-        // Left/right walls (local X offsets)
-        g.add(mk(wallGeo, { x: +halfW, y: 0, z: 0 }))
-        g.add(mk(wallGeo, { x: -halfW, y: 0, z: 0 }, Math.PI))
-
-        // Floor/ceiling (rotate plane so its normal points inward)
-        g.add(mk(floorGeo, { x: 0, y: -halfH, z: 0 }, -Math.PI / 2))
-        g.add(mk(floorGeo, { x: 0, y: +halfH, z: 0 }, Math.PI / 2))
-      }
-
-      return g
+      const m = new THREE.Mesh(geo, mat)
+      m.name = name
+      return m
     }
 
     return {
-      tunnelMeshes: [makeBoxTunnel(main, 'MineTunnelMain')],
+      tunnelMeshes: [makeCorridor(main, 'MineTunnelMain')],
       curves,
     }
   }
