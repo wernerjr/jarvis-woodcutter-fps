@@ -10,7 +10,7 @@
     {
       "id": "P0",
       "title": "MVP online jogável (conectar + movimento suave + mundo consistente)",
-      "status": "doing",
+      "status": "done",
       "stories": [
         {
           "id": "P0-S1",
@@ -75,7 +75,7 @@
         {
           "id": "P0-S4",
           "title": "Reconexão + re-sync de estado (players + chunks próximos)",
-          "status": "todo",
+          "status": "done",
           "objective": "Garantir que quedas de conexão não corrompem o mundo local nem deixem ‘fantasmas’ de players/entidades.",
           "description": "O client já tenta reconectar (documentado). A história é garantir um re-sync completo: ao reconectar, o client faz `join` novamente, limpa players remotos antigos, re-solicita/aceita `worldChunk` dos chunks relevantes e re-aplica estado authoritative do mundo.\n\nTambém incluir UX mínima: indicador ‘reconectando’ e fallback para menu se falhar.",
           "acceptanceCriteria": [

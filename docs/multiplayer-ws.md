@@ -9,7 +9,7 @@
 ## Visão geral
 - O client conecta ao WS ao entrar em **Play**.
 - Antes de conectar/join, o client obtém um token via `POST /api/auth/guest` (token curto, 60min) e envia no `join`.
-- Se cair, o client tenta **reconectar automaticamente** (backoff).
+- Se cair, o client tenta **reconectar automaticamente** (backoff). Após N tentativas (default: 5), o client desiste e volta a ficar offline.
 - O client envia `join` e depois envia `input` periodicamente.
 - O server simula movimento (20Hz) e publica `snapshot` (10Hz) com todos players na sala.
 - O client renderiza players remotos com **interpolação bufferizada** (ex.: 150ms) para suavizar jitter (client-only).

@@ -8,7 +8,7 @@ function wsUrl(path) {
 }
 
 export class WsClient {
-  constructor({ onMessage, onOpen, onClose, onStatus }) {
+  constructor({ onMessage, onOpen, onClose, onStatus, maxAttempts = 5 }) {
     this.onMessage = onMessage
     this.onOpen = onOpen
     this.onClose = onClose
@@ -18,6 +18,7 @@ export class WsClient {
     this._closedByUser = false
     this._reconnectTimer = 0
     this._attempt = 0
+    this.maxAttempts = maxAttempts
     this.status = 'off' // off|connecting|ok
   }
 
@@ -42,7 +43,7 @@ export class WsClient {
 
     ws.addEventListener('close', () => {
       this.ws = null
-      this.onClose?.()
+      this.onClose?.({ reason: 'closed' })
       if (this._closedByUser) {
         this._setStatus('off')
         return
@@ -72,6 +73,13 @@ export class WsClient {
     this._setStatus('connecting')
 
     const attempt = this._attempt++
+    if (this.maxAttempts > 0 && attempt >= this.maxAttempts) {
+      this._closedByUser = true
+      this._setStatus('off')
+      this.onClose?.({ reason: 'max_attempts' })
+      return
+    }
+
     const base = Math.min(5000, 500 * Math.pow(2, Math.min(4, attempt)))
     const jitter = Math.floor(Math.random() * 250)
     const wait = base + jitter

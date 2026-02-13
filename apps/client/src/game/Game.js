@@ -1647,8 +1647,13 @@ export class Game {
     if (this.ws) return
     if (!this._persistCtx?.guestId || !this._persistCtx?.worldId || !this._persistCtx?.token) return
 
+    this._wsGen = (this._wsGen || 0) + 1
+    const gen = this._wsGen
+
     this.ws = new WsClient({
+      maxAttempts: 5,
       onOpen: () => {
+        if (gen !== this._wsGen) return
         this.ws?.send({
           t: 'join',
           v: 1,
@@ -1663,14 +1668,31 @@ export class Game {
           },
         })
       },
-      onClose: () => {
+      onClose: ({ reason } = {}) => {
+        if (gen !== this._wsGen) return
+
         this.wsMeId = null
         this.remotePlayers.clear()
+
+        // Clear pending actions to avoid granting loot on late chunks from an old session.
+        for (const rec of this._pendingWorldActions.values()) {
+          if (rec?.timeoutId) clearTimeout(rec.timeoutId)
+        }
+        this._pendingWorldActions.clear()
+
+        if (reason === 'max_attempts') {
+          this.ui.toast('Multiplayer: não foi possível reconectar.', 1600)
+        }
       },
       onStatus: (s) => {
+        if (gen !== this._wsGen) return
         this._wsConnected = s === 'ok'
+        if (s === 'connecting') this.ui.toast('Reconectando...', 800)
       },
-      onMessage: (msg) => this._onWsMessage(msg),
+      onMessage: (msg) => {
+        if (gen !== this._wsGen) return
+        this._onWsMessage(msg)
+      },
     })
 
     this.ws.connect()
