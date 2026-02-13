@@ -24,6 +24,12 @@ function signGuestToken(params: { guestId: string; expMs: number }) {
 
 const BodySchema = z.object({
   guestId: z.string().min(8).max(128).optional(),
+  worldId: z
+    .string()
+    .min(3)
+    .max(40)
+    .regex(/^world-[a-z0-9-]+$/i, 'worldId must match /^world-[a-z0-9-]+$/')
+    .optional(),
 });
 
 const DEFAULT_WORLD_ID = 'world-1';
@@ -39,11 +45,14 @@ export async function registerAuthGuestRoutes(app: FastifyInstance) {
     const incomingGuestId = parsed.data.guestId;
     const guestId = incomingGuestId ?? crypto.randomUUID();
 
+    const worldId = parsed.data.worldId || DEFAULT_WORLD_ID;
+    const worldName = worldId === DEFAULT_WORLD_ID ? DEFAULT_WORLD_NAME : worldId;
+
     try {
-      // Ensure default world exists.
+      // Ensure world exists.
       await db
         .insert(worlds)
-        .values({ id: DEFAULT_WORLD_ID, name: DEFAULT_WORLD_NAME })
+        .values({ id: worldId, name: worldName })
         .onConflictDoNothing();
 
       // Upsert guest (minimal).
@@ -59,13 +68,13 @@ export async function registerAuthGuestRoutes(app: FastifyInstance) {
       const existing = await db
         .select({ guestId: playerState.guestId, worldId: playerState.worldId })
         .from(playerState)
-        .where(and(eq(playerState.guestId, guestId), eq(playerState.worldId, DEFAULT_WORLD_ID)))
+        .where(and(eq(playerState.guestId, guestId), eq(playerState.worldId, worldId)))
         .limit(1);
 
       if (existing.length === 0) {
         await db.insert(playerState).values({
           guestId,
-          worldId: DEFAULT_WORLD_ID,
+          worldId,
           state: {},
           updatedAt: new Date(),
         });
@@ -79,7 +88,7 @@ export async function registerAuthGuestRoutes(app: FastifyInstance) {
       return {
         ok: true,
         guestId,
-        worldId: DEFAULT_WORLD_ID,
+        worldId,
         token,
         tokenExpMs: expMs,
       };

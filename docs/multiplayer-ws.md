@@ -36,6 +36,10 @@
 }
 ```
 
+Notas:
+- `worldId` define a sala/room. Players em `worldId`s diferentes não se veem e não compartilham `worldChunk`.
+- O client permite escolher `worldId` no menu (persistido em localStorage).
+
 #### `teleport`
 ```json
 { "t": "teleport", "v": 1, "x": 0, "y": 1.65, "z": 0, "at": 1700000000000 }

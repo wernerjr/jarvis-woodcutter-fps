@@ -2,6 +2,7 @@ import { apiFetch } from './api.js';
 
 const LS_GUEST_ID = 'woodcutter_guest_id';
 const LS_GUEST_TOKEN = 'woodcutter_guest_token';
+const LS_WORLD_ID = 'woodcutter_world_id';
 
 export function getStoredGuestId() {
   try {
@@ -36,9 +37,30 @@ export function setStoredGuestToken(token) {
   }
 }
 
-export async function ensureGuest() {
+export function getStoredWorldId() {
+  try {
+    return localStorage.getItem(LS_WORLD_ID);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredWorldId(worldId) {
+  try {
+    if (!worldId) localStorage.removeItem(LS_WORLD_ID);
+    else localStorage.setItem(LS_WORLD_ID, worldId);
+  } catch {
+    // ignore
+  }
+}
+
+export async function ensureGuest({ worldId } = {}) {
   const guestId = getStoredGuestId();
-  const body = guestId ? { guestId } : {};
+  const desiredWorldId = worldId || getStoredWorldId();
+  const body = {
+    ...(guestId ? { guestId } : {}),
+    ...(desiredWorldId ? { worldId: desiredWorldId } : {}),
+  };
 
   const res = await apiFetch('/api/auth/guest', {
     method: 'POST',
@@ -55,6 +77,7 @@ export async function ensureGuest() {
 
   setStoredGuestId(data.guestId);
   setStoredGuestToken(data.token);
+  setStoredWorldId(data.worldId);
   return { guestId: data.guestId, worldId: data.worldId, token: data.token, tokenExpMs: data.tokenExpMs ?? null };
 }
 

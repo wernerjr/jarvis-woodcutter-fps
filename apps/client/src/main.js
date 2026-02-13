@@ -1,7 +1,7 @@
 import './style.css'
 import { Game } from './game/Game.js'
 import { UI } from './game/UI.js'
-import { ensureGuest, loadPlayerState, savePlayerState } from './net/persistence.js'
+import { ensureGuest, loadPlayerState, savePlayerState, getStoredWorldId, setStoredWorldId } from './net/persistence.js'
 
 const canvas = document.querySelector('#game')
 
@@ -37,11 +37,23 @@ const ui = new UI({
 
 const game = new Game({ canvas, ui })
 
+// World selection (simple lobby)
+const worldInput = document.querySelector('#worldId')
+if (worldInput) {
+  const saved = getStoredWorldId()
+  if (saved) worldInput.value = saved
+  worldInput.addEventListener('change', () => {
+    const v = String(worldInput.value || '').trim()
+    if (v) setStoredWorldId(v)
+  })
+}
+
 // Backend persistence bootstrap (guest + load saved state)
 ;(async () => {
   try {
     ui.toast('Conectando ao servidor...', 1200)
-    const { guestId, worldId, token } = await ensureGuest()
+    const desiredWorldId = String(worldInput?.value || '').trim() || undefined
+    const { guestId, worldId, token } = await ensureGuest({ worldId: desiredWorldId })
 
     game.setPersistenceContext({
       guestId,

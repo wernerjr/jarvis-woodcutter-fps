@@ -154,7 +154,7 @@
     {
       "id": "P2",
       "title": "Base para escala (otimizações de rede e organização)",
-      "status": "doing",
+      "status": "done",
       "stories": [
         {
           "id": "P2-S1",
@@ -176,7 +176,7 @@
         {
           "id": "P2-S2",
           "title": "Lobbies/world selection (worldId) e separação por sala mais explícita",
-          "status": "todo",
+          "status": "done",
           "objective": "Permitir múltiplas salas e facilitar testes (dev/prod) sem misturar players.",
           "description": "Hoje existe `worldId` no join. Criar uma UX mínima no menu para escolher `worldId` (ou ‘public’/‘dev’). Garantir no server que rooms e chunks são isolados por worldId.",
           "acceptanceCriteria": [

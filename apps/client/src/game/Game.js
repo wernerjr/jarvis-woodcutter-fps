@@ -895,6 +895,11 @@ export class Game {
   }
 
   async playFromMenu() {
+    // Always pick up any updated world selection from menu.
+    const worldInput = document.querySelector('#worldId')
+    const desiredWorldId = String(worldInput?.value || '').trim()
+    if (desiredWorldId && this._persistCtx) this._persistCtx.worldId = desiredWorldId
+
     // Reset world-ish things first.
     this.trees.resetAll()
     this.rocks?.resetAll?.()

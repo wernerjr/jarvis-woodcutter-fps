@@ -72,6 +72,11 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 .card h2{margin:0 0 10px; font-size:18px;}
 .muted{margin:6px 0 12px; color:var(--muted); line-height:1.4}
 .small{font-size:12px;}
+
+.row{display:flex; flex-direction:column; gap:6px; margin:10px 0 14px; text-align:left}
+input.text{padding:10px 12px; border-radius:12px; border:1px solid var(--stroke); background: rgba(255,255,255,0.04); color:var(--fg); outline:none; pointer-events:auto}
+input.text:focus{border-color: rgba(159,245,168,0.35);}
+
 .buttons{display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px;}
 button{appearance:none; border:1px solid var(--stroke); background: rgba(255,255,255,0.05); color:var(--fg); padding:10px 12px; border-radius:12px; font-weight:650; cursor:pointer;}
 button:hover{border-color: rgba(159,245,168,0.35); background: rgba(255,255,255,0.08)}
