@@ -81,6 +81,8 @@ export class Game {
     this.wsMeId = null
     this._wsPoseAt = 0
     this._wsConnected = false
+    this._lastColliders = []
+    this._lastGroundY = 0
 
     this._inMine = false
     this._fadeEl = null
@@ -1634,22 +1636,9 @@ export class Game {
     if (msg.t === 'snapshot') {
       this.remotePlayers.applySnapshot({ meId: this.wsMeId, players: msg.players })
 
-      // Apply server-authoritative pose to local player
       const me = (msg.players || []).find((p) => p.id === this.wsMeId)
-      if (me) {
-        // Smooth corrections to reduce jitter (authoritative snapshots).
-        const tx = me.x || 0
-        const ty = me.y || this.player.eyeHeight
-        const tz = me.z || 0
-        const a = 0.22
-        this.player.position.x += (tx - this.player.position.x) * a
-        this.player.position.y += (ty - this.player.position.y) * a
-        this.player.position.z += (tz - this.player.position.z) * a
-        this.player.velocity.set(0, 0, 0)
-
-        const yawT = me.yaw || 0
-        const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
-        this.player.yaw.rotation.y += dy * 0.30
+      if (me && this.state === 'playing') {
+        this._applyServerCorrection(me)
       }
     }
   }
@@ -1673,6 +1662,50 @@ export class Game {
       pitch: inp.pitch,
       at: Date.now(),
     })
+  }
+
+  _applyServerCorrection(me) {
+    const tx = me.x || 0
+    const ty = me.y || this.player.eyeHeight
+    const tz = me.z || 0
+
+    const dx = tx - this.player.position.x
+    const dz = tz - this.player.position.z
+    const dist = Math.hypot(dx, dz)
+
+    // Deadzone avoids micro-jitter when close enough.
+    const deadzone = 0.15
+    if (dist < deadzone) {
+      // still align yaw a bit
+      const yawT = me.yaw || 0
+      const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+      this.player.yaw.rotation.y += dy * 0.15
+      return
+    }
+
+    // Clamp correction step to avoid pulling through walls.
+    const maxStep = 0.25
+    const step = Math.min(maxStep, dist)
+    const nx = dx / (dist || 1)
+    const nz = dz / (dist || 1)
+
+    const next = this.player.position.clone()
+    next.x += nx * step
+    next.z += nz * step
+
+    // Y correction (clamped to ground constraints)
+    const groundY = this._lastGroundY || 0
+    const minY = groundY + this.player.eyeHeight
+    next.y = Math.max(minY, ty)
+
+    // Apply collision-aware correction
+    this.player.resolveCollisions(next, this._lastColliders || [])
+    this.player.position.copy(next)
+    this.player.velocity.set(0, 0, 0)
+
+    const yawT = me.yaw || 0
+    const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+    this.player.yaw.rotation.y += dy * 0.25
   }
 
   _disconnectWs() {
@@ -1928,6 +1961,9 @@ export class Game {
       : []
 
     const groundY = this._inMine ? this.mine.getFloorYAt(this.player.position.x, this.player.position.z) : 0
+
+    this._lastColliders = colliders
+    this._lastGroundY = groundY
 
     // Always run local movement + collision (prediction).
     this.player.update(simDt, colliders, groundY)

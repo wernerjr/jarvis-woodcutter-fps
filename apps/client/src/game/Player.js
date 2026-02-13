@@ -547,6 +547,10 @@ export class Player {
     return g
   }
 
+  resolveCollisions(nextPos, colliders) {
+    this._resolveCollisions(nextPos, colliders)
+  }
+
   _resolveCollisions(nextPos, colliders) {
     // Simple stable circle-vs-circle push-out in XZ.
     // Iterate a few times to handle multiple overlaps (prevents "diagonal squeezing" through dense collider fields).
