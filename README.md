@@ -23,6 +23,7 @@ pnpm dev
 - Server: http://localhost:3023/api/health
 - Guest bootstrap: `POST /api/auth/guest`
 - Save/Load: `GET /api/player/state` + `PUT /api/player/state`
+- Multiplayer WS (MVP): ver `docs/multiplayer-ws.md`
 
 ## Docker (recomendado no servidor)
 Pré-req:

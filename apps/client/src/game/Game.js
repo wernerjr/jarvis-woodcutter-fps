@@ -80,6 +80,7 @@ export class Game {
     this.ws = null
     this.wsMeId = null
     this._wsPoseAt = 0
+    this._wsConnected = false
 
     this._inMine = false
     this._fadeEl = null
@@ -1146,6 +1147,7 @@ export class Game {
     this.perfEnabled = !this.perfEnabled
     this.perf.setEnabled(this.perfEnabled)
     this.ui.setPerfVisible(this.perfEnabled)
+    this.ui.setNetDebug?.(this.perfEnabled ? 'NET: ...' : null)
 
     const btn = document.querySelector('#btnPerfToggle')
     if (btn) btn.textContent = `Performance: ${this.perfEnabled ? 'ON' : 'OFF'}`
@@ -1588,6 +1590,7 @@ export class Game {
 
     this.ws = new WsClient({
       onOpen: () => {
+        this._wsConnected = true
         this.ws?.send({
           t: 'join',
           v: 1,
@@ -1596,6 +1599,7 @@ export class Game {
         })
       },
       onClose: () => {
+        this._wsConnected = false
         this.wsMeId = null
         this.remotePlayers.clear()
       },
@@ -1836,6 +1840,10 @@ export class Game {
     // Perf overlay updates even in pause/menus (cheap).
     this.perf.update(dt)
     this.ui.setPerf({ fps: this.perf.fps, frameMs: this.perf.frameMs, memMB: this.perf.memMB })
+
+    const remoteCount = this.remotePlayers?.players?.size ?? 0
+    const netLine = `NET: ${this._wsConnected ? 'WS ok' : 'WS off'} • remote: ${remoteCount}${this.wsMeId ? ` • me: ${String(this.wsMeId).slice(0, 8)}` : ''}`
+    this.ui.setNetDebug?.(this.perfEnabled ? netLine : null)
 
     // Contextual interaction hint (only when playing + locked).
     if (this.state === 'playing' && document.pointerLockElement === this.canvas) {

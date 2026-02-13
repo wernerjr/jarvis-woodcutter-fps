@@ -1,4 +1,25 @@
 export class UI {
+  setNetDebug(text) {
+    if (!this.els?.perfEl) return
+    if (!text) {
+      const el = this.els.perfEl.querySelector?.('#netDebug')
+      if (el) el.remove()
+      return
+    }
+
+    let el = this.els.perfEl.querySelector?.('#netDebug')
+    if (!el) {
+      el = document.createElement('div')
+      el.id = 'netDebug'
+      el.style.opacity = '0.9'
+      el.style.fontSize = '12px'
+      el.style.marginTop = '6px'
+      el.style.whiteSpace = 'pre'
+      this.els.perfEl.appendChild(el)
+    }
+    el.textContent = text
+  }
+
   setInteractHint(text) {
     const el = document.querySelector('#interactHint')
     if (!el) return
