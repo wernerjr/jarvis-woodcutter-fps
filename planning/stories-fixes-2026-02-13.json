@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "project": "jarvis-woodcutter-fps",
+  "updatedAt": "2026-02-13T17:28:00Z",
+  "statusLegend": {
+    "epic": ["todo", "doing", "done"],
+    "story": ["todo", "doing", "done"]
+  },
+  "epics": [
+    {
+      "id": "P4",
+      "title": "Fixes de UX + persistência (highlight, autosave em menus, forja persistente)",
+      "status": "todo",
+      "stories": [
+        {
+          "id": "P4-S1",
+          "title": "Highlight de alvo: limpar ao perder alvo + verde mais leve/translúcido",
+          "status": "todo",
+          "objective": "Corrigir bug visual onde o realce verde permanece após perder o alvo e ajustar o highlight para ficar mais sutil.",
+          "description": "Hoje, ao mirar/‘passar o mouse’ sobre forja/mesa/fogueira, o highlight fica verde. Ao tirar o alvo (mover a mira), o highlight às vezes não volta ao normal. Precisamos garantir que: (1) o highlight sempre é limpo ao perder alvo, (2) o verde é mais leve e menos chamativo, e (3) tenha aparência um pouco translúcida, sem pós-process pesado.",
+          "acceptanceCriteria": [
+            "Quando não há alvo válido sob a mira, nenhum objeto permanece com emissive/highlight alterado.",
+            "Alternar rapidamente entre alvos não ‘acumula’ highlight nem deixa meshes presos verdes.",
+            "O highlight fica mais sutil (menor emissiveIntensity) e com aparência levemente translúcida (sem aumentar custo com transparência em massa).",
+            "Não introduz vazamento de memória (listas de meshes antigas limpas).",
+            "Docs atualizada: `apps/client/docs/interaction.md` descreve o comportamento final." 
+          ],
+          "technicalDecisions": [
+            "Manter highlight barato: emissive + intensity clamp (sem EffectComposer).",
+            "Não alterar materiais para transparent globalmente (risco de overdraw); preferir apenas emissive e, se necessário, ajustar `color` levemente.",
+            "Garantir ‘cleanup’ também quando state muda (menu/paused/inventory/forge), não só no loop playing." 
+          ]
+        },
+        {
+          "id": "P4-S2",
+          "title": "Persistência: enviar state também com menu/pausa abertos",
+          "status": "todo",
+          "objective": "Evitar perda de progresso quando o player abre menu/pausa e fica tempo sem salvar.",
+          "description": "Atualmente o autosave (PUT /api/player/state) roda apenas quando `state==='playing'`. Se o player estiver em menu/pausa/inventário/forja e der F5 ou cair energia, pode perder progresso recente. Ajustar o autosave para enviar o estado periodicamente mesmo fora de playing, com guardrails para não spammar e para não salvar estado intermediário inválido.",
+          "acceptanceCriteria": [
+            "Autosave roda periodicamente mesmo em `paused`, `inventory`, `crafting`, `forge`, `forgeTable` e `menu` (quando houver contexto de persistência).",
+            "Não salva com alta frequência (manter intervalo atual ou ligeiramente maior).",
+            "Não quebra performance nem spamma toasts.",
+            "Se backend estiver offline, falha é silenciosa (comportamento atual).",
+            "Docs atualizada (client): mencionar política de autosave em `apps/client/docs/architecture.md` ou doc apropriado." 
+          ],
+          "technicalDecisions": [
+            "Manter `saveNow()` como best-effort e idempotente.",
+            "Evitar salvar durante transições críticas se existirem (ex.: no meio de reset/restart) com um flag simples." 
+          ]
+        },
+        {
+          "id": "P4-S3",
+          "title": "Persistência da Forja: itens dentro não podem sumir após F5",
+          "status": "todo",
+          "objective": "Garantir que o conteúdo da forja (fuel/input/output/enabled/progress) seja persistido no player state e restaurado corretamente após reload.",
+          "description": "Hoje, ao dar F5 com itens dentro da forja UI, os itens são perdidos. Precisamos exportar no save do player os estados necessários da forja (por id) e reaplicar no load. Para manter multiplayer seguro, a persistência deve ser client-only/local (player state), sem alterar regras server-authoritative do mundo.\n\nEscopo MVP: persistir a forja ativa/colocada do player (por `forgeId`) e seu inventário interno (fuel/in/out), mais flags mínimas (enabled, burn, prog).",
+          "acceptanceCriteria": [
+            "Colocar itens na forja, dar F5, e ao voltar os itens continuam na forja.",
+            "Progresso/burn/enabled retornam de forma razoável (não precisa ser exato ao ms, mas não pode resetar sempre).",
+            "Não duplica itens (nenhum cenário de duplicação ao salvar/carregar repetidamente).",
+            "Funciona com múltiplas forjas colocadas (persistência por id; se a forja não existir mais no mundo, o save ignora).",
+            "Docs atualizada: `apps/client/docs/systems-forge.md` ou doc nova explicando o que é persistido." 
+          ],
+          "technicalDecisions": [
+            "Persistir por `forgeId` (id do placed) e só restaurar se a forja existir no mundo carregado.",
+            "Salvar slots como `Item slot` padrão `{id,qty,meta}`.",
+            "Não criar sync server-side do inventário interno da forja neste pacote (fica para futuro se necessário)." 
+          ]
+        }
+      ]
+    }
+  ]
+}
