@@ -51,21 +51,24 @@
         },
         {
           "id": "P4-S3",
-          "title": "Persistência da Forja: itens dentro não podem sumir após F5",
+          "title": "Forja server-side: estado persistente + progresso offline (sem player online)",
           "status": "todo",
-          "objective": "Garantir que o conteúdo da forja (fuel/input/output/enabled/progress) seja persistido no player state e restaurado corretamente após reload.",
-          "description": "Hoje, ao dar F5 com itens dentro da forja UI, os itens são perdidos. Precisamos exportar no save do player os estados necessários da forja (por id) e reaplicar no load. Para manter multiplayer seguro, a persistência deve ser client-only/local (player state), sem alterar regras server-authoritative do mundo.\n\nEscopo MVP: persistir a forja ativa/colocada do player (por `forgeId`) e seu inventário interno (fuel/in/out), mais flags mínimas (enabled, burn, prog).",
+          "objective": "Garantir que o estado da forja seja persistido no backend e que a fundição continue ‘offline’ (server-authoritative), consumindo combustível e parando quando input/combustível acabar.",
+          "description": "Hoje, ao dar F5 com itens dentro da forja UI, os itens são perdidos porque o estado da forja é client-only. Além disso, você quer que a forja continue processando mesmo sem o player online.\n\nSolução MVP recomendada: persistir o estado da forja no server (DB) por `worldId+forgeId` e aplicar um ‘catch-up’ por tempo decorrido (`now - updatedAt`) quando a forja for consultada/aberta. Esse catch-up consome combustível, consome input, produz output (se houver espaço) e para automaticamente se combustível ou input acabar.",
           "acceptanceCriteria": [
-            "Colocar itens na forja, dar F5, e ao voltar os itens continuam na forja.",
-            "Progresso/burn/enabled retornam de forma razoável (não precisa ser exato ao ms, mas não pode resetar sempre).",
-            "Não duplica itens (nenhum cenário de duplicação ao salvar/carregar repetidamente).",
-            "Funciona com múltiplas forjas colocadas (persistência por id; se a forja não existir mais no mundo, o save ignora).",
-            "Docs atualizada: `apps/client/docs/systems-forge.md` ou doc nova explicando o que é persistido." 
+            "Colocar combustível + minério na forja, sair (offline) por alguns minutos, voltar e ver progresso/saída avançados de acordo com o tempo decorrido.",
+            "Combustível é gasto corretamente; processamento para quando `burn` chega a 0.",
+            "Processamento para quando não houver input (minério) ou quando output estiver cheio.",
+            "Não há duplicação de itens (server-authoritative do inventário interno da forja).",
+            "Múltiplas forjas no mesmo `worldId` são isoladas por `forgeId`.",
+            "Docs atualizada: `apps/client/docs/systems-forge.md` e doc do multiplayer/world state (se aplicável) descrevem o que é server-side e o modelo de catch-up." 
           ],
           "technicalDecisions": [
-            "Persistir por `forgeId` (id do placed) e só restaurar se a forja existir no mundo carregado.",
-            "Salvar slots como `Item slot` padrão `{id,qty,meta}`.",
-            "Não criar sync server-side do inventário interno da forja neste pacote (fica para futuro se necessário)." 
+            "Persistir estado no DB com chave (worldId, forgeId): `enabled`, `burnSec`, `progSec`, `fuelSlots`, `inputSlots`, `outputSlots`, `updatedAt`.",
+            "Catch-up é ‘sob demanda’ (quando abrir/consultar): aplicar dt acumulado e salvar novo `updatedAt`.",
+            "Consumir combustível e input em passos discretos (ex.: secondsPerIngot) respeitando espaço no output.",
+            "Se `enabled=false`, não processar; ainda atualizar `updatedAt` ao salvar alterações de inventário.",
+            "Sem cron/job por enquanto (MVP)." 
           ]
         }
       ]
