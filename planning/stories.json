@@ -118,7 +118,7 @@
         {
           "id": "P1-S2",
           "title": "Validação + rate limit de worldEvent no server (anti-spam MVP)",
-          "status": "todo",
+          "status": "done",
           "objective": "Evitar grief e overload por spam de eventos sem implementar anti-cheat completo.",
           "description": "Implementar validações baratas para `worldEvent`: limitar frequência por player (bucket simples), validar alcance máximo (distância do player ao alvo), e validar que o alvo existe no chunk esperado. Rejeitar eventos inválidos sem modificar world state.\n\nManter UX: client recebe update via `worldChunk` (ou mensagem de erro opcional) e ‘pending’ some.",
           "acceptanceCriteria": [

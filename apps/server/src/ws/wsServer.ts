@@ -7,6 +7,23 @@ import { worldChunkState } from '../db/schema.js';
 import { env } from '../env.js';
 import crypto from 'node:crypto';
 
+function mkRateLimiter({ ratePerSec, burst }: { ratePerSec: number; burst: number }) {
+  // Token bucket
+  let tokens = burst;
+  let last = Date.now();
+  return {
+    allow(cost = 1) {
+      const now = Date.now();
+      const dt = Math.max(0, now - last);
+      last = now;
+      tokens = Math.min(burst, tokens + (dt / 1000) * ratePerSec);
+      if (tokens < cost) return false;
+      tokens -= cost;
+      return true;
+    },
+  };
+}
+
 function base64urlToBuf(s: string) {
   const pad = s.length % 4 === 0 ? '' : '='.repeat(4 - (s.length % 4));
   const b64 = (s + pad).replace(/-/g, '+').replace(/_/g, '/');
@@ -552,6 +569,11 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
     mpStats?.onConnOpen();
     app.log.info({ event: 'ws_open', remoteAddress }, 'ws connection opened');
 
+    const worldEventLimiter = mkRateLimiter({
+      ratePerSec: env.WOODCUTTER_WORLD_EVENT_RATE_PER_SEC,
+      burst: env.WOODCUTTER_WORLD_EVENT_BURST,
+    });
+
     ws.on('message', (raw) => {
       const msg = safeJsonParse(raw) as ClientMsg | null;
       if (!msg || typeof msg !== 'object') {
@@ -664,11 +686,48 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
         if (!st) return;
         if (msg.v !== 1) return;
 
+        if (!worldEventLimiter.allow(1)) {
+          if (logThrottle.shouldLog(`rate:${pid}`, 1000)) {
+            app.log.warn({ event: 'ws_worldEvent_throttled', remoteAddress, worldId: st.worldId, playerId: pid }, 'worldEvent throttled');
+          }
+          const id =
+            (msg.kind === 'treeCut' ? String((msg as any).treeId || '') :
+            msg.kind === 'rockCollect' ? String((msg as any).rockId || '') :
+            msg.kind === 'stickCollect' ? String((msg as any).stickId || '') :
+            msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
+            String((msg as any).id || ''));
+
+          const out: WorldEventResultMsg = { t: 'worldEventResult', v: 1, kind: msg.kind, id, ok: false, reason: 'invalid' };
+          if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(out));
+          return;
+        }
+
         const clampNum = (n: any) => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 
         const x = 'x' in msg ? clampNum((msg as any).x) : null;
         const z = 'z' in msg ? clampNum((msg as any).z) : null;
         if (x == null || z == null) return;
+
+        // Basic reach validation: the event must be near the server-authoritative player position.
+        const dxp = x - st.x;
+        const dzp = z - st.z;
+        const dist = Math.hypot(dxp, dzp);
+        if (!(dist <= env.WOODCUTTER_WORLD_EVENT_RADIUS)) {
+          if (logThrottle.shouldLog(`far:${pid}`, 1000)) {
+            app.log.warn({ event: 'ws_worldEvent_reject_far', remoteAddress, worldId: st.worldId, playerId: pid, dist }, 'worldEvent rejected (too far)');
+          }
+
+          const id =
+            (msg.kind === 'treeCut' ? String((msg as any).treeId || '') :
+            msg.kind === 'rockCollect' ? String((msg as any).rockId || '') :
+            msg.kind === 'stickCollect' ? String((msg as any).stickId || '') :
+            msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
+            String((msg as any).id || ''));
+
+          const out: WorldEventResultMsg = { t: 'worldEventResult', v: 1, kind: msg.kind, id, ok: false, reason: 'invalid' };
+          if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(out));
+          return;
+        }
 
         const { cx, cz } = chunkOf(x, z);
 

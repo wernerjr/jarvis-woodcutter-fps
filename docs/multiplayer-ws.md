@@ -71,6 +71,10 @@ Tipos atuais (`kind`):
 - `oreBreak` → `{ oreId, x, z, at }`
 - `place` → `{ placeKind, id, x, z, at }`
 
+Validações (MVP):
+- Rate limit por conexão (token bucket) para `worldEvent`.
+- Alcance: o server rejeita `worldEvent` se `{x,z}` estiver longe demais da posição server-authoritative do player.
+
 Exemplo:
 ```json
 { "t": "worldEvent", "v": 1, "kind": "rockCollect", "rockId": "12", "x": 1.2, "z": -3.4, "at": 1700000000000 }

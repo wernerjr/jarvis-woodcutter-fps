@@ -20,8 +20,13 @@ const EnvSchema = z.object({
     .default(process.env.WOODCUTTER_WS_AUTH_SECRET || process.env.WS_AUTH_SECRET || 'dev-insecure-secret'),
 
   // Optional token to protect /api/mp/stats.
-  // If blank/undefined: endpoint is open (use only in dev).
+  // If blank: endpoint is open (use only in dev).
   WOODCUTTER_MP_STATS_TOKEN: z.string().optional().default(process.env.WOODCUTTER_MP_STATS_TOKEN || ''),
+
+  // Anti-spam (worldEvent)
+  WOODCUTTER_WORLD_EVENT_RATE_PER_SEC: z.coerce.number().int().positive().default(12),
+  WOODCUTTER_WORLD_EVENT_BURST: z.coerce.number().int().positive().default(24),
+  WOODCUTTER_WORLD_EVENT_RADIUS: z.coerce.number().positive().default(3.25),
 });
 
 export const env = EnvSchema.parse(process.env);
