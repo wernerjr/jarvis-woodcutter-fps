@@ -20,7 +20,7 @@ services:
       PORT: "3023"
       # Uses the shared Postgres container on the shared docker network.
       # Override via env if needed.
-      DATABASE_URL: "${DATABASE_URL:-postgres://jarvis:jarvis@shared-postgres:5432/jarvis}"
+      DATABASE_URL: "${DATABASE_URL:-postgres://woodcutter:woodcutter@shared-postgres:5432/woodcutter}"
     expose:
       - "3023"
     networks:
