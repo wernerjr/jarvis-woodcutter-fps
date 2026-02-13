@@ -1,8 +1,17 @@
 import Fastify from 'fastify';
 import { env } from './env.js';
+import { assertDbConnectionReady } from './db/client.js';
 import { registerAuthGuestRoutes } from './routes/authGuest.js';
 
 const app = Fastify({ logger: true });
+
+// Fail fast if DB is not reachable (e.g. Infisical env missing or wrong).
+try {
+  await assertDbConnectionReady(app.log);
+} catch (err) {
+  app.log.error({ err }, 'db connection failed at startup');
+  process.exit(1);
+}
 
 app.get('/api/health', async () => {
   return {
