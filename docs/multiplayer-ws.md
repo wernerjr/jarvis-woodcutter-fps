@@ -8,6 +8,7 @@
 
 ## Visão geral
 - O client conecta ao WS ao entrar em **Play**.
+- Se cair, o client tenta **reconectar automaticamente** (backoff).
 - O client envia `join` e depois envia `pose` periodicamente.
 - O server responde com `welcome` e publica `snapshot` (10Hz) com todos players na sala.
 

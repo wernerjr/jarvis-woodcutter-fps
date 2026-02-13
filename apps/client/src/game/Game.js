@@ -1590,7 +1590,6 @@ export class Game {
 
     this.ws = new WsClient({
       onOpen: () => {
-        this._wsConnected = true
         this.ws?.send({
           t: 'join',
           v: 1,
@@ -1599,9 +1598,11 @@ export class Game {
         })
       },
       onClose: () => {
-        this._wsConnected = false
         this.wsMeId = null
         this.remotePlayers.clear()
+      },
+      onStatus: (s) => {
+        this._wsConnected = s === 'ok'
       },
       onMessage: (msg) => this._onWsMessage(msg),
     })
@@ -1842,7 +1843,8 @@ export class Game {
     this.ui.setPerf({ fps: this.perf.fps, frameMs: this.perf.frameMs, memMB: this.perf.memMB })
 
     const remoteCount = this.remotePlayers?.players?.size ?? 0
-    const netLine = `NET: ${this._wsConnected ? 'WS ok' : 'WS off'} • remote: ${remoteCount}${this.wsMeId ? ` • me: ${String(this.wsMeId).slice(0, 8)}` : ''}`
+    const wsStatus = this.ws?.status || (this._wsConnected ? 'ok' : 'off')
+    const netLine = `NET: WS ${wsStatus} • remote: ${remoteCount}${this.wsMeId ? ` • me: ${String(this.wsMeId).slice(0, 8)}` : ''}`
     this.ui.setNetDebug?.(this.perfEnabled ? netLine : null)
 
     // Contextual interaction hint (only when playing + locked).
