@@ -1611,7 +1611,7 @@ export class Game {
 
   // ----------------- persistence -----------------
 
-  /** @param {{guestId:string, worldId:string, save:(state:any)=>Promise<void>}|null} ctx */
+  /** @param {{guestId:string, worldId:string, token?:string, save:(state:any)=>Promise<void>}|null} ctx */
   setPersistenceContext(ctx) {
     this._persistCtx = ctx
   }
@@ -1640,15 +1640,17 @@ export class Game {
 
   _connectWsIfPossible() {
     if (this.ws) return
-    if (!this._persistCtx?.guestId || !this._persistCtx?.worldId) return
+    if (!this._persistCtx?.guestId || !this._persistCtx?.worldId || !this._persistCtx?.token) return
 
     this.ws = new WsClient({
       onOpen: () => {
         this.ws?.send({
           t: 'join',
           v: 1,
+          // guestId is kept for backward compatibility/debug, but server trusts token.
           guestId: this._persistCtx.guestId,
           worldId: this._persistCtx.worldId,
+          token: this._persistCtx.token,
           spawn: {
             x: this.player.position.x,
             y: this.player.position.y,
@@ -1673,6 +1675,24 @@ export class Game {
     if (!msg || typeof msg !== 'object') return
     if (msg.t === 'welcome') {
       this.wsMeId = msg.id
+      return
+    }
+    if (msg.t === 'error') {
+      const code = String(msg.code || '')
+      if (code === 'auth_expired' || code === 'auth_invalid' || code === 'auth_required') {
+        this.ui.toast('Multiplayer: sessão expirada. Reautenticando...', 1400)
+        // Refresh token and reconnect.
+        ;(async () => {
+          try {
+            const { ensureGuest } = await import('../net/persistence.js')
+            const next = await ensureGuest()
+            if (this._persistCtx) this._persistCtx.token = next.token
+          } catch {
+            // ignore
+          }
+          try { this.ws?.close() } catch {}
+        })()
+      }
       return
     }
     if (msg.t === 'worldChunk') {

@@ -8,6 +8,12 @@ import { registerWs } from './ws/wsServer.js';
 
 const app = Fastify({ logger: true });
 
+if (env.WOODCUTTER_WS_AUTH_SECRET === 'dev-insecure-secret') {
+  app.log.warn(
+    'WOODCUTTER_WS_AUTH_SECRET is not set; using dev-insecure-secret (do not use in production)'
+  );
+}
+
 // Fail fast if DB is not reachable (e.g. Infisical env missing or wrong).
 try {
   await assertDbConnectionReady(app.log);

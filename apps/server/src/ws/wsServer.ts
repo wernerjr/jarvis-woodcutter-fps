@@ -4,14 +4,62 @@ import type { FastifyInstance } from 'fastify';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { worldChunkState } from '../db/schema.js';
+import { env } from '../env.js';
+import crypto from 'node:crypto';
+
+function base64urlToBuf(s: string) {
+  const pad = s.length % 4 === 0 ? '' : '='.repeat(4 - (s.length % 4));
+  const b64 = (s + pad).replace(/-/g, '+').replace(/_/g, '/');
+  return Buffer.from(b64, 'base64');
+}
+
+function verifyGuestToken(token: string) {
+  // token = base64url(payloadB64).base64url(sig)
+  const parts = String(token || '').split('.');
+  if (parts.length !== 2) return { ok: false as const, error: 'invalid_format' as const };
+
+  const [payloadB64, sigB64] = parts;
+  if (!payloadB64 || !sigB64) return { ok: false as const, error: 'invalid_format' as const };
+
+  const expected = crypto.createHmac('sha256', env.WOODCUTTER_WS_AUTH_SECRET).update(payloadB64).digest();
+  const got = base64urlToBuf(sigB64);
+  if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) {
+    return { ok: false as const, error: 'bad_signature' as const };
+  }
+
+  let payload: any;
+  try {
+    payload = JSON.parse(base64urlToBuf(payloadB64).toString('utf8'));
+  } catch {
+    return { ok: false as const, error: 'invalid_payload' as const };
+  }
+
+  const gid = String(payload?.gid || '');
+  const exp = Number(payload?.exp);
+  if (!gid) return { ok: false as const, error: 'invalid_payload' as const };
+  if (!Number.isFinite(exp)) return { ok: false as const, error: 'invalid_payload' as const };
+  if (Date.now() > exp) return { ok: false as const, error: 'expired' as const };
+
+  return { ok: true as const, guestId: gid, expMs: exp };
+}
 
 type JoinMsg = {
   t: 'join';
   v: 1;
-  guestId: string;
+  /** Deprecated: server trusts id from token, not from this field. */
+  guestId?: string;
   worldId: string;
+  /** Short-lived token from POST /api/auth/guest */
+  token: string;
   // Optional spawn hint (used to avoid snapping to default spawn after reconnect/teleport).
   spawn?: { x: number; y: number; z: number };
+};
+
+type ServerErrorMsg = {
+  t: 'error';
+  v: 1;
+  code: 'auth_required' | 'auth_invalid' | 'auth_expired' | 'bad_join';
+  message: string;
 };
 type InputMsg = {
   t: 'input';
@@ -482,15 +530,35 @@ export function registerWs(app: FastifyInstance) {
 
       if (msg.t === 'join') {
         if (msg.v !== 1) return;
-        if (!msg.guestId || !msg.worldId) return;
+        if (!msg.worldId) {
+          const err: ServerErrorMsg = { t: 'error', v: 1, code: 'bad_join', message: 'missing worldId' };
+          if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(err));
+          try { ws.close(); } catch {}
+          return;
+        }
+        if (!msg.token) {
+          const err: ServerErrorMsg = { t: 'error', v: 1, code: 'auth_required', message: 'missing token' };
+          if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(err));
+          try { ws.close(); } catch {}
+          return;
+        }
 
-        const id = msg.guestId;
+        const vtok = verifyGuestToken(String(msg.token));
+        if (!vtok.ok) {
+          const code: ServerErrorMsg['code'] = vtok.error === 'expired' ? 'auth_expired' : 'auth_invalid';
+          const err: ServerErrorMsg = { t: 'error', v: 1, code, message: 'invalid token' };
+          if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(err));
+          try { ws.close(); } catch {}
+          return;
+        }
+
+        const id = vtok.guestId;
         ws.__playerId = id;
 
         const existing = players.get(id);
         const st: PlayerState = existing ?? {
           id,
-          guestId: msg.guestId,
+          guestId: id,
           worldId: msg.worldId,
           x: 0,
           y: 1.65,

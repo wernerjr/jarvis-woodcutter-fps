@@ -8,6 +8,7 @@
 
 ## Visão geral
 - O client conecta ao WS ao entrar em **Play**.
+- Antes de conectar/join, o client obtém um token via `POST /api/auth/guest` (token curto, 60min) e envia no `join`.
 - Se cair, o client tenta **reconectar automaticamente** (backoff).
 - O client envia `join` e depois envia `input` periodicamente.
 - O server simula movimento (20Hz) e publica `snapshot` (10Hz) com todos players na sala.
@@ -21,8 +22,9 @@
 {
   "t": "join",
   "v": 1,
-  "guestId": "<uuid>",
   "worldId": "world-1",
+  "token": "<token de POST /api/auth/guest>",
+  "guestId": "<uuid> (opcional; debug)",
   "spawn": { "x": 0, "y": 1.65, "z": 6 }
 }
 ```

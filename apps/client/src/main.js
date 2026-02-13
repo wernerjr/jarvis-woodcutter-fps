@@ -41,11 +41,12 @@ const game = new Game({ canvas, ui })
 ;(async () => {
   try {
     ui.toast('Conectando ao servidor...', 1200)
-    const { guestId, worldId } = await ensureGuest()
+    const { guestId, worldId, token } = await ensureGuest()
 
     game.setPersistenceContext({
       guestId,
       worldId,
+      token,
       save: async (state) => {
         await savePlayerState({ guestId, worldId, state })
       },

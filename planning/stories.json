@@ -10,12 +10,12 @@
     {
       "id": "P0",
       "title": "MVP online jogável (conectar + movimento suave + mundo consistente)",
-      "status": "todo",
+      "status": "doing",
       "stories": [
         {
           "id": "P0-S1",
           "title": "Autenticação mínima no WebSocket (join com token curto)",
-          "status": "todo",
+          "status": "done",
           "objective": "Impedir spoof simples de guestId e preparar terreno para anti-grief básico sem complicar o MVP.",
           "description": "Hoje o protocolo de WS aceita `guestId` no `join`. O objetivo é exigir um token curto emitido pelo backend HTTP (fluxo guest existente: `POST /api/auth/guest`) e validá-lo no handshake/join do WebSocket. Isso reduz o risco de alguém entrar como outro jogador e cria uma base para evoluir permissões e rate limits.\n\nEscopo MVP: autenticação apenas de identidade (quem é o player), sem autorização granular de ações ainda.",
           "acceptanceCriteria": [

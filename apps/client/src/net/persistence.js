@@ -1,6 +1,7 @@
 import { apiFetch } from './api.js';
 
 const LS_GUEST_ID = 'woodcutter_guest_id';
+const LS_GUEST_TOKEN = 'woodcutter_guest_token';
 
 export function getStoredGuestId() {
   try {
@@ -13,6 +14,23 @@ export function getStoredGuestId() {
 export function setStoredGuestId(guestId) {
   try {
     localStorage.setItem(LS_GUEST_ID, guestId);
+  } catch {
+    // ignore
+  }
+}
+
+export function getStoredGuestToken() {
+  try {
+    return localStorage.getItem(LS_GUEST_TOKEN);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredGuestToken(token) {
+  try {
+    if (!token) localStorage.removeItem(LS_GUEST_TOKEN);
+    else localStorage.setItem(LS_GUEST_TOKEN, token);
   } catch {
     // ignore
   }
@@ -33,10 +51,11 @@ export async function ensureGuest() {
   }
 
   const data = await res.json();
-  if (!data?.guestId || !data?.worldId) throw new Error('auth/guest invalid response');
+  if (!data?.guestId || !data?.worldId || !data?.token) throw new Error('auth/guest invalid response');
 
   setStoredGuestId(data.guestId);
-  return { guestId: data.guestId, worldId: data.worldId };
+  setStoredGuestToken(data.token);
+  return { guestId: data.guestId, worldId: data.worldId, token: data.token, tokenExpMs: data.tokenExpMs ?? null };
 }
 
 export async function loadPlayerState({ guestId, worldId }) {

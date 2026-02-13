@@ -3,6 +3,24 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { guests, playerState, worlds } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
+import { env } from '../env.js';
+import crypto from 'node:crypto';
+
+function base64url(buf: Buffer) {
+  return buf
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function signGuestToken(params: { guestId: string; expMs: number }) {
+  const payload = JSON.stringify({ gid: params.guestId, exp: params.expMs });
+  const payloadB64 = base64url(Buffer.from(payload, 'utf8'));
+  const sig = crypto.createHmac('sha256', env.WOODCUTTER_WS_AUTH_SECRET).update(payloadB64).digest();
+  const sigB64 = base64url(sig);
+  return `${payloadB64}.${sigB64}`;
+}
 
 const BodySchema = z.object({
   guestId: z.string().min(8).max(128).optional(),
@@ -53,10 +71,17 @@ export async function registerAuthGuestRoutes(app: FastifyInstance) {
         });
       }
 
+      // Short-lived WS auth token (prevents spoofing guestId on WS join).
+      const now = Date.now();
+      const expMs = now + 60 * 60 * 1000; // 60 min
+      const token = signGuestToken({ guestId, expMs });
+
       return {
         ok: true,
         guestId,
         worldId: DEFAULT_WORLD_ID,
+        token,
+        tokenExpMs: expMs,
       };
     } catch (err) {
       req.log.error({ err }, 'auth/guest failed');
