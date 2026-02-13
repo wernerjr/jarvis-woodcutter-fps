@@ -41,6 +41,12 @@ export class RockManager {
 
   update(dt) {
     for (const mesh of this._rocks.values()) {
+      // World persistence: removed rocks should stay gone (no respawn).
+      if (mesh.userData.worldRemoved) {
+        mesh.visible = false
+        continue
+      }
+
       if (mesh.userData.collected) {
         mesh.userData.respawnRemaining = Math.max(0, mesh.userData.respawnRemaining - dt)
         if (mesh.userData.respawnRemaining === 0) {
