@@ -13,7 +13,8 @@ Pré-req: Node 22+ e **pnpm** (via corepack).
 corepack enable
 pnpm install
 
-docker compose up -d postgres
+# DB: usa o Postgres **shared** (container `shared-postgres`).
+# Se for rodar fora do docker, ajuste DATABASE_URL.
 pnpm dev
 ```
 - Client: Vite imprime a URL
@@ -30,7 +31,8 @@ docker compose up -d --build
 Isso sobe:
 - `client` (Nginx, porta interna 80)
 - `server` (porta interna 3023)
-- `postgres`
+
+Obs: **não** sobe Postgres por aqui; usa o `shared-postgres` existente na rede `shared`.
 
 ## Caddy (separado)
 O Caddy do servidor deve fazer proxy para:
