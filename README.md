@@ -22,6 +22,7 @@ pnpm dev
 - Client: Vite imprime a URL
 - Server: http://localhost:3023/api/health
 - Guest bootstrap: `POST /api/auth/guest`
+- Save/Load: `GET /api/player/state` + `PUT /api/player/state`
 
 ## Docker (recomendado no servidor)
 Pré-req:

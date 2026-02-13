@@ -1,6 +1,7 @@
 import './style.css'
 import { Game } from './game/Game.js'
 import { UI } from './game/UI.js'
+import { ensureGuest, loadPlayerState, savePlayerState } from './net/persistence.js'
 
 const canvas = document.querySelector('#game')
 
@@ -35,6 +36,32 @@ const ui = new UI({
 })
 
 const game = new Game({ canvas, ui })
+
+// Backend persistence bootstrap (guest + load saved state)
+;(async () => {
+  try {
+    ui.toast('Conectando ao servidor...', 1200)
+    const { guestId, worldId } = await ensureGuest()
+
+    game.setPersistenceContext({
+      guestId,
+      worldId,
+      save: async (state) => {
+        await savePlayerState({ guestId, worldId, state })
+      },
+    })
+
+    const state = await loadPlayerState({ guestId, worldId })
+    if (state) {
+      game.setPersistedState(state)
+      ui.toast('Save encontrado.', 1100)
+    } else {
+      ui.toast('Sem save (novo jogador).', 1100)
+    }
+  } catch {
+    ui.toast('Offline: backend indisponível.', 1600)
+  }
+})()
 
 // Menu buttons
 const $ = (id) => document.querySelector(id)

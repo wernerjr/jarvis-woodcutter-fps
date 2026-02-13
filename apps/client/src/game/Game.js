@@ -33,6 +33,12 @@ export class Game {
     this.canvas = canvas
     this.ui = ui
 
+    /** @type {{guestId:string, worldId:string, save:(state:any)=>Promise<void>}|null} */
+    this._persistCtx = null
+    /** @type {any|null} */
+    this._persistedState = null
+    this._persistTimer = 0
+
     this.scene = new THREE.Scene()
     this.scene.fog = new THREE.FogExp2(0x0b160b, 0.022)
 
@@ -206,10 +212,20 @@ export class Game {
 
     this.selectHotbar(0)
     this.ui.toast('Play para começar.')
+
+    // Best-effort autosave while playing (server persistence).
+    this._persistTimer = window.setInterval(() => {
+      if (this.state !== 'playing') return
+      void this.saveNow()
+    }, 20000)
   }
 
   stop() {
     this._running = false
+    if (this._persistTimer) {
+      clearInterval(this._persistTimer)
+      this._persistTimer = 0
+    }
     window.removeEventListener('resize', this._onResize)
     document.removeEventListener('pointerlockchange', this._onPointerLockChange)
     window.removeEventListener('keydown', this._onKeyDown)
@@ -822,20 +838,7 @@ export class Game {
   }
 
   async playFromMenu() {
-    this.score = 0
-    this.ui.setScore(0)
-    this.inventory.clear()
-
-    // Start with one stone axe equipped in hotbar slot 2.
-    this.hotbar[1] = {
-      id: ItemId.AXE_STONE,
-      qty: 1,
-      meta: { tool: 'axe', tier: 'stone', dmg: TOOL_STATS.axe_stone.dmg, dur: TOOL_STATS.axe_stone.maxDur, maxDur: TOOL_STATS.axe_stone.maxDur },
-    }
-
-    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
-    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
-
+    // Reset world-ish things first.
     this.trees.resetAll()
     this.rocks?.resetAll?.()
     this.fires.resetAll()
@@ -844,6 +847,27 @@ export class Game {
     this.ores.init({ points: this.mine.getOreSpawnPoints() })
     this.ores.setVisible(false)
     this.player.reset()
+
+    // Load persisted state if available, otherwise start fresh.
+    if (this._persistedState) {
+      await this._applyPersistedState(this._persistedState)
+      this.ui.toast('Save carregado.', 900)
+    } else {
+      this.score = 0
+      this.ui.setScore(0)
+      this.inventory.clear()
+
+      // Start with one stone axe equipped in hotbar slot 2.
+      this.hotbar = Array.from({ length: 10 }, (_, i) => (i === 0 ? { id: 'hand', qty: 1 } : null))
+      this.hotbar[1] = {
+        id: ItemId.AXE_STONE,
+        qty: 1,
+        meta: { tool: 'axe', tier: 'stone', dmg: TOOL_STATS.axe_stone.dmg, dur: TOOL_STATS.axe_stone.maxDur, maxDur: TOOL_STATS.axe_stone.maxDur },
+      }
+    }
+
+    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
 
     this.selectHotbar(0)
 
@@ -1514,6 +1538,33 @@ export class Game {
       this.selectHotbar(0)
     } else {
       this.selectHotbar(this.hotbarActive)
+    }
+  }
+
+  // ----------------- persistence -----------------
+
+  /** @param {{guestId:string, worldId:string, save:(state:any)=>Promise<void>}|null} ctx */
+  setPersistenceContext(ctx) {
+    this._persistCtx = ctx
+  }
+
+  /** @param {any|null} state */
+  setPersistedState(state) {
+    this._persistedState = state
+  }
+
+  async _applyPersistedState(state) {
+    const { applyGameSave } = await import('../net/gameSave.js')
+    applyGameSave(this, state)
+  }
+
+  async saveNow() {
+    if (!this._persistCtx?.save) return
+    const { exportGameSave } = await import('../net/gameSave.js')
+    try {
+      await this._persistCtx.save(exportGameSave(this))
+    } catch {
+      // Silent: do not spam toasts.
     }
   }
 

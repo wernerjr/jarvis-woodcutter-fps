@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { env } from './env.js';
 import { assertDbConnectionReady } from './db/client.js';
 import { registerAuthGuestRoutes } from './routes/authGuest.js';
+import { registerPlayerStateRoutes } from './routes/playerState.js';
 
 const app = Fastify({ logger: true });
 
@@ -22,5 +23,6 @@ app.get('/api/health', async () => {
 });
 
 await registerAuthGuestRoutes(app);
+await registerPlayerStateRoutes(app);
 
 await app.listen({ port: env.PORT, host: '0.0.0.0' });
