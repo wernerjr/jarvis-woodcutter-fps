@@ -1641,7 +1641,7 @@ export class Game {
         const tx = me.x || 0
         const ty = me.y || this.player.eyeHeight
         const tz = me.z || 0
-        const a = 0.55
+        const a = 0.22
         this.player.position.x += (tx - this.player.position.x) * a
         this.player.position.y += (ty - this.player.position.y) * a
         this.player.position.z += (tz - this.player.position.z) * a
@@ -1649,7 +1649,7 @@ export class Game {
 
         const yawT = me.yaw || 0
         const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
-        this.player.yaw.rotation.y += dy * 0.55
+        this.player.yaw.rotation.y += dy * 0.30
       }
     }
   }
@@ -1915,7 +1915,9 @@ export class Game {
 
     const authoritative = !!(this._wsConnected && this.wsMeId)
 
-    const colliders = this.state === 'playing' && !authoritative
+    // Client-side prediction keeps the game responsive and preserves collision feel.
+    // Server snapshots correct drift.
+    const colliders = this.state === 'playing'
       ? this.trees
           .getTrunkColliders()
           .concat(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
@@ -1926,13 +1928,12 @@ export class Game {
       : []
 
     const groundY = this._inMine ? this.mine.getFloorYAt(this.player.position.x, this.player.position.z) : 0
-    if (authoritative) {
-      this.player.updateVisual(simDt)
-      if (simDt > 0) this._sendWsInput(simDt)
-    } else {
-      this.player.update(simDt, colliders, groundY)
-      if (simDt > 0) this._sendWsInput(simDt)
-    }
+
+    // Always run local movement + collision (prediction).
+    this.player.update(simDt, colliders, groundY)
+
+    // Send input when connected.
+    if (simDt > 0 && authoritative) this._sendWsInput(simDt)
 
     // Torch durability + light intensity (mainly useful at night)
     const night = 1 - this.time.getDayFactor()
