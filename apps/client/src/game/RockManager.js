@@ -11,7 +11,8 @@ function makeRockMesh(rng) {
   mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI)
   group.add(mesh)
 
-  const hitGeo = new THREE.SphereGeometry(0.55, 10, 8)
+  // 2x bigger pickup hitbox.
+  const hitGeo = new THREE.SphereGeometry(1.10, 12, 10)
   const hitMat = new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0.0, depthWrite: false })
   const hit = new THREE.Mesh(hitGeo, hitMat)
   hit.name = 'RockHitbox'
@@ -102,11 +103,13 @@ export class RockManager {
       targets.push(mesh)
     }
 
-    const hits = this._raycaster.intersectObjects(targets, false)
+    const hits = this._raycaster.intersectObjects(targets, true)
     if (!hits.length) return null
 
     const hit = hits[0]
-    const rockId = hit.object?.userData?.id
+    let obj = hit.object
+    while (obj && !obj.userData?.id && obj.parent) obj = obj.parent
+    const rockId = obj?.userData?.id
     if (!rockId) return null
     return { rockId, distance: hit.distance, point: hit.point?.clone?.() }
   }

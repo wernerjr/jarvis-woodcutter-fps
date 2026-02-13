@@ -16,7 +16,8 @@ function makeStickMesh(rng) {
   group.add(main)
 
   // Invisible hitbox to make pickup easier (raycast target).
-  const hitGeo = new THREE.BoxGeometry(len * 1.85, r * 10.0, r * 10.0)
+  // 2x bigger pickup hitbox.
+  const hitGeo = new THREE.BoxGeometry(len * 2.7, r * 12.0, r * 12.0)
   const hitMat = new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0.0, depthWrite: false })
   const hit = new THREE.Mesh(hitGeo, hitMat)
   hit.name = 'StickHitbox'

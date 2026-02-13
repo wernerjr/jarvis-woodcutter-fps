@@ -125,6 +125,10 @@ Tempos atuais:
 - trees: **45s**
 - iron ore: **120s (2min)**
 
+### UX de pickup (client)
+- Pedras e galhos têm **hitbox invisível maior** para facilitar o raycast/pickup (sem alterar a distância máxima de interação).
+- O raycast para pedras é **recursivo** (a pedra é um `Group` com mesh + hitbox filho).
+
 ## Próximos passos (planejado)
 - Autenticação do WS via token/assinatura (ou reaproveitar guest + sessão).
 - Trocar `pose` por `input` (server-authoritative de verdade).
