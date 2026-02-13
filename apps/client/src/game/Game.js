@@ -251,9 +251,11 @@ export class Game {
     this.selectHotbar(0)
     this.ui.toast('Play para começar.')
 
-    // Best-effort autosave while playing (server persistence).
+    // Best-effort autosave (server persistence).
+    // IMPORTANT: also save while in menus/modals to reduce loss on F5.
     this._persistTimer = window.setInterval(() => {
-      if (this.state !== 'playing') return
+      // Skip only when we truly have no persistence context.
+      if (!this._persistCtx?.save) return
       void this.saveNow()
     }, 20000)
   }

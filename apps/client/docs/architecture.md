@@ -11,6 +11,10 @@
 - Fora de `playing`, a maioria da simulação usa `simDt=0`.
 - Exceções controladas: forja aberta roda com `forgeDt`.
 
+## Persistência (save)
+- O client faz autosave best-effort a cada ~20s quando há backend disponível.
+- O autosave **não depende** de estar em `playing` (também roda em pausa/menus/modais) para reduzir perda por F5.
+
 ## Onde estender
 - Novo item/receita: `items.js` + `recipes.js`.
 - Novo conteúdo do mundo: criar manager `XManager.js` + integrar em `Game` (init/update/colliders/raycast).

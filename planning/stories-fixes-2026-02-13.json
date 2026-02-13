@@ -34,7 +34,7 @@
         {
           "id": "P4-S2",
           "title": "Persistência: enviar state também com menu/pausa abertos",
-          "status": "todo",
+          "status": "done",
           "objective": "Evitar perda de progresso quando o player abre menu/pausa e fica tempo sem salvar.",
           "description": "Atualmente o autosave (PUT /api/player/state) roda apenas quando `state==='playing'`. Se o player estiver em menu/pausa/inventário/forja e der F5 ou cair energia, pode perder progresso recente. Ajustar o autosave para enviar o estado periodicamente mesmo fora de playing, com guardrails para não spammar e para não salvar estado intermediário inválido.",
           "acceptanceCriteria": [
