@@ -164,6 +164,35 @@
         </div>
       </div>
 
+      <!-- Chest (personal storage) -->
+      <div id="chest" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Baú">
+        <div class="card forgePanel">
+          <div class="forgeHeader">
+            <div>
+              <h2>Baú</h2>
+              <p class="muted small">Só você pode abrir este baú. Arraste itens entre inventário e baú.</p>
+            </div>
+            <div class="buttons">
+              <button id="btnChestClose" class="primary">Close</button>
+            </div>
+          </div>
+
+          <div class="forgeWide">
+            <div class="forgeBlock forgeInv">
+              <div class="forgeBlockTitle">Inventário</div>
+              <div id="chestInvGrid" class="invGrid forgeInvGrid"></div>
+            </div>
+
+            <div class="forgeBlock forgeOut">
+              <div class="forgeBlockTitle">Baú</div>
+              <div class="muted small">16 slots</div>
+              <div id="chestSlots" class="forgeSlots forgeOutSlots" data-kind="chest"></div>
+              <div class="muted small">Recolher/destruir só quando estiver vazio.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Forge Table (metal crafting station) -->
       <div id="forgeTable" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Mesa de Forja">
         <div class="card">

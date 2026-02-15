@@ -29,6 +29,17 @@ export async function runMigrations(logger?: { info: (o: any, msg?: string) => v
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "chest_state" (
+        "world_id" text NOT NULL REFERENCES "worlds"("id"),
+        "chest_id" text NOT NULL,
+        "owner_id" text NOT NULL,
+        "state" jsonb NOT NULL DEFAULT '{}'::jsonb,
+        "updated_at" timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT "chest_state_pk" PRIMARY KEY ("world_id", "chest_id")
+      );
+    `);
+
     logger?.info?.({ ms: Date.now() - startedAt }, 'db migrations ok (idempotent)');
   } catch (err) {
     logger?.error?.({ err }, 'db migrations failed');

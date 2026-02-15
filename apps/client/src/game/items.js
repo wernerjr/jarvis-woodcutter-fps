@@ -14,7 +14,10 @@ export const ItemId = {
   CAMPFIRE: 'campfire',
   FORGE: 'forge',
   FORGE_TABLE: 'forge_table',
+  CHEST: 'chest',
 }
+
+// (Keep ITEMS below in sync with ItemId)
 
 export const ITEMS = {
   [ItemId.LOG]: { id: ItemId.LOG, name: 'Tronco', icon: '🪵', stackable: true },
@@ -32,4 +35,5 @@ export const ITEMS = {
   [ItemId.CAMPFIRE]: { id: ItemId.CAMPFIRE, name: 'Fogueira', icon: '🪵', stackable: false },
   [ItemId.FORGE]: { id: ItemId.FORGE, name: 'Forja (Fornalha)', icon: '⚒️', stackable: false },
   [ItemId.FORGE_TABLE]: { id: ItemId.FORGE_TABLE, name: 'Mesa de Forja', icon: '🧰', stackable: false },
+  [ItemId.CHEST]: { id: ItemId.CHEST, name: 'Baú', icon: '🧰', stackable: false },
 }

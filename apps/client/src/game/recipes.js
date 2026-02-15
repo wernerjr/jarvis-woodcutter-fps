@@ -7,6 +7,7 @@ export const RecipeId = {
   PICKAXE_STONE: 'pickaxe_stone',
   FORGE: 'forge',
   FORGE_TABLE: 'forge_table',
+  CHEST: 'chest',
 }
 
 export const DURABILITY = {
@@ -93,6 +94,16 @@ export const RECIPES = [
       { id: ItemId.STONE, qty: 10 },
       { id: ItemId.LOG, qty: 4 },
       { id: ItemId.IRON_INGOT, qty: 4 },
+    ],
+  },
+  {
+    id: RecipeId.CHEST,
+    name: 'Baú',
+    output: { id: ItemId.CHEST, qty: 1 },
+    cost: [
+      { id: ItemId.LOG, qty: 2 },
+      { id: ItemId.STICK, qty: 8 },
+      { id: ItemId.STONE, qty: 4 },
     ],
   },
 ]

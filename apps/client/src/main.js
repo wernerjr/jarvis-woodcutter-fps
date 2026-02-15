@@ -15,6 +15,9 @@ const ui = new UI({
   inventoryEl: document.querySelector('#inventory'),
   invGridEl: document.querySelector('#invGrid'),
   forgeEl: document.querySelector('#forge'),
+  chestEl: document.querySelector('#chest'),
+  chestInvGridEl: document.querySelector('#chestInvGrid'),
+  chestSlotsEl: document.querySelector('#chestSlots'),
   forgeFuelEl: document.querySelector('#forgeFuel'),
   forgeInEl: document.querySelector('#forgeIn'),
   forgeOutEl: document.querySelector('#forgeOut'),
@@ -127,6 +130,72 @@ invGrid.addEventListener('drop', (e) => {
 
 // Drag/drop + click: embedded forge inventory <-> forge slots
 const forgeRoot = document.querySelector('#forge')
+
+// Drag/drop: chest inventory <-> chest slots
+const chestRoot = document.querySelector('#chest')
+const chestInvGrid = document.querySelector('#chestInvGrid')
+
+chestInvGrid?.addEventListener('dragstart', (e) => {
+  if (!document.body.classList.contains('chest-open')) return
+  const slot = e.target?.closest?.('.invSlot')
+  if (!slot) return
+  const idx = Number(slot.dataset.index)
+  if (Number.isNaN(idx)) return
+  e.dataTransfer?.setData('application/json', JSON.stringify({ from: 'inv', idx }))
+})
+
+chestInvGrid?.addEventListener('dragover', (e) => {
+  if (!document.body.classList.contains('chest-open')) return
+  e.preventDefault()
+})
+
+chestInvGrid?.addEventListener('drop', (e) => {
+  if (!document.body.classList.contains('chest-open')) return
+  const data = e.dataTransfer?.getData('application/json')
+  if (!data) return
+  let payload
+  try { payload = JSON.parse(data) } catch { return }
+
+  const toSlot = e.target?.closest?.('.invSlot')
+  if (!toSlot) return
+  const toIdx = Number(toSlot.dataset.index)
+  if (Number.isNaN(toIdx)) return
+
+  game.moveItem(payload, { to: 'inv', idx: toIdx })
+})
+
+chestRoot?.addEventListener('dragstart', (e) => {
+  if (!document.body.classList.contains('chest-open')) return
+  const slot = e.target?.closest?.('.forgeSlot')
+  if (!slot) return
+  const kind = slot.dataset.kind
+  const idx = Number(slot.dataset.index)
+  if (!kind || Number.isNaN(idx)) return
+  e.dataTransfer?.setData('application/json', JSON.stringify({ from: 'chest', kind, idx }))
+})
+
+chestRoot?.addEventListener('dragover', (e) => {
+  if (!document.body.classList.contains('chest-open')) return
+  const slot = e.target?.closest?.('.forgeSlot')
+  if (!slot) return
+  e.preventDefault()
+})
+
+chestRoot?.addEventListener('drop', (e) => {
+  if (!document.body.classList.contains('chest-open')) return
+  const slot = e.target?.closest?.('.forgeSlot')
+  if (!slot) return
+  const kind = slot.dataset.kind
+  const idx = Number(slot.dataset.index)
+  if (!kind || Number.isNaN(idx)) return
+
+  const data = e.dataTransfer?.getData('application/json')
+  if (!data) return
+  let payload
+  try { payload = JSON.parse(data) } catch { return }
+
+  game.moveItem(payload, { to: 'chest', kind, idx })
+})
 
 const forgeInvGrid = document.querySelector('#forgeInvGrid')
 forgeInvGrid?.addEventListener('dragstart', (e) => {
@@ -268,6 +337,7 @@ $('#btnForgeCollect').addEventListener('click', () => game.collectAllForgeOutput
 $('#btnForgeStart').addEventListener('click', () => game.toggleForgeEnabled())
 
 $('#btnForgeTableClose').addEventListener('click', () => game.closeForgeTable())
+$('#btnChestClose').addEventListener('click', () => game.closeChest())
 
 // Start at main menu
 ui.showMenu()

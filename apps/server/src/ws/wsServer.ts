@@ -3,7 +3,7 @@ import type { WebSocket } from 'ws';
 import type { FastifyInstance } from 'fastify';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { worldChunkState } from '../db/schema.js';
+import { worldChunkState, chestState } from '../db/schema.js';
 import { env } from '../env.js';
 import crypto from 'node:crypto';
 
@@ -96,7 +96,7 @@ type WorldEventMsg =
   | { t: 'worldEvent'; v: 1; kind: 'rockCollect'; rockId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'stickCollect'; stickId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'oreBreak'; oreId: string; x: number; z: number; at: number }
-  | { t: 'worldEvent'; v: 1; kind: 'place'; placeKind: 'campfire' | 'forge' | 'forgeTable'; id: string; x: number; z: number; at: number };
+  | { t: 'worldEvent'; v: 1; kind: 'place'; placeKind: 'campfire' | 'forge' | 'forgeTable' | 'chest'; id: string; x: number; z: number; at: number };
 
 type ClientMsg = JoinMsg | InputMsg | TeleportMsg | WorldEventMsg;
 
@@ -158,7 +158,7 @@ type WorldChunkMsg = {
     removedRocks: string[];
     removedSticks: string[];
     removedOres: string[];
-    placed: Array<{ id: string; type: 'campfire' | 'forge' | 'forgeTable'; x: number; z: number }>;
+    placed: Array<{ id: string; type: 'campfire' | 'forge' | 'forgeTable' | 'chest'; x: number; z: number }>;
   };
 };
 
@@ -300,7 +300,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
           placed: Array.isArray(st.placed)
             ? st.placed
                 .map((p: any) => ({ id: String(p?.id), type: p?.type, x: Number(p?.x), z: Number(p?.z) }))
-                .filter((p: any) => p.id && (p.type === 'campfire' || p.type === 'forge' || p.type === 'forgeTable') && Number.isFinite(p.x) && Number.isFinite(p.z))
+                .filter((p: any) => p.id && (p.type === 'campfire' || p.type === 'forge' || p.type === 'forgeTable' || p.type === 'chest') && Number.isFinite(p.x) && Number.isFinite(p.z))
             : [],
         },
       };
@@ -844,7 +844,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
             } else if (msg.kind === 'place') {
               const id = String((msg as any).id || '');
               const placeKind = (msg as any).placeKind;
-              const type = placeKind === 'campfire' || placeKind === 'forge' || placeKind === 'forgeTable' ? placeKind : null;
+              const type = placeKind === 'campfire' || placeKind === 'forge' || placeKind === 'forgeTable' || placeKind === 'chest' ? placeKind : null;
               if (!id || !type) {
                 setResult('place', id || '', false, 'invalid');
               } else if (next.placed.some((p: any) => String(p?.id) === id)) {
@@ -852,6 +852,19 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
                 setResult('place', id, false, 'duplicate');
               } else {
                 next.placed.push({ id, type, x, z });
+
+                // Create server-side chest record at placement time (personal by default).
+                if (type === 'chest') {
+                  try {
+                    await db
+                      .insert(chestState)
+                      .values({ worldId: st.worldId, chestId: id, ownerId: st.guestId, state: { slots: Array.from({ length: 16 }, () => null) }, updatedAt: new Date() })
+                      .onConflictDoNothing();
+                  } catch {
+                    // best-effort; if DB write fails, chest open will 404
+                  }
+                }
+
                 setResult('place', id, true);
               }
             }

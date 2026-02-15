@@ -24,6 +24,8 @@ import { RECIPES, DURABILITY, FORGE_TABLE_RECIPES, TOOL_STATS } from './recipes.
 import { CampfireGhost } from './CampfireGhost.js'
 import { ForgeGhost } from './ForgeGhost.js'
 import { ForgeTableGhost } from './ForgeTableGhost.js'
+import { ChestManager } from './ChestManager.js'
+import { ChestGhost } from './ChestGhost.js'
 import { raycastGround } from './raycastGround.js'
 import { RemotePlayersManager } from './RemotePlayersManager.js'
 import { WsClient } from '../net/wsClient.js'
@@ -75,6 +77,7 @@ export class Game {
     this.fires = new CampfireManager({ scene: this.scene })
     this.forges = new ForgeManager({ scene: this.scene })
     this.forgeTables = new ForgeTableManager({ scene: this.scene })
+    this.chests = new ChestManager({ scene: this.scene })
     this.mine = new MineManager({ scene: this.scene })
     this.ores = new OreManager({ scene: this.scene })
 
@@ -97,6 +100,7 @@ export class Game {
       campfires: new Set(),
       forges: new Set(),
       forgeTables: new Set(),
+      chests: new Set(),
     }
 
     this._inMine = false
@@ -118,17 +122,22 @@ export class Game {
     this._placingCampfire = false
     this._placingForge = false
     this._placingForgeTable = false
+    this._placingChest = false
 
     this._activeForgeId = null
     this._activeForgeTableId = null
+    this._activeChestId = null
+    this._chestSlots = Array.from({ length: 16 }, () => null)
 
     this._ghost = new CampfireGhost()
     this._forgeGhost = new ForgeGhost()
     this._forgeTableGhost = new ForgeTableGhost()
+    this._chestGhost = new ChestGhost()
 
     this.scene.add(this._ghost.mesh)
     this.scene.add(this._forgeGhost.mesh)
     this.scene.add(this._forgeTableGhost.mesh)
+    this.scene.add(this._chestGhost.mesh)
 
     this._ghostX = 0
     this._ghostZ = 0
@@ -142,7 +151,7 @@ export class Game {
     this.score = 0
     this._running = false
 
-    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'forge'|'forgeTable'|'wheel'|'controls-menu'|'controls-pause'} */
+    /** @type {'menu'|'playing'|'paused'|'inventory'|'crafting'|'forge'|'forgeTable'|'chest'|'wheel'|'controls-menu'|'controls-pause'} */
     this.state = 'menu'
 
     this._onResize = () => this._resize()
@@ -580,6 +589,9 @@ export class Game {
       const f = this.forges.raycastFromCamera(this.camera)
       if (f && f.distance <= 2.6) trySet('forge', f.forgeId, f.distance, 'Abrir', 'Forja')
 
+      const ch = this.chests.raycastFromCamera?.(this.camera)
+      if (ch && ch.distance <= 2.6) trySet('chest', ch.chestId, ch.distance, 'Abrir', 'Baú')
+
       const c = this.fires.raycastFromCamera?.(this.camera)
       if (c && c.distance <= 2.6) {
         const lit = this.fires.isLit(c.campfireId)
@@ -617,6 +629,7 @@ export class Game {
     let root = null
     if (t.kind === 'forge') root = this.forges.get(t.id)?.mesh
     else if (t.kind === 'forgeTable') root = this.forgeTables.get(t.id)?.mesh
+    else if (t.kind === 'chest') root = this.chests.get(t.id)?.mesh
     else if (t.kind === 'campfire') root = this.fires.get(t.id)?.mesh
 
     if (!root) return
@@ -656,6 +669,7 @@ export class Game {
     if (!t) return
     if (t.kind === 'forge') return this.openForge(t.id)
     if (t.kind === 'forgeTable') return this.openForgeTable(t.id)
+    if (t.kind === 'chest') return this.openChest(t.id)
     if (t.kind === 'campfire') return this._campfireToggle(t.id)
   }
 
@@ -684,6 +698,42 @@ export class Game {
     if (!t) return false
     if (t.kind === 'campfire') return false
 
+    // Chest: only allow pickup if empty.
+    if (t.kind === 'chest') {
+      if (this.state === 'chest' && this._activeChestId === t.id) return false
+      // best-effort: if we haven't loaded slots, ask server quickly.
+      if (!this._persistCtx?.worldId || !this._persistCtx?.guestId) {
+        this.ui.toast('Offline: não pode recolher baú.', 1000)
+        return false
+      }
+      try {
+        // NOTE: blocking sync not ideal, but pickup is rare.
+      } catch {}
+      // We will enforce empty on server on GET/PUT later; for now, client-side: refuse if we have cached non-empty.
+      // (If unknown, allow pickup but chest will be empty anyway if never used.)
+      const known = this._activeChestId === t.id ? this._chestSlots : null
+      if (known && known.some((s) => s && s.qty > 0)) {
+        this.ui.toast('Baú não está vazio.', 1000)
+        return false
+      }
+
+      const overflow = this.inventory.add(ItemId.CHEST, 1)
+      if (overflow) {
+        this.ui.toast('Inventário cheio.', 1000)
+        return false
+      }
+
+      const removed = this.chests.remove(t.id)
+      if (!removed) {
+        this.inventory.remove(ItemId.CHEST, 1)
+        this.ui.toast('Falha ao recolher.', 1000)
+        return false
+      }
+
+      this.ui.toast('Recolhido.', 900)
+      return true
+    }
+
     const itemId = t.kind === 'forge' ? ItemId.FORGE : t.kind === 'forgeTable' ? ItemId.FORGE_TABLE : null
     if (!itemId) return false
 
@@ -707,6 +757,18 @@ export class Game {
 
   _destroyStructure(t) {
     if (!t) return
+
+    if (t.kind === 'chest') {
+      const known = this._activeChestId === t.id ? this._chestSlots : null
+      if (known && known.some((s) => s && s.qty > 0)) {
+        this.ui.toast('Baú não está vazio.', 1000)
+        return
+      }
+      this.chests.remove(t.id)
+      this.ui.toast('Destruído.', 900)
+      return
+    }
+
     if (t.kind === 'forge') this.forges.remove(t.id)
     else if (t.kind === 'forgeTable') this.forgeTables.remove(t.id)
     else if (t.kind === 'campfire') this.fires.remove(t.id)
@@ -774,6 +836,11 @@ export class Game {
         this._forgeTableGhost.setVisible(true)
         return
       }
+      if (this.tool === 'chest' && this.hotbarActive !== 0 && !this._inMine) {
+        this._placingChest = true
+        this._chestGhost.setVisible(true)
+        return
+      }
     }
 
     if (e.button !== 0) return
@@ -805,6 +872,13 @@ export class Game {
       this._placingForgeTable = false
       this._forgeTableGhost.setVisible(false)
       if (this._ghostValid) this._placeForgeTableAtGhost()
+      return
+    }
+
+    if (e.button === 0 && this._placingChest) {
+      this._placingChest = false
+      this._chestGhost.setVisible(false)
+      if (this._ghostValid) this._placeChestAtGhost()
       return
     }
   }
@@ -1051,6 +1125,7 @@ export class Game {
     this.ui.hideInventory?.()
     this.ui.hideCrafting?.()
     this.ui.hideForge?.()
+    this.ui.hideChest?.()
     this.ui.showHUD()
 
     await this.sfx.enable()
@@ -1198,6 +1273,82 @@ export class Game {
 
     this.ui.showForgeTable()
     this.ui.renderForgeTable(FORGE_TABLE_RECIPES, (id) => this.inventory.count(id), (id) => ITEMS[id], (rid) => this.craftForgeTable(rid))
+  }
+
+  async openChest(chestId) {
+    if (this.state !== 'playing') return
+    const ch = this.chests.get(chestId)
+    if (!ch) return
+    if (!this._persistCtx?.worldId || !this._persistCtx?.guestId) {
+      this.ui.toast('Offline: baú indisponível.', 1100)
+      return
+    }
+
+    this.state = 'chest'
+    this._activeChestId = chestId
+
+    this.player.setLocked(false)
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+
+    // Load (and create if missing) server-side chest state
+    try {
+      const { loadChestState } = await import('../net/chestState.js')
+      const res = await loadChestState({ worldId: this._persistCtx.worldId, chestId, guestId: this._persistCtx.guestId })
+      if (!res?.ok) {
+        this.ui.toast('Trancado.', 1100)
+        this._activeChestId = null
+        await this.returnToGameMode()
+        return
+      }
+      this._chestSlots = Array.isArray(res?.state?.slots) ? res.state.slots.slice(0, 16) : Array.from({ length: 16 }, () => null)
+      while (this._chestSlots.length < 16) this._chestSlots.push(null)
+    } catch {
+      this.ui.toast('Servidor indisponível (baú).', 1100)
+      this._activeChestId = null
+      await this.returnToGameMode()
+      return
+    }
+
+    this.ui.showChest?.()
+    this.ui.renderChestInventory?.(this.inventory.slots, (id) => ITEMS[id])
+    this.ui.renderChest?.(this._chestSlots, (id) => ITEMS[id])
+  }
+
+  _queueChestSave(chestId = null) {
+    if (this.state !== 'chest') return
+    const cid = String(chestId || this._activeChestId || '')
+    if (!cid) return
+    if (!this._persistCtx?.worldId || !this._persistCtx?.guestId) return
+
+    const worldId = this._persistCtx.worldId
+    const guestId = this._persistCtx.guestId
+
+    if (this._chestSaveTimer) clearTimeout(this._chestSaveTimer)
+    this._chestSaveTimer = window.setTimeout(async () => {
+      this._chestSaveTimer = 0
+      try {
+        const { saveChestState } = await import('../net/chestState.js')
+        await saveChestState({ worldId, chestId: cid, guestId, state: { slots: this._chestSlots } })
+      } catch {
+        // silent
+      }
+    }, 600)
+  }
+
+  async closeChest() {
+    if (this.state !== 'chest') return
+
+    // Flush save best-effort
+    try {
+      if (this._chestSaveTimer) {
+        clearTimeout(this._chestSaveTimer)
+        this._chestSaveTimer = 0
+      }
+      this._queueChestSave(this._activeChestId)
+    } catch {}
+
+    this._activeChestId = null
+    await this.returnToGameMode()
   }
 
   async closeForgeTable() {
@@ -1622,6 +1773,7 @@ export class Game {
     else if (s.id === ItemId.CAMPFIRE) this.setTool('campfire')
     else if (s.id === ItemId.FORGE) this.setTool('forge')
     else if (s.id === ItemId.FORGE_TABLE) this.setTool('forgeTable')
+    else if (s.id === ItemId.CHEST) this.setTool('chest')
     else this.setTool('hand')
 
     if (this.state === 'playing') {
@@ -1638,7 +1790,9 @@ export class Game {
                   ? 'Forja selecionada.'
                   : this.tool === 'forgeTable'
                     ? 'Mesa de forja selecionada.'
-                    : 'Mão equipada.'
+                    : this.tool === 'chest'
+                      ? 'Baú selecionado.'
+                      : 'Mão equipada.'
       this.ui.toast(msg, 900)
     }
   }
@@ -1662,6 +1816,11 @@ export class Game {
         if (kind === 'in') return forge.input
         if (kind === 'out') return forge.output
         return null
+      }
+      if (loc === 'chest') {
+        if (this.state !== 'chest') return null
+        if (kind !== 'chest') return null
+        return this._chestSlots
       }
       return null
     }
@@ -1691,6 +1850,8 @@ export class Game {
         if (!ok) return
       }
     }
+
+    // Chest rules: anything goes (personal storage)
 
     const dst = dstArr[dIdx]
 
@@ -1746,8 +1907,8 @@ export class Game {
     // Keep hand fixed.
     this.hotbar[0] = { id: 'hand', qty: 1 }
 
-    // Re-render if inventory/forge open.
-    if (this.state === 'inventory' || this.state === 'forge') {
+    // Re-render if inventory/forge/chest open.
+    if (this.state === 'inventory' || this.state === 'forge' || this.state === 'chest') {
       if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
 
       if (this.state === 'forge') {
@@ -1756,6 +1917,11 @@ export class Game {
           const f = this.forges.get(this._activeForgeId)
           if (f) this.ui.renderForge(f, (id) => ITEMS[id], { secondsPerIngot: this.forges.secondsPerIngot })
         }
+      }
+
+      if (this.state === 'chest') {
+        this.ui.renderChestInventory?.(this.inventory.slots, (id) => ITEMS[id])
+        this.ui.renderChest?.(this._chestSlots, (id) => ITEMS[id])
       }
 
       this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
@@ -1770,8 +1936,9 @@ export class Game {
       this.selectHotbar(this.hotbarActive)
     }
 
-    // Persist forge state server-side (debounced)
+    // Persist forge/chest state server-side (debounced)
     if (this.state === 'forge') this._queueForgeSave(this._activeForgeId)
+    if (this.state === 'chest') this._queueChestSave(this._activeChestId)
   }
 
   // ----------------- persistence -----------------
@@ -2036,6 +2203,10 @@ export class Game {
         this._appliedWorld.forgeTables.add(id)
         this.forgeTables.place({ x, z }, id)
         this._hasForgeTableBuilt = true
+      } else if (type === 'chest') {
+        if (this._appliedWorld.chests.has(id)) continue
+        this._appliedWorld.chests.add(id)
+        this.chests.place({ x, z }, id)
       }
 
       const k = `place:${id}`
@@ -2266,6 +2437,62 @@ export class Game {
     }
   }
 
+  _updateChestGhost() {
+    const p = raycastGround(this.camera)
+    if (!p) {
+      this._ghostValid = false
+      this._chestGhost.setValid(false)
+      return
+    }
+
+    const x = Math.round(p.x * 10) / 10
+    const z = Math.round(p.z * 10) / 10
+    this._ghostX = x
+    this._ghostZ = z
+
+    const dx = x - this.player.position.x
+    const dz = z - this.player.position.z
+    const d = Math.hypot(dx, dz)
+
+    const nearFire = this.fires.getNearest({ x, z }, 1.6)
+    const nearForge = this._getNearestForge({ x, z }, 2.0)
+    const nearTable = this.forgeTables.getColliders().some((c) => Math.hypot(c.x - x, c.z - z) < 2.0)
+    const nearChest = this.chests.getColliders().some((c) => Math.hypot(c.x - x, c.z - z) < 1.6)
+
+    const ok = d >= 1.2 && !nearFire && !nearForge && !nearTable && !nearChest
+    this._ghostValid = ok
+    this._chestGhost.setValid(ok)
+    this._chestGhost.setPos(x, z)
+  }
+
+  _placeChestAtGhost() {
+    const slot = this.hotbar[this.hotbarActive]
+    if (!slot || slot.id !== ItemId.CHEST) return
+
+    const placeId = crypto.randomUUID?.() ?? String(Math.random()).slice(2)
+    const key = `place:${placeId}`
+
+    this._setPendingWorldAction(key, () => {
+      this.chests.place({ x: this._ghostX, z: this._ghostZ }, placeId)
+
+      slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
+      if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+
+      this.ui.toast('Baú colocado.', 900)
+      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+
+      if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+    })
+
+    const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'chest', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
+    if (!sent) {
+      const rec = this._pendingWorldActions.get(key)
+      if (rec?.timeoutId) clearTimeout(rec.timeoutId)
+      this._pendingWorldActions.delete(key)
+      this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+    }
+  }
+
   _placeForgeAtGhost() {
     const slot = this.hotbar[this.hotbarActive]
     if (!slot || slot.id !== ItemId.FORGE) return
@@ -2465,6 +2692,9 @@ export class Game {
     if (simDt > 0 && this._placingForgeTable) {
       this._updateForgeTableGhost()
     }
+    if (simDt > 0 && this._placingChest) {
+      this._updateChestGhost()
+    }
 
     const authoritative = !!(this._wsConnected && this.wsMeId)
 
@@ -2476,6 +2706,7 @@ export class Game {
           .concat(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
           .concat(this._inMine ? [] : this.forges.getColliders())
           .concat(this._inMine ? [] : this.forgeTables.getColliders())
+          .concat(this._inMine ? [] : this.chests.getColliders())
           .concat(this._inMine ? [] : this.river.getColliders())
           // Lake is decorative; collision boundary is enforced by the river.
       : []

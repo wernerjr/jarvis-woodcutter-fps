@@ -15,7 +15,7 @@
         {
           "id": "P5-S1",
           "title": "Baú pessoal: craft + colocar + abrir só o dono + recolher/destruir só vazio",
-          "status": "todo",
+          "status": "doing",
           "objective": "Adicionar um baú colocável para o jogador guardar itens, com acesso exclusivo do dono.",
           "description": "Criar um novo item/estrutura 'Baú'. O jogador crafta e coloca no mundo. Cada baú nasce com um ownerId (player/guestId) e só esse owner pode abrir e mover itens. Outros jogadores ao interagir devem ver um feedback simples ('Trancado'). Recolher (pickup) e destruir só é permitido se o baú estiver vazio.",
           "acceptanceCriteria": [

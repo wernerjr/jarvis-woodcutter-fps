@@ -165,7 +165,7 @@ export class UI {
     return `Dur: ${dur ?? '-'}`
   }
 
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement, hitmarkerEl?: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, chestEl?: HTMLElement, chestInvGridEl?: HTMLElement, chestSlotsEl?: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement, hitmarkerEl?: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -224,12 +224,14 @@ export class UI {
   showHUD() {
     document.body.classList.remove('state-menu')
     document.body.classList.remove('forge-open')
+    document.body.classList.remove('chest-open')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
     this.els.inventoryEl.classList.add('hidden')
     this.els.craftingEl.classList.add('hidden')
     this.els.forgeEl.classList.add('hidden')
+    this.els.chestEl?.classList.add('hidden')
     this.els.forgeTableEl.classList.add('hidden')
     this.els.hudEl.classList.remove('hidden')
   }
@@ -239,6 +241,7 @@ export class UI {
     this.els.controlsEl.classList.remove('hidden')
     this.els.inventoryEl.classList.add('hidden')
     this.els.forgeEl.classList.add('hidden')
+    this.els.chestEl?.classList.add('hidden')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
   }
@@ -249,6 +252,7 @@ export class UI {
     this.els.inventoryEl.classList.remove('hidden')
     this.els.craftingEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
+    this.els.chestEl?.classList.add('hidden')
     this.els.menuEl.classList.add('hidden')
     this.els.pauseEl.classList.add('hidden')
     this.els.hudEl.classList.remove('hidden')
@@ -262,9 +266,11 @@ export class UI {
   showForge() {
     document.body.classList.add('forge-open')
     document.body.classList.remove('inventory-open')
+    document.body.classList.remove('chest-open')
 
     // Single forge panel: embedded inventory on the left.
     this.els.forgeEl.classList.remove('hidden')
+    this.els.chestEl?.classList.add('hidden')
     this.els.inventoryEl.classList.add('hidden')
 
     this.els.craftingEl.classList.add('hidden')
@@ -277,6 +283,27 @@ export class UI {
   hideForge() {
     document.body.classList.remove('forge-open')
     this.els.forgeEl.classList.add('hidden')
+  }
+
+  showChest() {
+    document.body.classList.add('chest-open')
+    document.body.classList.remove('inventory-open')
+    document.body.classList.remove('forge-open')
+
+    this.els.chestEl?.classList.remove('hidden')
+    this.els.forgeEl.classList.add('hidden')
+    this.els.inventoryEl.classList.add('hidden')
+
+    this.els.craftingEl.classList.add('hidden')
+    this.els.controlsEl.classList.add('hidden')
+    this.els.menuEl.classList.add('hidden')
+    this.els.pauseEl.classList.add('hidden')
+    this.els.hudEl.classList.remove('hidden')
+  }
+
+  hideChest() {
+    document.body.classList.remove('chest-open')
+    this.els.chestEl?.classList.add('hidden')
   }
 
   showForgeTable() {
@@ -327,6 +354,53 @@ export class UI {
       }
 
       grid.appendChild(cell)
+    }
+  }
+
+  renderChestInventory(slots, getItem) {
+    const grid = this.els.chestInvGridEl
+    if (!grid) return
+    grid.innerHTML = ''
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i]
+      const cell = document.createElement('div')
+      cell.className = 'invSlot' + (s ? ' draggable' : ' invEmpty')
+      cell.dataset.index = String(i)
+
+      if (s) {
+        const item = getItem(s.id)
+        cell.draggable = true
+        const extra = item.stackable ? `${s.qty} / 100` : this._toolLine(s)
+        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${extra}</div>`
+      } else {
+        cell.innerHTML = ''
+      }
+
+      grid.appendChild(cell)
+    }
+  }
+
+  renderChest(slots, getItem) {
+    const root = this.els.chestSlotsEl
+    if (!root) return
+    root.innerHTML = ''
+
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i]
+      const el = document.createElement('div')
+      el.className = 'forgeSlot' + (s ? '' : ' empty')
+      el.draggable = !!s
+      el.dataset.kind = 'chest'
+      el.dataset.index = String(i)
+
+      if (!s) {
+        el.innerHTML = `<div class="line1"><div class="ico">+</div><div class="qty">vazio</div></div><div class="muted small">&nbsp;</div>`
+      } else {
+        const it = getItem(s.id)
+        el.innerHTML = `<div class="line1"><div class="ico">${it?.icon ?? ''}</div><div class="qty">${s.qty}</div></div><div class="muted small">${it?.name ?? s.id}</div>`
+      }
+
+      root.appendChild(el)
     }
   }
 

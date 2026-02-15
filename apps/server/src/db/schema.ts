@@ -44,6 +44,22 @@ export const forgeState = pgTable(
   })
 );
 
+export const chestState = pgTable(
+  'chest_state',
+  {
+    worldId: text('world_id')
+      .notNull()
+      .references(() => worlds.id),
+    chestId: text('chest_id').notNull(),
+    ownerId: text('owner_id').notNull(),
+    state: jsonb('state').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.worldId, t.chestId] }),
+  })
+);
+
 export const playerState = pgTable(
   'player_state',
   {
