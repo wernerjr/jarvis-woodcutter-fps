@@ -2046,7 +2046,7 @@ export class Game {
         const reason = String(msg.reason || '')
         if (reason === 'already_removed') this.ui.toast('Já foi coletado por outro jogador.', 1100)
         else if (reason === 'duplicate') this.ui.toast('Já existe.', 900)
-        else this.ui.toast('Ação rejeitada pelo servidor.', 1100)
+        else this.ui.toast(`Ação rejeitada pelo servidor (${reason}).`, 1300)
         return
       }
 
@@ -2459,7 +2459,8 @@ export class Game {
     const nearTable = this.forgeTables.getColliders().some((c) => Math.hypot(c.x - x, c.z - z) < 2.0)
     const nearChest = this.chests.getColliders().some((c) => Math.hypot(c.x - x, c.z - z) < 1.6)
 
-    const ok = d >= 1.2 && !nearFire && !nearForge && !nearTable && !nearChest
+    // Must be within reach; server also validates with WOODCUTTER_WORLD_EVENT_RADIUS.
+    const ok = d >= 1.2 && d <= 3.0 && !nearFire && !nearForge && !nearTable && !nearChest
     this._ghostValid = ok
     this._chestGhost.setValid(ok)
     this._chestGhost.setPos(x, z)
