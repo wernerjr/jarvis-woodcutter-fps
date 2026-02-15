@@ -654,7 +654,10 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
         st.worldId = msg.worldId;
         st.lastAtMs = nowMs();
 
-        // Reset input on join (prevents "stuck running" if old input lingers).
+        // Reset sequencing/input on join (important on reconnect/page refresh).
+        // Client seq restarts at 1; if we keep an old lastSeq, we would ignore all inputs
+        // and the client would rubber-band back to spawn.
+        st.lastSeq = 0;
         st.input = undefined;
 
         // Apply optional spawn hint.
