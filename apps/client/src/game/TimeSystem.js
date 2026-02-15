@@ -11,24 +11,43 @@ function smoothstep(edge0, edge1, x) {
 
 export class TimeSystem {
   /**
-   * 24h in 10 real minutes => 600s.
+   * Real-time tuned cycle:
+   * - Day (sunrise->sunset): 15 min (900s)
+   * - Night (sunset->sunrise): 5 min (300s)
+   * Total: 20 min (1200s)
+   *
+   * In-game clock remains 24h with sunrise=06:00, sunset=18:00.
+   * We achieve 15/5 by advancing hours at different rates in day vs night.
+   *
    * @param {{startHours?: number}} opts
    */
   constructor({ startHours = 9.0 } = {}) {
-    this.daySeconds = 600
-    this.hoursPerSecond = 24 / this.daySeconds
+    // Conventional sunrise/sunset (for blending + UI).
+    this.sunrise = 6
+    this.sunset = 18
+
+    // Real seconds per segment.
+    this.realDaySeconds = 15 * 60
+    this.realNightSeconds = 5 * 60
+
+    // In-game hours per segment.
+    this.dayHours = 12 // 06 -> 18
+    this.nightHours = 12 // 18 -> 06
 
     this.hours = startHours
     this.norm = this.hours / 24
-
-    // Conventional sunrise/sunset (for blending).
-    this.sunrise = 6
-    this.sunset = 18
   }
 
   update(dt) {
     if (dt <= 0) return
-    this.hours = (this.hours + dt * this.hoursPerSecond) % 24
+
+    const h = this.hours
+    const isDay = h >= this.sunrise && h < this.sunset
+
+    // Advance faster at night so it lasts only 5 min real time.
+    const hoursPerSecond = isDay ? (this.dayHours / this.realDaySeconds) : (this.nightHours / this.realNightSeconds)
+
+    this.hours = (h + dt * hoursPerSecond) % 24
     this.norm = this.hours / 24
   }
 
@@ -40,15 +59,21 @@ export class TimeSystem {
 
   /**
    * Returns daylight factor [0..1] with smooth transitions.
-   * Uses a simple solar altitude model.
+   * We blend around sunrise/sunset in *clock hours* (not cosine altitude)
+   * so day/night lengths can be asymmetric (15/5).
    */
   getDayFactor() {
-    // angle: -pi at midnight, 0 at noon, pi at next midnight
-    const a = this.norm * Math.PI * 2 - Math.PI
-    const altitude = Math.cos(a) // 1 at noon, -1 at midnight
+    const h = this.hours
 
-    // Widen transition band so dawn/dusk lasts a bit.
-    return smoothstep(-0.10, 0.20, altitude)
+    // Transition width in in-game hours.
+    // 1.0h ~= ~75s in day, ~25s at night (good enough).
+    const w = 1.0
+
+    const sunriseIn = smoothstep(this.sunrise - w, this.sunrise + w, h)
+    const sunsetOut = 1 - smoothstep(this.sunset - w, this.sunset + w, h)
+
+    // If we're after midnight (< sunrise), sunriseIn will be ~0; that's fine.
+    return clamp(sunriseIn * sunsetOut, 0, 1)
   }
 
   /**

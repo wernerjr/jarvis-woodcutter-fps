@@ -156,7 +156,8 @@ export class CampfireManager {
     if (!f) return false
     f.lit = !!lit
     if (f.lit) f.ttl = 180
-    f.light.intensity = f.lit ? this._torchMain * 3.6 : 0.0
+    // Doubled campfire brightness.
+    f.light.intensity = f.lit ? this._torchMain * 7.2 : 0.0
     const ember = f.mesh.userData.ember
     const flame = f.mesh.userData.flame
     if (ember?.material) ember.material.emissiveIntensity = f.lit ? 0.8 : 0.0

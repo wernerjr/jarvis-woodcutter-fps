@@ -594,26 +594,21 @@ export class Game {
     const nextKey = t ? `${t.kind}:${t.id}` : null
     if (nextKey === this._hlKey) return
 
-    // clear previous
-    if (this._hlMeshes?.length) {
-      for (const m of this._hlMeshes) {
-        const mat = m.material
-        if (mat && typeof mat === 'object') {
-          if ('emissiveIntensity' in mat) {
-            mat.emissiveIntensity = m.userData.__hlPrevEmiIntensity ?? mat.emissiveIntensity
-          }
-          // IMPORTANT: emissive is a mutable Color; store/restore hex, not the object reference.
-          if (mat.emissive && typeof mat.emissive.getHex === 'function' && typeof mat.emissive.setHex === 'function') {
-            const prevHex = m.userData.__hlPrevEmiHex
-            if (typeof prevHex === 'number') {
-              try { mat.emissive.setHex(prevHex) } catch {}
-            }
-          }
+    // clear previous (IMPORTANT: some meshes share the same material instance;
+    // restore must happen per-material, not per-mesh, otherwise the “prev” value
+    // can be captured after we already tinted the shared material.)
+    if (this._hlMats?.size) {
+      for (const [mat, prev] of this._hlMats.entries()) {
+        if (!mat || typeof mat !== 'object') continue
+        if ('emissiveIntensity' in mat && typeof prev?.emiIntensity === 'number') {
+          mat.emissiveIntensity = prev.emiIntensity
         }
-        delete m.userData.__hlPrevEmiIntensity
-        delete m.userData.__hlPrevEmiHex
+        if (mat.emissive && typeof mat.emissive.setHex === 'function' && typeof prev?.emiHex === 'number') {
+          try { mat.emissive.setHex(prev.emiHex) } catch {}
+        }
       }
     }
+    this._hlMats = new Map()
     this._hlMeshes = []
     this._hlKey = nextKey
 
@@ -641,11 +636,13 @@ export class Game {
 
     for (const m of meshes) {
       const mat = m.material
-      m.userData.__hlPrevEmiIntensity = mat.emissiveIntensity
-      try {
-        m.userData.__hlPrevEmiHex = mat.emissive?.getHex?.()
-      } catch {
-        m.userData.__hlPrevEmiHex = null
+      if (!mat || typeof mat !== 'object') continue
+
+      // store prev once per material (shared materials are common in our props)
+      if (!this._hlMats.has(mat)) {
+        let prevHex = null
+        try { prevHex = mat.emissive?.getHex?.() } catch {}
+        this._hlMats.set(mat, { emiIntensity: mat.emissiveIntensity, emiHex: prevHex })
       }
 
       try { mat.emissive?.setHex?.(HL_HEX) } catch {}
@@ -2526,10 +2523,11 @@ export class Game {
 
     const flicker = 0.90 + 0.10 * Math.sin(performance.now() * 0.018) + 0.05 * Math.sin(performance.now() * 0.041)
 
-    // Torch baseline brightness signal (used for campfire target = 3x).
-    // Torch baseline brightness signal (used for campfire/forge scaling).
-    // Doubled torch brightness.
-    const torchMain = (3.2 + night * 6.0) * flicker
+    // Baseline brightness signal for world fire/forge lighting (scales a bit with night).
+    const fireMain = (3.2 + night * 6.0) * flicker
+
+    // Torch brightness (doubled as requested).
+    const torchMain = fireMain * 2.0
 
     const targetSpot = torchOn ? torchMain : 0.0
     const targetPoint = torchOn ? torchMain * 0.65 : 0.0
@@ -2538,8 +2536,8 @@ export class Game {
     this.torchPoint.intensity += (targetPoint - this.torchPoint.intensity) * (simDt > 0 ? 0.25 : 0.0)
 
     // Provide baseline to campfire/forge lighting.
-    this.fires.setTorchMain(torchMain)
-    this.forges.setTorchMain(torchMain)
+    this.fires.setTorchMain(fireMain)
+    this.forges.setTorchMain(fireMain)
 
     // Sync flame visuals with the same flicker signal.
     // Keep torch flame visible even during daytime.

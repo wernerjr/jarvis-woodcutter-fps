@@ -117,50 +117,74 @@ function addOutput(st: any, id: string, qty: number) {
 }
 
 function advanceForge(st: any, dtSec: number) {
-  let dt = Math.max(0, dtSec);
+  let remaining = Math.max(0, dtSec);
   // cap catch-up to avoid huge loops (MVP)
-  dt = Math.min(dt, 6 * 60 * 60);
+  remaining = Math.min(remaining, 6 * 60 * 60);
 
-  // burn down regardless of input
-  if (st.enabled && st.burn > 0) {
-    st.burn = Math.max(0, st.burn - dt);
+  // If enabled but missing ore, shutdown immediately (matches client)
+  if (st.enabled && !hasOre(st)) {
+    st.enabled = false;
   }
 
-  const ore = hasOre(st);
-  const outSpace = outputHasSpace(st);
+  // Offline catch-up must account for the fact that burn is consumed over time.
+  // We cannot just subtract the whole dt from burn first, otherwise we lose all
+  // production that should have happened while burn was available.
+  //
+  // Model:
+  // - While enabled, if we have ore + output space, we convert available burn-time
+  //   into progress.
+  // - When burn is low, we may auto-consume fuel (same rule as client).
+  // - When we can't proceed (no ore/space, no fuel+burn), stop.
+  let safety = 0;
+  while (remaining > 1e-6 && st.enabled) {
+    safety++;
+    if (safety > 50000) break;
 
-  // progress only when burning + ore + space
-  if (st.enabled && st.burn > 0 && ore && outSpace) {
-    st.prog = (st.prog ?? 0) + dt;
+    const ore = hasOre(st);
+    const outSpace = outputHasSpace(st);
+    if (!ore || !outSpace) {
+      // client shuts down immediately when ore missing; keep that behavior
+      st.enabled = false;
+      break;
+    }
+
+    const hf = hasFuel(st);
+
+    // auto-consume fuel when low (or when burning and ore is present)
+    if ((st.burn ?? 0) <= 0.1 || ((st.burn ?? 0) > 0 && (st.burn ?? 0) < 2.5 && ore)) {
+      if (hf) consumeOneFuel(st);
+    }
+
+    const burnNow = Number(st.burn ?? 0);
+    if (burnNow <= 0.001) {
+      // No burn available; if no fuel, shut down.
+      if (!hasFuel(st)) {
+        st.enabled = false;
+        break;
+      }
+      // otherwise loop will consume fuel on next iteration
+      continue;
+    }
+
+    // Advance by the amount of time we can actually burn.
+    const step = Math.min(remaining, burnNow);
+    st.burn = Math.max(0, burnNow - step);
+    remaining -= step;
+
+    st.prog = (st.prog ?? 0) + step;
+
     while (st.prog >= secondsPerIngot) {
-      // Stop if we ran out of burn/ore/space mid-loop
-      if (!(st.burn > 0 && hasOre(st) && outputHasSpace(st))) break;
-
+      if (!(hasOre(st) && outputHasSpace(st))) break;
       st.prog -= secondsPerIngot;
       consumeOneOre(st);
       addOutput(st, ItemId.IRON_INGOT, 1);
-
-      // As in client: try to auto-consume fuel while enabled
-      if ((st.burn <= 0.1 || (st.burn > 0 && st.burn < 2.5 && hasOre(st))) && hasFuel(st)) {
-        consumeOneFuel(st);
-      }
-
-      // shutdown rules
-      if (st.enabled) {
-        const hf = hasFuel(st);
-        const ho = hasOre(st);
-        if (!ho || (!hf && st.burn <= 0.001)) st.enabled = false;
-      }
-
-      if (!st.enabled) break;
     }
-  }
 
-  // If enabled but missing ore, shutdown immediately (matches client)
-  if (st.enabled) {
-    const ho = hasOre(st);
-    const hf = hasFuel(st);
-    if (!ho || (!hf && st.burn <= 0.001)) st.enabled = false;
+    // Shutdown rule: if we ran out of ore, or we have no fuel and no burn left.
+    if (!hasOre(st) || (!hasFuel(st) && (st.burn ?? 0) <= 0.001)) {
+      st.enabled = false;
+      break;
+    }
   }
 
   // keep sane

@@ -44,7 +44,8 @@ export class MineManager {
     this._lights = new THREE.Group()
     this._lights.name = 'MineLights'
 
-    this._amb = new THREE.AmbientLight(0x242432, 0.20)
+    // Mine should be readable even without torch; torch still improves contrast.
+    this._amb = new THREE.AmbientLight(0x2e3142, 0.35)
 
     /** @type {THREE.CatmullRomCurve3[]} */
     this._curves = []

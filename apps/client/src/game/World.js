@@ -234,23 +234,24 @@ export class World {
     }
 
     // Light tuning
-    this._sun.intensity = 0.15 + day * 1.25
+    this._sun.intensity = 0.20 + day * 1.20
     this._sun.color.setHex(0xfff1d6)
 
-    this._moon.intensity = 0.09 + night * 0.42
+    // Brighter moonlight (goal: navigable nights without torch).
+    this._moon.intensity = 0.18 + night * 0.62
     this._moon.color.setHex(0x9bbcff)
 
-    // Slightly brighter nights (still clearly darker than day)
-    this._amb.intensity = 0.18 + day * 0.52
-    this._amb.color.setHex(day > 0.5 ? 0x5d7a5d : 0x2a3a52)
+    // Brighter ambient at night, still clearly darker than day.
+    this._amb.intensity = 0.30 + day * 0.46
+    this._amb.color.setHex(day > 0.5 ? 0x5d7a5d : 0x344862)
 
     // Sky + fog blending
     const skyDayTop = new THREE.Color(0x5aa6ff)
     const skyDayBottom = new THREE.Color(0xbfe7ff)
     const skyDuskTop = new THREE.Color(0x2b3a7a)
     const skyDuskBottom = new THREE.Color(0xffb07a)
-    const skyNightTop = new THREE.Color(0x0a1022)
-    const skyNightBottom = new THREE.Color(0x101f33)
+    const skyNightTop = new THREE.Color(0x121a2f)
+    const skyNightBottom = new THREE.Color(0x1b2c45)
 
     const dusk = 1 - Math.abs(day * 2 - 1) // peak at transitions
 
@@ -283,10 +284,10 @@ export class World {
     if (this._sunMesh) this._sunMesh.material.opacity = 0.15 + day * 0.95
     if (this._moonMesh) this._moonMesh.material.opacity = 0.22 + night * 0.78
 
-    // Fog density slightly higher at night
-    const fogColor = bottom.clone().lerp(top, 0.65).multiplyScalar(0.75)
+    // Fog density slightly higher at night (but don't crush visibility)
+    const fogColor = bottom.clone().lerp(top, 0.65).multiplyScalar(0.88)
     this.scene.fog.color.copy(fogColor)
-    this.scene.fog.density = 0.018 + night * 0.008
+    this.scene.fog.density = 0.016 + night * 0.006
 
     // Keep sky centered on camera
     if (this._sky) this._sky.position.copy(camera.position)

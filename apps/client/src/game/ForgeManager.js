@@ -331,7 +331,8 @@ export class ForgeManager {
 
       const flick = 0.9 + 0.1 * Math.sin(this._t * 7.2) + 0.06 * Math.sin(this._t * 11.9)
       const heat01 = Math.min(1, (f.enabled ? f.burn : 0) / 12)
-      const I = this._torchMain * 1.4 * heat01 * flick
+      // Doubled forge brightness.
+      const I = this._torchMain * 2.8 * heat01 * flick
 
       f.light.intensity = I
       f.light.distance = 10
