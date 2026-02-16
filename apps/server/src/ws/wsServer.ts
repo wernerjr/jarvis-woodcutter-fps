@@ -861,7 +861,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
                   try {
                     await db
                       .insert(chestState)
-                      .values({ worldId: st.worldId, chestId: id, ownerId: st.guestId, state: { slots: Array.from({ length: 16 }, () => null) }, updatedAt: new Date() })
+                      .values({ worldId: st.worldId, chestId: id, ownerId: st.guestId, state: { slots: Array.from({ length: 15 }, () => null) }, updatedAt: new Date() })
                       .onConflictDoNothing();
                   } catch {
                     // best-effort; if DB write fails, chest open will 404

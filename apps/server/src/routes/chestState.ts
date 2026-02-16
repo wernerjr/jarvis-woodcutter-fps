@@ -55,9 +55,9 @@ export async function registerChestStateRoutes(app: FastifyInstance) {
       }
 
       const st = ChestStateSchema.parse(rows[0].state ?? {});
-      // normalize to 16 slots
-      const slots = Array.isArray(st.slots) ? st.slots.slice(0, 16) : [];
-      while (slots.length < 16) slots.push(null);
+      // normalize to 15 slots
+      const slots = Array.isArray(st.slots) ? st.slots.slice(0, 15) : [];
+      while (slots.length < 15) slots.push(null);
 
       return { ok: true, worldId, chestId, state: { slots }, updatedAt: rows[0].updatedAt };
     } catch (err) {
@@ -79,9 +79,9 @@ export async function registerChestStateRoutes(app: FastifyInstance) {
       return reply.status(400).send({ ok: false, error: 'invalid_chest_state' });
     }
 
-    // normalize slots length 16
-    st.slots = Array.isArray(st.slots) ? st.slots.slice(0, 16) : [];
-    while (st.slots.length < 16) st.slots.push(null);
+    // normalize slots length 15
+    st.slots = Array.isArray(st.slots) ? st.slots.slice(0, 15) : [];
+    while (st.slots.length < 15) st.slots.push(null);
 
     try {
       // Verify ownership

@@ -96,8 +96,8 @@ button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,16
 .craftReq{margin-top:6px; color:var(--muted); font-size:12px;}
 .craftRow button{pointer-events:auto;}
 
-.invGrid{display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-top:10px;}
-.invSlot{border:1px solid var(--stroke); border-radius:12px; padding:10px; min-height:58px; background: rgba(255,255,255,0.04)}
+.invGrid{display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-top:10px; align-content:start; grid-auto-rows:minmax(62px, auto);}
+.invSlot{border:1px solid var(--stroke); border-radius:12px; padding:10px; min-height:62px; background: rgba(255,255,255,0.04)}
 .invSlot.invEmpty{background: rgba(255,255,255,0.02);}
 .invSlot.draggable{cursor: grab;}
 .invSlot.draggable:active{cursor: grabbing;}
@@ -135,12 +135,13 @@ body.forge-open #forge.overlay{display:flex;}
 body.forge-open #inventory.overlay{display:none;}
 
 #forge.overlay{background:rgba(0,0,0,.52)}
-#forge .card.forgePanel{width:min(78vw, 1200px); height:min(78vh, 860px); max-width:none; display:flex; flex-direction:column}
+#forge .card.forgePanel{width:min(96vw, 1400px); height:min(92vh, 980px); max-width:none; display:flex; flex-direction:column}
+#chest .card.forgePanel{width:min(96vw, 1400px); height:min(92vh, 980px); max-width:none; display:flex; flex-direction:column}
 
 .forgeHeader{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
 
-.forgeWide{flex:1; display:grid; grid-template-columns: 1.2fr 0.9fr 0.8fr; gap:14px; margin-top:10px; min-height:0}
-.forgeBlock{padding:12px; border:1px solid rgba(255,255,255,.10); border-radius:14px; background:rgba(0,0,0,.16); min-height:0; overflow:auto}
+.forgeWide{flex:1; display:grid; grid-template-columns: 1.4fr 1.0fr 1.0fr; gap:16px; margin-top:10px; min-height:0}
+.forgeBlock{padding:14px; border:1px solid rgba(255,255,255,.10); border-radius:14px; background:rgba(0,0,0,.16); min-height:0; overflow:auto}
 .forgeBlockTitle{font-weight:800; letter-spacing:.2px; margin-bottom:8px}
 
 .forgeInvGrid{margin-top:10px}
@@ -154,10 +155,13 @@ body.forge-open #inventory.overlay{display:none;}
 .forgeGrid{display:grid; grid-template-columns: 1fr 1fr; gap:12px}
 .forgeTitle{font-weight:800; margin:2px 0 4px}
 .forgeTitle.small{font-weight:800; font-size:12px; opacity:.9}
-.forgeSlots{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:8px}
+.forgeSlots{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:8px; align-content:start; grid-auto-rows:minmax(74px, auto)}
 .forgeOutSlots{grid-template-columns:repeat(2,1fr)}
 
-.forgeSlot{min-height:64px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.22); padding:10px; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer}
+/* Chest: use more columns (15 slots = 5x3) */
+body.chest-open #chestSlots.forgeSlots{grid-template-columns:repeat(5,1fr)}
+
+.forgeSlot{min-height:74px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.22); padding:10px; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer}
 .forgeSlot.empty{opacity:.55}
 .forgeSlot .line1{display:flex; justify-content:space-between; align-items:center}
 .forgeSlot .ico{font-size:22px}

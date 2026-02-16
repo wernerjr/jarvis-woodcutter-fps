@@ -127,7 +127,7 @@ export class Game {
     this._activeForgeId = null
     this._activeForgeTableId = null
     this._activeChestId = null
-    this._chestSlots = Array.from({ length: 16 }, () => null)
+    this._chestSlots = Array.from({ length: 15 }, () => null)
 
     this._ghost = new CampfireGhost()
     this._forgeGhost = new ForgeGhost()
@@ -1300,8 +1300,8 @@ export class Game {
         await this.returnToGameMode()
         return
       }
-      this._chestSlots = Array.isArray(res?.state?.slots) ? res.state.slots.slice(0, 16) : Array.from({ length: 16 }, () => null)
-      while (this._chestSlots.length < 16) this._chestSlots.push(null)
+      this._chestSlots = Array.isArray(res?.state?.slots) ? res.state.slots.slice(0, 15) : Array.from({ length: 15 }, () => null)
+      while (this._chestSlots.length < 15) this._chestSlots.push(null)
     } catch {
       this.ui.toast('Servidor indisponível (baú).', 1100)
       this._activeChestId = null
@@ -1328,7 +1328,7 @@ export class Game {
       this._chestSaveTimer = 0
       try {
         const { saveChestState } = await import('../net/chestState.js')
-        await saveChestState({ worldId, chestId: cid, guestId, state: { slots: this._chestSlots } })
+        await saveChestState({ worldId, chestId: cid, guestId, state: { slots: (this._chestSlots || []).slice(0, 15) } })
       } catch {
         // silent
       }
