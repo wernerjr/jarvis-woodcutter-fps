@@ -2527,6 +2527,7 @@ export class Game {
 
     this._wsSeq = (this._wsSeq || 0) + 1
     const inp = this.player.getNetInput()
+    this._lastNetInput = inp
 
     this.ws.send({
       t: 'input',
@@ -2542,6 +2543,17 @@ export class Game {
 
   _applyServerCorrection(me) {
     const now = Date.now()
+
+    // When the player is actively moving, positional reconciliation can feel like "rubber banding".
+    // Prefer local feel while moving; keep yaw gently aligned.
+    const k = this._lastNetInput?.keys
+    const moving = !!(k && (k.w || k.a || k.s || k.d))
+    if (moving) {
+      const yawT = me.yaw || 0
+      const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+      this.player.yaw.rotation.y += dy * 0.10
+      return
+    }
 
     // PERF/feel: avoid constant tiny corrections that "fight" the local movement.
     // Apply reconciliation at a limited rate.
