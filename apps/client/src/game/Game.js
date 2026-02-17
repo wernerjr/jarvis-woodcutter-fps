@@ -5,6 +5,7 @@ import { Player } from './Player.js'
 import { TreeManager } from './TreeManager.js'
 import { RockManager } from './RockManager.js'
 import { StickManager } from './StickManager.js'
+import { BushManager } from './BushManager.js'
 import { GrassManager } from './GrassManager.js'
 import { RiverManager } from './RiverManager.js'
 import { LakeManager } from './LakeManager.js'
@@ -74,6 +75,7 @@ export class Game {
     this.trees = new TreeManager({ scene: this.scene })
     this.rocks = new RockManager({ scene: this.scene })
     this.sticks = new StickManager({ scene: this.scene })
+    this.bushes = new BushManager({ scene: this.scene })
     this.fires = new CampfireManager({ scene: this.scene })
     this.forges = new ForgeManager({ scene: this.scene })
     this.forgeTables = new ForgeTableManager({ scene: this.scene })
@@ -96,6 +98,7 @@ export class Game {
     this._appliedWorld = {
       trees: new Set(),
       rocks: new Set(),
+      bushes: new Set(),
       ores: new Set(),
       campfires: new Set(),
       forges: new Set(),
@@ -216,6 +219,7 @@ export class Game {
     this.trees.init({ seed: 1337, count: 42, radius: 42 })
     this.rocks.init({ seed: 2026, count: 32, radius: 45 })
     this.sticks.init({ seed: 1991, count: 46, radius: 45 })
+    this.bushes.init({ seed: 3033, count: 26, radius: 46 })
 
     this.mine.init()
     // Hide interior while in the world (prevents reaching it by walking out of bounds).
@@ -2124,6 +2128,7 @@ export class Game {
     const removedTrees = Array.isArray(st.removedTrees) ? st.removedTrees : []
     const removedRocks = Array.isArray(st.removedRocks) ? st.removedRocks : []
     const removedSticks = Array.isArray(st.removedSticks) ? st.removedSticks : []
+    const removedBushes = Array.isArray(st.removedBushes) ? st.removedBushes : []
     const removedOres = Array.isArray(st.removedOres) ? st.removedOres : []
     const placed = Array.isArray(st.placed) ? st.placed : []
 
@@ -2168,6 +2173,19 @@ export class Game {
       }
     }
     this.sticks.applyChunkState(msg.chunkX, msg.chunkZ, removedSticks)
+
+    // Bushes can respawn (server-authoritative): apply full chunk state every time.
+    for (const id of removedBushes) {
+      const sid = String(id)
+      const k = `bushCollect:${sid}`
+      const rec = this._pendingWorldActions.get(k)
+      if (rec?.accepted) {
+        if (rec.timeoutId) clearTimeout(rec.timeoutId)
+        this._pendingWorldActions.delete(k)
+        rec.fn()
+      }
+    }
+    this.bushes.applyChunkState(msg.chunkX, msg.chunkZ, removedBushes)
 
     // Ores can respawn (server-authoritative): apply full chunk state every time.
     for (const id of removedOres) {
@@ -2578,10 +2596,19 @@ export class Game {
 
     const rockHit = this.rocks.raycastFromCamera(this.camera)
     const stickHit = this.sticks.raycastFromCamera(this.camera)
+    const bushHit = this.bushes.raycastFromCamera(this.camera)
 
     // Choose nearest.
-    const hit =
-      rockHit && stickHit ? (rockHit.distance <= stickHit.distance ? { kind: 'rock', ...rockHit } : { kind: 'stick', ...stickHit }) : rockHit ? { kind: 'rock', ...rockHit } : stickHit ? { kind: 'stick', ...stickHit } : null
+    const hits = [
+      rockHit ? { kind: 'rock', ...rockHit } : null,
+      stickHit ? { kind: 'stick', ...stickHit } : null,
+      bushHit ? { kind: 'bush', ...bushHit } : null,
+    ].filter(Boolean)
+
+    let hit = null
+    for (const h of hits) {
+      if (!hit || h.distance < hit.distance) hit = h
+    }
 
     if (!hit || hit.distance > 2.0) {
       this.ui.toast('Nada para pegar por perto.', 800)
@@ -2620,27 +2647,71 @@ export class Game {
       return
     }
 
-    // stick
-    const stickId = String(hit.stickId)
-    const key = `stickCollect:${stickId}`
+    if (hit.kind === 'stick') {
+      const stickId = String(hit.stickId)
+      const key = `stickCollect:${stickId}`
+      this._setPendingWorldAction(key, () => {
+        const ok = this.sticks.collect(stickId, { world: true })
+        if (!ok) return
+
+        const overflow = this.inventory.add(ItemId.STICK, 1)
+        if (overflow) {
+          this.ui.toast('Inventário cheio: galho descartado.', 1200)
+          this.sfx.click()
+        } else {
+          this.ui.toast('Pegou: +1 galho', 900)
+          this.sfx.pickup()
+          if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+        }
+      })
+
+      const px = hit.point?.x ?? this.player.position.x
+      const pz = hit.point?.z ?? this.player.position.z
+      const sent = this._sendWorldEvent({ kind: 'stickCollect', stickId, x: px, z: pz, at: Date.now() })
+      if (!sent) {
+        const rec = this._pendingWorldActions.get(key)
+        if (rec?.timeoutId) clearTimeout(rec.timeoutId)
+        this._pendingWorldActions.delete(key)
+        this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+      }
+      return
+    }
+
+    // bush
+    const bushId = String(hit.bushId)
+    const key = `bushCollect:${bushId}`
     this._setPendingWorldAction(key, () => {
-      const ok = this.sticks.collect(stickId, { world: true })
+      const ok = this.bushes.collect(bushId, { world: true })
       if (!ok) return
 
-      const overflow = this.inventory.add(ItemId.STICK, 1)
-      if (overflow) {
-        this.ui.toast('Inventário cheio: galho descartado.', 1200)
-        this.sfx.click()
-      } else {
-        this.ui.toast('Pegou: +1 galho', 900)
-        this.sfx.pickup()
-        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      // Drops: always leaves + 20% cotton_seed
+      const leaves = 2
+      const gotSeed = Math.random() < 0.20
+
+      const dropped = []
+      const overflowLeaf = this.inventory.add(ItemId.LEAF, leaves)
+      if (overflowLeaf) dropped.push(`${overflowLeaf} ${ITEMS[ItemId.LEAF].name}`)
+
+      let overflowSeed = 0
+      if (gotSeed) {
+        overflowSeed = this.inventory.add(ItemId.COTTON_SEED, 1)
+        if (overflowSeed) dropped.push(`${overflowSeed} ${ITEMS[ItemId.COTTON_SEED].name}`)
       }
+
+      const msg = gotSeed
+        ? (dropped.length ? `Coletou: +${leaves} folhas +1 semente (excedente descartado)` : `Coletou: +${leaves} folhas +1 semente`)
+        : (dropped.length ? `Coletou: +${leaves} folhas (excedente descartado)` : `Coletou: +${leaves} folhas`)
+
+      if (dropped.length) this.sfx.click()
+      else this.sfx.pickup()
+
+      this.ui.toast(msg, 1100)
+      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     })
 
     const px = hit.point?.x ?? this.player.position.x
     const pz = hit.point?.z ?? this.player.position.z
-    const sent = this._sendWorldEvent({ kind: 'stickCollect', stickId, x: px, z: pz, at: Date.now() })
+    const sent = this._sendWorldEvent({ kind: 'bushCollect', bushId, x: px, z: pz, at: Date.now() })
     if (!sent) {
       const rec = this._pendingWorldActions.get(key)
       if (rec?.timeoutId) clearTimeout(rec.timeoutId)

@@ -95,6 +95,7 @@ type WorldEventMsg =
   | { t: 'worldEvent'; v: 1; kind: 'treeCut'; treeId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'rockCollect'; rockId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'stickCollect'; stickId: string; x: number; z: number; at: number }
+  | { t: 'worldEvent'; v: 1; kind: 'bushCollect'; bushId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'oreBreak'; oreId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'place'; placeKind: 'campfire' | 'forge' | 'forgeTable' | 'chest'; id: string; x: number; z: number; at: number };
 
@@ -157,6 +158,7 @@ type WorldChunkMsg = {
     /** Active removals only (server-authoritative). */
     removedRocks: string[];
     removedSticks: string[];
+    removedBushes: string[];
     removedOres: string[];
     placed: Array<{ id: string; type: 'campfire' | 'forge' | 'forgeTable' | 'chest'; x: number; z: number }>;
   };
@@ -199,13 +201,14 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
   // Respawn rules (server-authoritative)
   const ROCK_RESPAWN_MS = 30_000;
   const STICK_RESPAWN_MS = 30_000;
+  const BUSH_RESPAWN_MS = 120_000;
   const TREE_RESPAWN_MS = 45_000;
   const ORE_RESPAWN_MS = 120_000;
 
   // worldId:chunkX:chunkZ:<kind>:<id> -> timeout
   const respawnTimers = new Map<string, NodeJS.Timeout>();
 
-  type RespawnKind = 'rock' | 'stick' | 'tree' | 'ore';
+  type RespawnKind = 'rock' | 'stick' | 'bush' | 'tree' | 'ore';
 
   /** playerId -> state */
   const players = new Map<string, PlayerState>();
@@ -264,6 +267,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
       const treeRespawnUntil = normalizeRespawns(st, 'treeRespawnUntil', 'removedTrees');
       const rockRespawnUntil = normalizeRespawns(st, 'rockRespawnUntil', 'removedRocks');
       const stickRespawnUntil = normalizeRespawns(st, 'stickRespawnUntil', 'removedSticks');
+      const bushRespawnUntil = normalizeRespawns(st, 'bushRespawnUntil', 'removedBushes');
       const oreRespawnUntil = normalizeRespawns(st, 'oreRespawnUntil', 'removedOres');
 
       // Schedule respawn broadcasts for any timed entities in this chunk.
@@ -282,6 +286,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
       for (const [id, until] of Object.entries(treeRespawnUntil)) schedule('tree', id, until);
       for (const [id, until] of Object.entries(rockRespawnUntil)) schedule('rock', id, until);
       for (const [id, until] of Object.entries(stickRespawnUntil)) schedule('stick', id, until);
+      for (const [id, until] of Object.entries(bushRespawnUntil)) schedule('bush', id, until);
       for (const [id, until] of Object.entries(oreRespawnUntil)) schedule('ore', id, until);
 
       return {
@@ -296,6 +301,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
           removedTrees: activeRemoved(treeRespawnUntil),
           removedRocks: activeRemoved(rockRespawnUntil),
           removedSticks: activeRemoved(stickRespawnUntil),
+          removedBushes: activeRemoved(bushRespawnUntil),
           removedOres: activeRemoved(oreRespawnUntil),
           placed: Array.isArray(st.placed)
             ? st.placed
@@ -314,7 +320,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
       chunkZ,
       version: 0,
       rawState: {},
-      state: { removedTrees: [], removedRocks: [], removedSticks: [], removedOres: [], placed: [] },
+      state: { removedTrees: [], removedRocks: [], removedSticks: [], removedBushes: [], removedOres: [], placed: [] },
     };
   }
 
@@ -331,8 +337,8 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
 
     const st = (row[0].state ?? {}) as any;
 
-    const field = kind === 'tree' ? 'treeRespawnUntil' : kind === 'rock' ? 'rockRespawnUntil' : kind === 'stick' ? 'stickRespawnUntil' : 'oreRespawnUntil';
-    const legacyField = kind === 'tree' ? 'removedTrees' : kind === 'rock' ? 'removedRocks' : kind === 'stick' ? 'removedSticks' : 'removedOres';
+    const field = kind === 'tree' ? 'treeRespawnUntil' : kind === 'rock' ? 'rockRespawnUntil' : kind === 'stick' ? 'stickRespawnUntil' : kind === 'bush' ? 'bushRespawnUntil' : 'oreRespawnUntil';
+    const legacyField = kind === 'tree' ? 'removedTrees' : kind === 'rock' ? 'removedRocks' : kind === 'stick' ? 'removedSticks' : kind === 'bush' ? 'removedBushes' : 'removedOres';
 
     const respawnUntil = normalizeRespawns(st, field, legacyField);
 
@@ -353,6 +359,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
     const treeRespawnUntil = normalizeRespawns(next, 'treeRespawnUntil', 'removedTrees');
     const rockRespawnUntil = normalizeRespawns(next, 'rockRespawnUntil', 'removedRocks');
     const stickRespawnUntil = normalizeRespawns(next, 'stickRespawnUntil', 'removedSticks');
+    const bushRespawnUntil = normalizeRespawns(next, 'bushRespawnUntil', 'removedBushes');
     const oreRespawnUntil = normalizeRespawns(next, 'oreRespawnUntil', 'removedOres');
 
     const out: WorldChunkMsg = {
@@ -366,6 +373,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
         removedTrees: activeRemoved(treeRespawnUntil),
         removedRocks: activeRemoved(rockRespawnUntil),
         removedSticks: activeRemoved(stickRespawnUntil),
+        removedBushes: activeRemoved(bushRespawnUntil),
         removedOres: activeRemoved(oreRespawnUntil),
         placed: Array.isArray(next.placed) ? next.placed : [],
       },
@@ -720,6 +728,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
             (msg.kind === 'treeCut' ? String((msg as any).treeId || '') :
             msg.kind === 'rockCollect' ? String((msg as any).rockId || '') :
             msg.kind === 'stickCollect' ? String((msg as any).stickId || '') :
+            msg.kind === 'bushCollect' ? String((msg as any).bushId || '') :
             msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
             String((msg as any).id || ''));
 
@@ -747,6 +756,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
             (msg.kind === 'treeCut' ? String((msg as any).treeId || '') :
             msg.kind === 'rockCollect' ? String((msg as any).rockId || '') :
             msg.kind === 'stickCollect' ? String((msg as any).stickId || '') :
+            msg.kind === 'bushCollect' ? String((msg as any).bushId || '') :
             msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
             String((msg as any).id || ''));
 
@@ -769,6 +779,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
             const treeRespawnUntil = normalizeRespawns(next, 'treeRespawnUntil', 'removedTrees');
             const rockRespawnUntil = normalizeRespawns(next, 'rockRespawnUntil', 'removedRocks');
             const stickRespawnUntil = normalizeRespawns(next, 'stickRespawnUntil', 'removedSticks');
+            const bushRespawnUntil = normalizeRespawns(next, 'bushRespawnUntil', 'removedBushes');
             const oreRespawnUntil = normalizeRespawns(next, 'oreRespawnUntil', 'removedOres');
 
             const schedule = (kind: RespawnKind, id: string, delayMs: number) => {
@@ -829,6 +840,20 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
                 next.removedSticks = [];
                 schedule('stick', id, STICK_RESPAWN_MS);
                 setResult('stickCollect', id, true);
+              }
+            } else if (msg.kind === 'bushCollect') {
+              const id = String((msg as any).bushId || '');
+              if (!id) {
+                setResult('bushCollect', '', false, 'invalid');
+              } else if ((bushRespawnUntil[id] ?? 0) > t) {
+                setResult('bushCollect', id, false, 'already_removed');
+              } else {
+                const until = t + BUSH_RESPAWN_MS;
+                bushRespawnUntil[id] = until;
+                next.bushRespawnUntil = bushRespawnUntil;
+                next.removedBushes = [];
+                schedule('bush', id, BUSH_RESPAWN_MS);
+                setResult('bushCollect', id, true);
               }
             } else if (msg.kind === 'oreBreak') {
               const id = String((msg as any).oreId || '');
