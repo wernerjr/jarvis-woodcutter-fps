@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-17T16:27:00Z",
+  "updatedAt": "2026-02-17T16:38:14Z",
   "statusLegend": {
     "epic": ["todo", "doing", "done"],
     "story": ["todo", "doing", "done"]
@@ -51,7 +51,7 @@
         {
           "id": "P6-S1",
           "title": "Redis: player:state + room players (base multiplayer)",
-          "status": "todo",
+          "status": "done",
           "acceptanceCriteria": [
             "Servidor escreve player:state no Redis (TTL 15s) e renova em tick.",
             "Servidor mantém room:{worldId}:players no Redis (TTL 30s), renova em input/join.",
