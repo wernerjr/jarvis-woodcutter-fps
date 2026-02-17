@@ -27,11 +27,30 @@ export async function saveChestState({ worldId, chestId, guestId, lockToken, sta
   return { ok: true }
 }
 
+export async function renewChestLock({ worldId, chestId, guestId, lockToken }) {
+  const res = await apiFetch('/api/chest/lock/renew', {
+    method: 'POST',
+    body: JSON.stringify({ worldId, chestId, guestId, lockToken }),
+  })
+  if (res.status === 403) return { ok: false, error: 'forbidden' }
+  if (res.status === 423) return { ok: false, error: 'locked' }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`renew chest lock failed: ${res.status} ${text}`)
+  }
+  return { ok: true }
+}
+
 export async function releaseChestLock({ worldId, chestId, guestId, lockToken }) {
   const res = await apiFetch('/api/chest/lock/release', {
     method: 'POST',
     body: JSON.stringify({ worldId, chestId, guestId, lockToken }),
   })
-  if (!res.ok) return { ok: false }
+  if (res.status === 403) return { ok: false, error: 'forbidden' }
+  if (res.status === 423) return { ok: false, error: 'locked' }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`release chest lock failed: ${res.status} ${text}`)
+  }
   return { ok: true }
 }

@@ -1519,6 +1519,22 @@ export class Game {
       this._chestLockToken = String(res?.lockToken || '') || null
       this._chestSlots = Array.isArray(res?.state?.slots) ? res.state.slots.slice(0, 15) : Array.from({ length: 15 }, () => null)
       while (this._chestSlots.length < 15) this._chestSlots.push(null)
+
+      // Renew lock while chest UI is open
+      try {
+        if (this._chestLockTimer) clearInterval(this._chestLockTimer)
+        const lockToken = this._chestLockToken
+        if (lockToken) {
+          const { renewChestLock } = await import('../net/chestState.js')
+          this._chestLockTimer = window.setInterval(() => {
+            if (this.state !== 'chest') return
+            if (!this._persistCtx?.worldId || !this._persistCtx?.guestId || !this._activeChestId || !this._chestLockToken) return
+            renewChestLock({ worldId: this._persistCtx.worldId, chestId: this._activeChestId, guestId: this._persistCtx.guestId, lockToken: this._chestLockToken }).catch(() => null)
+          }, 4000)
+        }
+      } catch {
+        // ignore
+      }
     } catch {
       this.ui.toast('Servidor indisponível (baú).', 1100)
       this._activeChestId = null
@@ -1571,6 +1587,11 @@ export class Game {
 
     const prevChestId = this._activeChestId
     const prevLock = this._chestLockToken
+
+    if (this._chestLockTimer) {
+      clearInterval(this._chestLockTimer)
+      this._chestLockTimer = 0
+    }
 
     this._activeChestId = null
     this._chestLockToken = null

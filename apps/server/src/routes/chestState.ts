@@ -41,6 +41,13 @@ const ReleaseBodySchema = z.object({
   lockToken: z.string().min(8),
 });
 
+const RenewBodySchema = z.object({
+  worldId: z.string().min(1),
+  chestId: z.string().min(3).max(128),
+  guestId: z.string().min(8),
+  lockToken: z.string().min(8),
+});
+
 export async function registerChestStateRoutes(app: FastifyInstance) {
   const redisP = getRedis();
   let redis: Awaited<typeof redisP> | null = null;
@@ -221,6 +228,40 @@ export async function registerChestStateRoutes(app: FastifyInstance) {
     } catch (err) {
       req.log.error({ err }, 'put chest state failed');
       return reply.status(503).send({ ok: false, error: 'db_unavailable' });
+    }
+  });
+
+  app.post('/api/chest/lock/renew', async (req, reply) => {
+    const parsed = RenewBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_body' });
+
+    const { worldId, chestId, guestId, lockToken } = parsed.data;
+
+    // Ownership check (avoid arbitrary renew attempts)
+    try {
+      const rows = await db
+        .select({ ownerId: chestState.ownerId })
+        .from(chestState)
+        .where(and(eq(chestState.worldId, worldId), eq(chestState.chestId, chestId)))
+        .limit(1);
+
+      if (!rows.length) return reply.status(404).send({ ok: false, error: 'not_found' });
+      if (String(rows[0].ownerId) !== String(guestId)) return reply.status(403).send({ ok: false, error: 'forbidden' });
+    } catch {
+      return reply.status(503).send({ ok: false, error: 'db_unavailable' });
+    }
+
+    const r = redis;
+    if (!r) return { ok: true };
+
+    try {
+      const k = keyChestLock(worldId, chestId);
+      const cur = await r.get(k);
+      if (String(cur || '') !== String(lockToken || '')) return reply.status(423).send({ ok: false, error: 'locked' });
+      await r.set(k, String(lockToken), { XX: true, EX: TTL_LOCK_S });
+      return { ok: true };
+    } catch {
+      return { ok: true };
     }
   });
 
