@@ -916,6 +916,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
                 removedTrees: activeRemoved(treeRespawnUntil),
                 removedRocks: activeRemoved(rockRespawnUntil),
                 removedSticks: activeRemoved(stickRespawnUntil),
+                removedBushes: activeRemoved(bushRespawnUntil),
                 removedOres: activeRemoved(oreRespawnUntil),
                 placed: next.placed,
               },
