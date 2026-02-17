@@ -148,7 +148,7 @@ type WorldEventResultMsg = {
   kind: WorldEventMsg['kind'];
   id: string;
   ok: boolean;
-  reason?: 'already_removed' | 'invalid' | 'duplicate';
+  reason?: 'already_removed' | 'invalid' | 'duplicate' | 'not_ready';
 };
 
 type WorldChunkMsg = {
@@ -1351,7 +1351,7 @@ return 1
                 } else {
                   const readyAt = Number(p.plantedAt) + Number(p.growMs);
                   if (readyAt > t) {
-                    setResult('harvest', plotId, false, 'invalid');
+                    setResult('harvest', plotId, false, 'not_ready');
                   } else {
                     // Clear plant, keep tilled.
                     next.farmPlots[plotId] = {

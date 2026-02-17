@@ -1211,6 +1211,12 @@ export class Game {
     // Decide action: harvest > plant > till
     const ready = this.farm.isReady(st)
 
+    if (st?.seedId && !ready) {
+      this.ui.toast('Ainda não está crescida.', 1100)
+      this.sfx.click()
+      return
+    }
+
     if (st?.seedId && ready) {
       const key = `harvest:${plotId}`
       const pendingKey = `harvest:${plotId}`
@@ -2449,6 +2455,7 @@ export class Game {
         const reason = String(msg.reason || '')
         if (reason === 'already_removed') this.ui.toast('Já foi coletado por outro jogador.', 1100)
         else if (reason === 'duplicate') this.ui.toast('Já existe.', 900)
+        else if (reason === 'not_ready') this.ui.toast('Ainda não está crescida.', 1100)
         else this.ui.toast(`Ação rejeitada pelo servidor (${reason}).`, 1300)
         return
       }
