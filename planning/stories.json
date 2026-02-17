@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-17T16:53:58Z",
+  "updatedAt": "2026-02-17T17:03:34Z",
   "statusLegend": {
     "epic": ["todo", "doing", "done"],
     "story": ["todo", "doing", "done"]
@@ -71,7 +71,7 @@
         {
           "id": "P6-S3",
           "title": "Redis: cache de chunk state (worldChunkState) + invalidação", 
-          "status": "todo",
+          "status": "done",
           "acceptanceCriteria": [
             "Leitura de chunk tenta Redis primeiro (TTL 30m); fallback DB.",
             "Escrita de chunk atualiza Redis após persistir no DB.",
