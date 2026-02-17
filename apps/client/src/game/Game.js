@@ -137,6 +137,7 @@ export class Game {
     this._activeForgeId = null
     this._activeForgeTableId = null
     this._activeChestId = null
+    this._chestLockToken = null
     this._chestSlots = Array.from({ length: 15 }, () => null)
 
     this._ghost = new CampfireGhost()
@@ -1509,11 +1510,13 @@ export class Game {
       const { loadChestState } = await import('../net/chestState.js')
       const res = await loadChestState({ worldId: this._persistCtx.worldId, chestId, guestId: this._persistCtx.guestId })
       if (!res?.ok) {
-        this.ui.toast('Trancado.', 1100)
+        this.ui.toast(res?.error === 'locked' ? 'Trancado (em uso).' : 'Trancado.', 1100)
         this._activeChestId = null
+        this._chestLockToken = null
         await this.returnToGameMode()
         return
       }
+      this._chestLockToken = String(res?.lockToken || '') || null
       this._chestSlots = Array.isArray(res?.state?.slots) ? res.state.slots.slice(0, 15) : Array.from({ length: 15 }, () => null)
       while (this._chestSlots.length < 15) this._chestSlots.push(null)
     } catch {
@@ -1542,7 +1545,12 @@ export class Game {
       this._chestSaveTimer = 0
       try {
         const { saveChestState } = await import('../net/chestState.js')
-        await saveChestState({ worldId, chestId: cid, guestId, state: { slots: (this._chestSlots || []).slice(0, 15) } })
+        const lockToken = this._chestLockToken
+        if (!lockToken) return
+        const res = await saveChestState({ worldId, chestId: cid, guestId, lockToken, state: { slots: (this._chestSlots || []).slice(0, 15) } })
+        if (res?.ok === false && res?.error === 'locked') {
+          this.ui.toast('Baú trancou (sessão perdida).', 1200)
+        }
       } catch {
         // silent
       }
@@ -1561,7 +1569,20 @@ export class Game {
       this._queueChestSave(this._activeChestId)
     } catch {}
 
+    const prevChestId = this._activeChestId
+    const prevLock = this._chestLockToken
+
     this._activeChestId = null
+    this._chestLockToken = null
+
+    // Release lock best-effort (avoids waiting TTL when closing normally)
+    try {
+      if (prevChestId && prevLock && this._persistCtx?.worldId && this._persistCtx?.guestId) {
+        const { releaseChestLock } = await import('../net/chestState.js')
+        void releaseChestLock({ worldId: this._persistCtx.worldId, chestId: prevChestId, guestId: this._persistCtx.guestId, lockToken: prevLock })
+      }
+    } catch {}
+
     await this.returnToGameMode()
   }
 
