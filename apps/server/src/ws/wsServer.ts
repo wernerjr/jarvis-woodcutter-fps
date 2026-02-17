@@ -422,6 +422,8 @@ return 1
     };
   }
 
+  const FARM_TILLED_DECAY_MS = 15 * 60_000;
+
   async function getChunk(worldId: string, chunkX: number, chunkZ: number) {
     const r = redis;
     if (r) {
@@ -445,8 +447,38 @@ return 1
       .limit(1);
 
     if (row[0]) {
-      const version = Number(row[0].version ?? 0);
-      const rawState = (row[0].state ?? {}) as any;
+      let version = Number(row[0].version ?? 0);
+      let rawState = (row[0].state ?? {}) as any;
+
+      // Farm decay: tilled plots with no seed revert to normal after 15 min (offline too).
+      try {
+        const farm = rawState?.farmPlots;
+        if (farm && typeof farm === 'object' && !Array.isArray(farm)) {
+          const now = nowMs();
+          let changed = false;
+          const nextFarm: any = { ...farm };
+          for (const [k, v] of Object.entries(farm)) {
+            const p = v as any;
+            const tilledAt = Number(p?.tilledAt);
+            const seedId = p?.seedId != null ? String(p.seedId) : null;
+            if (!Number.isFinite(tilledAt)) continue;
+            if (seedId) continue;
+            if (now - tilledAt >= FARM_TILLED_DECAY_MS) {
+              delete nextFarm[String(k)];
+              changed = true;
+            }
+          }
+          if (changed) {
+            version = version + 1;
+            const next = structuredClone(rawState) as any;
+            next.farmPlots = nextFarm;
+            await saveChunk({ worldId, chunkX, chunkZ, version, state: next });
+            rawState = next;
+          }
+        }
+      } catch {
+        // ignore
+      }
 
       if (r) {
         try {
