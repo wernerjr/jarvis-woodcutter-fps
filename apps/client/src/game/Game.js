@@ -547,40 +547,16 @@ export class Game {
   }
 
   _updateWheelSelectionFromMouse(x, y) {
-    const cx = window.innerWidth / 2
-    const cy = window.innerHeight / 2
-    const dx = x - cx
-    const dy = y - cy
+    // New UI: action buttons grid. Select only when hovering a button.
+    const el = document.elementFromPoint(x, y)
+    const btn = el?.closest?.('[data-action]')
+    const actionId = btn?.getAttribute?.('data-action') || null
 
-    // Selection is purely angular (radius ignored): any point within the slice selects it.
-    // Degenerate case: exactly at center -> treat as pointing up.
-    const d = Math.hypot(dx, dy)
-    let ndx = dx
-    let ndy = dy
-    if (d < 0.001) {
-      ndx = 0
-      ndy = -1
+    if (actionId !== this._wheelAction) {
+      this._wheelAction = actionId
+      // Keep API call for compatibility, but visual highlight is handled by :hover.
+      this.ui.setWheelActive?.(this._wheelAction)
     }
-
-    const actions = this._wheelActions || []
-    const n = actions.length
-    if (!n) {
-      this._wheelAction = null
-      this.ui.setWheelActive?.(null)
-      return
-    }
-
-    // Equal segments: 360 / N. Angle 0 = up.
-    const ang = Math.atan2(ndy, ndx) // radians, 0 at right
-    let deg = (ang * 180) / Math.PI
-    deg = (deg + 450) % 360 // shift so 0 is up
-
-    const step = 360 / n
-    const idx = Math.floor(deg / step)
-    const actionId = actions[idx]?.id || null
-
-    this._wheelAction = actionId
-    this.ui.setWheelActive?.(this._wheelAction)
   }
 
   _getInteractTarget() {

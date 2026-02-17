@@ -49,34 +49,10 @@ export class UI {
   }
 
   _renderWheelBackground(wheel, actions, activeIdx) {
-    const n = actions.length
-    const step = 360 / n
-
-    // Start angle at -90deg so first segment is at the top.
-    const inactiveA = 'rgba(0,0,0,.16)'
-    const inactiveB = 'rgba(255,255,255,.03)'
-    const active = 'rgba(255,182,106,.18)'
-    const activeDanger = 'rgba(255,120,120,.18)'
-    const sep = 'rgba(0,0,0,.70)'
-    const eps = 1.8 // degrees for separators
-
-    const stops = []
-    for (let i = 0; i < n; i++) {
-      const a0 = i * step
-      const a1 = (i + 1) * step
-      stops.push(`${sep} ${a0}deg ${Math.min(a0 + eps, a1)}deg`)
-      const fill0 = Math.min(a0 + eps, a1)
-      const fill1 = Math.max(a1 - eps, fill0)
-
-      let col
-      if (i === activeIdx) col = actions[i]?.danger ? activeDanger : active
-      else col = i % 2 === 0 ? inactiveA : inactiveB
-
-      stops.push(`${col} ${fill0}deg ${fill1}deg`)
-      stops.push(`${sep} ${Math.max(a1 - eps, a0)}deg ${a1}deg`)
-    }
-
-    wheel.style.background = `conic-gradient(from -90deg, ${stops.join(',')})`
+    // Deprecated: wheel is now a button grid. Keep as no-op.
+    void wheel
+    void actions
+    void activeIdx
   }
 
   /** @param {{id:string, label:string, danger?:boolean}[]} actions */
@@ -87,70 +63,44 @@ export class UI {
     const wheel = root.querySelector('.wheel')
     if (!wheel) return
 
-    // remove old labels (keep center)
-    for (const el of Array.from(wheel.querySelectorAll('.wheelLabel'))) el.remove()
+    // Clear previous buttons
+    for (const el of Array.from(wheel.querySelectorAll('.wheelBtn'))) el.remove()
 
-    // If no actions, keep it 100% gone: hide root and remove the base circle styling.
     if (!actions || actions.length === 0) {
       this._wheelActions = []
       this._wheelActiveIdx = -1
       root.classList.add('hidden')
-      wheel.style.background = 'transparent'
-      wheel.style.border = 'none'
       wheel.removeAttribute('data-n')
+      wheel.style.border = 'none'
       return
     }
 
     this._wheelActions = actions
-    this._wheelActiveIdx = 0
-
-    // restore base styling (in case it was cleared)
-    wheel.style.border = '1px solid rgba(255,255,255,.12)'
+    this._wheelActiveIdx = -1
 
     const n = actions.length
     wheel.setAttribute('data-n', String(n))
+    wheel.style.border = '1px solid rgba(255,255,255,.12)'
 
-    this._renderWheelBackground(wheel, actions, this._wheelActiveIdx)
+    // Make a square-ish grid: cols = ceil(sqrt(n))
+    const cols = Math.max(1, Math.ceil(Math.sqrt(n)))
+    wheel.style.display = 'grid'
+    wheel.style.gridTemplateColumns = `repeat(${cols}, 1fr)`
 
-    // Labels equally distributed (angle at center of each slice)
-    const step = 360 / n
-    const r = 120
-    for (let i = 0; i < n; i++) {
-      const a = actions[i]
-      const ang = -90 + (i + 0.5) * step
-      const el = document.createElement('div')
-      el.className = 'wheelLabel'
-      el.textContent = a.label
-      el.setAttribute('data-action', a.id)
-      el.classList.toggle('danger', !!a.danger)
-      el.style.transform = `translate(-50%,-50%) rotate(${ang}deg) translate(0, -${r}px) rotate(${-ang}deg)`
-      wheel.appendChild(el)
+    for (const a of actions) {
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'wheelBtn'
+      btn.textContent = a.label
+      btn.setAttribute('data-action', a.id)
+      if (a.danger) btn.classList.add('danger')
+      wheel.appendChild(btn)
     }
-
-    // Apply initial active state.
-    this.setWheelActive(actions[0]?.id)
   }
 
   setWheelActive(actionId) {
-    const root = this.els.actionWheelEl
-    if (!root) return
-    const wheel = root.querySelector('.wheel')
-    if (!wheel) return
-
-    const actions = this._wheelActions || []
-    if (!actions.length) return
-
-    let idx = actions.findIndex((a) => a.id === actionId)
-    if (idx < 0) idx = 0
-    this._wheelActiveIdx = idx
-
-    this._renderWheelBackground(wheel, actions, idx)
-
-    for (const el of wheel.querySelectorAll('.wheelLabel')) {
-      const isActive = el.getAttribute('data-action') === actions[idx]?.id
-      el.classList.toggle('active', isActive)
-      el.classList.toggle('dim', !isActive)
-    }
+    // Highlight is hover-only now. Keep method for compatibility.
+    this._wheelActiveId = actionId
   }
 
   _toolLine(s) {
