@@ -247,6 +247,14 @@ export class OreManager {
     }
   }
 
+  /**
+   * Ores should not block player movement (prevents mine jitter/drift).
+   * Keep interaction via raycast only.
+   */
+  getColliders() {
+    return []
+  }
+
   _randInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min
   }
