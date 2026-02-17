@@ -2936,7 +2936,8 @@ export class Game {
       this._updateChestGhost()
     }
 
-    const authoritative = !!(this._wsConnected && this.wsMeId)
+    // Server knows the player by WS connection after join; don't wait for welcome/meId to start sending input.
+    const authoritative = !!this._wsConnected
 
     // Client-side prediction keeps the game responsive and preserves collision feel.
     // Server snapshots correct drift.
