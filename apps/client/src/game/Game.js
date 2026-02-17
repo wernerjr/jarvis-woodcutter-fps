@@ -497,9 +497,8 @@ export class Game {
   _wheelActionsFor(target) {
     if (!target) return []
 
-    // If we recently detected this target is locked by someone else,
-    // show a lock-only wheel (no action buttons).
-    if ((target.kind === 'chest' || target.kind === 'forge') && this._isTargetLocked(target.kind, target.id)) {
+    // Trancado (não é do player) => lock-only.
+    if (target.kind === 'chest' && this._isTargetLocked('chest', target.id)) {
       return [{ id: 'locked', label: '🔒' }]
     }
 
@@ -529,17 +528,10 @@ export class Game {
 
     // If chest/forge might be locked, do a quick status check so we can show lock-only UI.
     try {
-      if ((target?.kind === 'chest' || target?.kind === 'forge') && this._persistCtx?.worldId && this._persistCtx?.guestId) {
-        if (target.kind === 'chest') {
-          const { getChestLockStatus } = await import('../net/chestState.js')
-          const st = await getChestLockStatus({ worldId: this._persistCtx.worldId, chestId: target.id, guestId: this._persistCtx.guestId })
-          if (st?.ok && st.locked) actions = [{ id: 'locked', label: '🔒' }]
-        }
-        if (target.kind === 'forge') {
-          const { getForgeLockStatus } = await import('../net/forgeState.js')
-          const st = await getForgeLockStatus({ worldId: this._persistCtx.worldId, forgeId: target.id, guestId: this._persistCtx.guestId })
-          if (st?.ok && st.locked) actions = [{ id: 'locked', label: '🔒' }]
-        }
+      if ((target?.kind === 'forge') && this._persistCtx?.worldId && this._persistCtx?.guestId) {
+        const { getForgeLockStatus } = await import('../net/forgeState.js')
+        const st = await getForgeLockStatus({ worldId: this._persistCtx.worldId, forgeId: target.id, guestId: this._persistCtx.guestId })
+        if (st?.ok && st.locked) actions = [{ id: 'locked', label: '🔒' }]
       }
     } catch {
       // ignore
@@ -1571,8 +1563,15 @@ export class Game {
       const { loadChestState } = await import('../net/chestState.js')
       const res = await loadChestState({ worldId: this._persistCtx.worldId, chestId, guestId: this._persistCtx.guestId })
       if (!res?.ok) {
-        this.ui.toast(res?.error === 'locked' ? 'Trancado (em uso).' : 'Trancado.', 1100)
-        if (res?.error === 'locked') this._markTargetLocked('chest', chestId)
+        // Sem dono (forbidden) = trancado. Em uso (locked) = outra sessão do mesmo dono.
+        if (res?.error === 'forbidden') {
+          this.ui.toast('Trancado.', 1100)
+          this._markTargetLocked('chest', chestId, 15000)
+        } else if (res?.error === 'locked') {
+          this.ui.toast('Baú em uso.', 1100)
+        } else {
+          this.ui.toast('Trancado.', 1100)
+        }
         this._activeChestId = null
         this._chestLockToken = null
         await this.returnToGameMode()
