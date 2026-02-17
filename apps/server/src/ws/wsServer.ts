@@ -1253,7 +1253,8 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
         st.vy = 0;
         st.onGround = false;
         st.input = undefined;
-        st.lastAtMs = typeof msg.at === 'number' ? msg.at : nowMs();
+        // same reasoning as input: do not trust client clock
+        st.lastAtMs = nowMs();
         return;
       }
 
@@ -1268,9 +1269,10 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
         if (typeof msg.seq !== 'number') return;
         if (msg.seq <= st.lastSeq) return;
 
-        // Clamp client-provided dt, but sim uses fixed dt anyway.
-        const at = typeof msg.at === 'number' ? msg.at : nowMs();
-        st.lastAtMs = at;
+        // IMPORTANT: do NOT trust client clock for freshness.
+        // lastAtMs is used server-side to drop stale input; clock skew would cause
+        // the server to ignore all movement -> client drifts then gets pulled back.
+        st.lastAtMs = nowMs();
         st.lastSeq = msg.seq;
 
         st.input = msg;
