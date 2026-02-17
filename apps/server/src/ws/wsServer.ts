@@ -304,6 +304,49 @@ return 1
   const REDIS_TTL_CHUNK_CACHE_S = 30 * 60;
   const keyChunkCache = (worldId: string, chunkX: number, chunkZ: number) => `cache:chunk:${worldId}:${chunkX}:${chunkZ}`;
 
+  // In-memory cache: placed colliders by chunk (for server-side collision)
+  // key: worldId:chunkX:chunkZ
+  const placedCollidersByChunk = new Map<string, Array<{ x: number; z: number; r: number }>>();
+  const placedChunkKey = (worldId: string, chunkX: number, chunkZ: number) => `${worldId}:${chunkX}:${chunkZ}`;
+
+  function placedCollidersFromRawState(rawState: any) {
+    const st = (rawState ?? {}) as any;
+    const placed = Array.isArray(st?.placed) ? st.placed : [];
+    const out: Array<{ x: number; z: number; r: number }> = [];
+
+    for (const p of placed) {
+      const type = String(p?.type || '');
+      if (!(type === 'campfire' || type === 'forge' || type === 'forgeTable' || type === 'chest')) continue;
+      const x = Number(p?.x);
+      const z = Number(p?.z);
+      if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+
+      // Approx radii should match client colliders.
+      const r = type === 'chest' ? 0.9 : type === 'forge' ? 1.15 : type === 'forgeTable' ? 1.35 : 1.05;
+      out.push({ x, z, r });
+    }
+
+    return out;
+  }
+
+  function getNearbyPlacedColliders(worldId: string, x: number, z: number) {
+    const cs = 32;
+    const cx0 = Math.floor(x / cs);
+    const cz0 = Math.floor(z / cs);
+
+    const out: Array<{ x: number; z: number; r: number }> = [];
+    for (let dz = -2; dz <= 2; dz++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const cx = cx0 + dx;
+        const cz = cz0 + dz;
+        const k = placedChunkKey(worldId, cx, cz);
+        const arr = placedCollidersByChunk.get(k);
+        if (arr && arr.length) out.push(...arr);
+      }
+    }
+    return out;
+  }
+
   function deriveChunk(params: { worldId: string; chunkX: number; chunkZ: number; version: number; rawState: any }) {
     const { worldId, chunkX, chunkZ, version } = params;
     const st = (params.rawState ?? {}) as any;
@@ -413,6 +456,13 @@ return 1
         }
       }
 
+      // Update in-memory placed collider cache.
+      try {
+        placedCollidersByChunk.set(placedChunkKey(worldId, chunkX, chunkZ), placedCollidersFromRawState(rawState));
+      } catch {
+        // ignore
+      }
+
       return deriveChunk({ worldId, chunkX, chunkZ, version, rawState });
     }
 
@@ -425,6 +475,12 @@ return 1
       } catch {
         // ignore
       }
+    }
+
+    try {
+      placedCollidersByChunk.set(placedChunkKey(worldId, chunkX, chunkZ), []);
+    } catch {
+      // ignore
     }
 
     return deriveChunk({ worldId, chunkX, chunkZ, version: 0, rawState: {} });
@@ -522,6 +578,12 @@ return 1
       } catch {
         // ignore
       }
+    }
+
+    try {
+      placedCollidersByChunk.set(placedChunkKey(next.worldId, next.chunkX, next.chunkZ), placedCollidersFromRawState(next.state));
+    } catch {
+      // ignore
     }
   }
 
@@ -665,6 +727,8 @@ return 1
       st.input = undefined;
     }
 
+    const placedColliders = getNearbyPlacedColliders(st.worldId, st.x, st.z);
+
     if (st.input) {
       const inp2 = st.input;
       st.yaw = inp2!.yaw;
@@ -696,8 +760,9 @@ return 1
       st.x += rx * speed * dt;
       st.z += rz * speed * dt;
 
-      // Macro collision: keep within boundary.
+      // Collision: keep within boundary + placed structures (server-authoritative).
       resolveCollisionsXZ(st, worldBoundaryColliders, capsuleR);
+      if (placedColliders.length) resolveCollisionsXZ(st, placedColliders, capsuleR);
 
       // jump (edge on client; server trusts boolean)
       if (inp2!.keys.jump && st.onGround) {
