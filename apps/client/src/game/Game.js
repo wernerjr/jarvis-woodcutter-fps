@@ -2230,6 +2230,7 @@ export class Game {
       this.remotePlayers.applySnapshot({ meId: this.wsMeId, players })
 
       const me = players.find((p) => p.id === this.wsMeId)
+      if (me) this._lastServerMe = me
       if (me && this.state === 'playing') {
         this._applyServerCorrection(me)
       }
@@ -2895,7 +2896,11 @@ export class Game {
     const remoteCount = this.remotePlayers?.players?.size ?? 0
     const wsStatus = this.ws?.status || (this._wsConnected ? 'ok' : 'off')
     const extra = this.remotePlayers?.getDebugLine?.()
-    const netLine = `NET: WS ${wsStatus} • remote: ${remoteCount}${this.wsMeId ? ` • me: ${String(this.wsMeId).slice(0, 8)}` : ''}${extra ? ` • ${extra}` : ''}`
+    const srv = this._lastServerMe
+    const drift = srv
+      ? Math.hypot((srv.x || 0) - this.player.position.x, (srv.z || 0) - this.player.position.z)
+      : null
+    const netLine = `NET: WS ${wsStatus} • remote: ${remoteCount}${this.wsMeId ? ` • me: ${String(this.wsMeId).slice(0, 8)}` : ''}${drift != null ? ` • drift: ${drift.toFixed(2)}` : ''}${extra ? ` • ${extra}` : ''}`
     this.ui.setNetDebug?.(this.perfEnabled ? netLine : null)
 
     // Contextual interaction hint (only when playing + locked).
