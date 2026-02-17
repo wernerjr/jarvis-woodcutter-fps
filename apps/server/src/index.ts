@@ -8,6 +8,7 @@ import { registerForgeStateRoutes } from './routes/forgeState.js';
 import { registerChestStateRoutes } from './routes/chestState.js';
 import { registerWs } from './ws/wsServer.js';
 import { createMpStats, registerMpStatsRoute } from './mp/stats.js';
+import { closeRedis, getRedis } from './redis/client.js';
 
 const app = Fastify({ logger: true });
 
@@ -23,6 +24,14 @@ try {
   await runMigrations(app.log);
 } catch (err) {
   app.log.error({ err }, 'db init failed at startup');
+  process.exit(1);
+}
+
+// Fail fast if Redis is not reachable (volatile state for multiplayer).
+try {
+  await getRedis();
+} catch (err) {
+  app.log.error({ err }, 'redis init failed at startup');
   process.exit(1);
 }
 
@@ -42,5 +51,9 @@ await registerChestStateRoutes(app);
 const mpStats = createMpStats();
 await registerMpStatsRoute(app, mpStats, { token: env.WOODCUTTER_MP_STATS_TOKEN });
 registerWs(app, { mpStats });
+
+app.addHook('onClose', async () => {
+  await closeRedis();
+});
 
 await app.listen({ port: env.PORT, host: '0.0.0.0' });

@@ -6,6 +6,9 @@ dotenv.config();
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3023),
 
+  // Redis (shared, volatile state). Injected by Infisical.
+  SHARED_REDIS_URL: z.string().min(1, 'SHARED_REDIS_URL is required').default(process.env.SHARED_REDIS_URL || ''),
+
   // Prefer Infisical var (WOODCUTTER_DATABASE_URL). Fallback to DATABASE_URL.
   // Fail fast if missing/blank to avoid silently running without persistence.
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required').default(

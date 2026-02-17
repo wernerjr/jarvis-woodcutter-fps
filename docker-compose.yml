@@ -21,6 +21,7 @@ services:
       # Injected by Infisical (recommended):
       #   WOODCUTTER_DATABASE_URL=postgres://user:pass@shared-postgres:5432/woodcutter
       DATABASE_URL: ${WOODCUTTER_DATABASE_URL}
+      SHARED_REDIS_URL: ${SHARED_REDIS_URL}
     expose:
       - "3023"
     networks:
