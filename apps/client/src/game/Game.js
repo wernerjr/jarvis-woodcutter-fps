@@ -521,7 +521,30 @@ export class Game {
   }
 
   _openWheel(target) {
-    const actions = this._wheelActionsFor(target)
+    void this._openWheelAsync(target)
+  }
+
+  async _openWheelAsync(target) {
+    let actions = this._wheelActionsFor(target)
+
+    // If chest/forge might be locked, do a quick status check so we can show lock-only UI.
+    try {
+      if ((target?.kind === 'chest' || target?.kind === 'forge') && this._persistCtx?.worldId && this._persistCtx?.guestId) {
+        if (target.kind === 'chest') {
+          const { getChestLockStatus } = await import('../net/chestState.js')
+          const st = await getChestLockStatus({ worldId: this._persistCtx.worldId, chestId: target.id, guestId: this._persistCtx.guestId })
+          if (st?.ok && st.locked) actions = [{ id: 'locked', label: '🔒' }]
+        }
+        if (target.kind === 'forge') {
+          const { getForgeLockStatus } = await import('../net/forgeState.js')
+          const st = await getForgeLockStatus({ worldId: this._persistCtx.worldId, forgeId: target.id, guestId: this._persistCtx.guestId })
+          if (st?.ok && st.locked) actions = [{ id: 'locked', label: '🔒' }]
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     if (!actions.length) return
 
     this._wheelActions = actions
@@ -1602,7 +1625,11 @@ export class Game {
         const { saveChestState } = await import('../net/chestState.js')
         const lockToken = this._chestLockToken
         if (!lockToken) return
-        const res = await saveChestState({ worldId, chestId: cid, guestId, lockToken, state: { slots: (this._chestSlots || []).slice(0, 15) } })
+        const payload = { slots: (this._chestSlots || []).slice(0, 15) }
+        const json = JSON.stringify(payload)
+        if (json === this._chestLastSavedJson) return
+        const res = await saveChestState({ worldId, chestId: cid, guestId, lockToken, state: payload })
+        if (res?.ok) this._chestLastSavedJson = json
         if (res?.ok === false && res?.error === 'locked') {
           this.ui.toast('Baú trancou (sessão perdida).', 1200)
         }
@@ -2218,11 +2245,14 @@ export class Game {
 
   _queuePlayerSave() {
     if (!this._persistCtx?.save) return
+    const now = Date.now()
+    if (now < (this._nextPlayerSaveAt || 0)) return
     if (this._playerSaveTimer) clearTimeout(this._playerSaveTimer)
     this._playerSaveTimer = window.setTimeout(() => {
       this._playerSaveTimer = 0
+      this._nextPlayerSaveAt = Date.now() + 1200
       void this.saveNow()
-    }, 500)
+    }, 650)
   }
 
   _queueForgeSave(forgeId = null) {
@@ -2242,8 +2272,11 @@ export class Game {
         if (!st) return
         const lockToken = this._forgeLockToken
         if (!lockToken) return
+        const json = JSON.stringify(st)
+        if (json === this._forgeLastSavedJson) return
         const { saveForgeState } = await import('../net/forgeState.js')
         const res = await saveForgeState({ worldId, forgeId: fid, guestId, lockToken, state: st })
+        if (res?.ok) this._forgeLastSavedJson = json
         if (res?.ok === false && res?.error === 'locked') {
           this.ui.toast('Forja trancou (sessão perdida).', 1200)
           this._markTargetLocked('forge', fid)

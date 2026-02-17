@@ -369,6 +369,25 @@ export async function registerForgeStateRoutes(app: FastifyInstance) {
     }
   });
 
+  app.get('/api/forge/lock/status', async (req, reply) => {
+    const parsed = GetQuerySchema.safeParse(req.query ?? {});
+    if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_query' });
+
+    const { worldId, forgeId, guestId } = parsed.data;
+
+    const r = redis;
+    if (!r) return { ok: true, locked: false };
+
+    try {
+      const cur = await r.get(keyForgeLock(worldId, forgeId));
+      if (!cur) return { ok: true, locked: false };
+      const bySelf = String(cur).startsWith(`${guestId}:`);
+      return { ok: true, locked: !bySelf, bySelf };
+    } catch {
+      return { ok: true, locked: false };
+    }
+  });
+
   app.post('/api/forge/lock/renew', async (req, reply) => {
     const parsed = RenewBodySchema.safeParse(req.body ?? {});
     if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_body' });

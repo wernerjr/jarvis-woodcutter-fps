@@ -26,6 +26,13 @@ export async function saveForgeState({ worldId, forgeId, guestId, lockToken, sta
   return { ok: true }
 }
 
+export async function getForgeLockStatus({ worldId, forgeId, guestId }) {
+  const qs = new URLSearchParams({ worldId, forgeId, guestId })
+  const res = await apiFetch(`/api/forge/lock/status?${qs.toString()}`, { method: 'GET' })
+  if (!res.ok) return { ok: false }
+  return await res.json()
+}
+
 export async function renewForgeLock({ worldId, forgeId, guestId, lockToken }) {
   const res = await apiFetch('/api/forge/lock/renew', {
     method: 'POST',

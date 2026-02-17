@@ -231,6 +231,39 @@ export async function registerChestStateRoutes(app: FastifyInstance) {
     }
   });
 
+  app.get('/api/chest/lock/status', async (req, reply) => {
+    const parsed = GetQuerySchema.safeParse(req.query ?? {});
+    if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_query' });
+
+    const { worldId, chestId, guestId } = parsed.data;
+
+    // ownership check (avoid leaking lock status of others)
+    try {
+      const rows = await db
+        .select({ ownerId: chestState.ownerId })
+        .from(chestState)
+        .where(and(eq(chestState.worldId, worldId), eq(chestState.chestId, chestId)))
+        .limit(1);
+
+      if (!rows.length) return reply.status(404).send({ ok: false, error: 'not_found' });
+      if (String(rows[0].ownerId) !== String(guestId)) return reply.status(403).send({ ok: false, error: 'forbidden' });
+    } catch {
+      return reply.status(503).send({ ok: false, error: 'db_unavailable' });
+    }
+
+    const r = redis;
+    if (!r) return { ok: true, locked: false };
+
+    try {
+      const cur = await r.get(keyChestLock(worldId, chestId));
+      if (!cur) return { ok: true, locked: false };
+      const bySelf = String(cur).startsWith(`${guestId}:`);
+      return { ok: true, locked: !bySelf, bySelf };
+    } catch {
+      return { ok: true, locked: false };
+    }
+  });
+
   app.post('/api/chest/lock/renew', async (req, reply) => {
     const parsed = RenewBodySchema.safeParse(req.body ?? {});
     if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_body' });
