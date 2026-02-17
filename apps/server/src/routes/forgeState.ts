@@ -214,8 +214,83 @@ export async function registerForgeStateRoutes(app: FastifyInstance) {
   const TTL_CACHE_S = 60 * 60; // 60m
   const TTL_LOCK_S = 10; // 10s (renew)
 
+  // Background forge processing: keep producing even when UI is closed.
+  // Multi-pod: best-effort leader election via Redis lock.
+  const WORKER_LOCK_KEY = 'lock:forge:worker';
+  const WORKER_LOCK_TTL_S = 5;
+  const WORKER_TICK_MS = 1000;
+
   const keyForgeCache = (worldId: string, forgeId: string) => `cache:forge:${worldId}:${forgeId}`;
   const keyForgeLock = (worldId: string, forgeId: string) => `lock:forge:${worldId}:${forgeId}`;
+
+  let workerToken = crypto.randomUUID();
+  let workerTimer: NodeJS.Timeout | null = null;
+
+  async function workerTryAcquire() {
+    const r = redis;
+    if (!r) return false;
+    try {
+      const ok = await r.set(WORKER_LOCK_KEY, workerToken, { NX: true, EX: WORKER_LOCK_TTL_S });
+      return ok === 'OK';
+    } catch {
+      return false;
+    }
+  }
+
+  async function workerRenew() {
+    const r = redis;
+    if (!r) return false;
+    try {
+      const cur = await r.get(WORKER_LOCK_KEY);
+      if (String(cur || '') !== workerToken) return false;
+      await r.set(WORKER_LOCK_KEY, workerToken, { XX: true, EX: WORKER_LOCK_TTL_S });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function workerTick() {
+    // Acquire/renew leader lock
+    const got = await workerTryAcquire();
+    const ok = got || (await workerRenew());
+    if (!ok) return;
+
+    const now = new Date();
+
+    // NOTE: JSONB filter is a bit blunt; keep it small by capping rows.
+    // We process only enabled forges.
+    const rows = await db
+      .select({ worldId: forgeState.worldId, forgeId: forgeState.forgeId, state: forgeState.state, updatedAt: forgeState.updatedAt })
+      .from(forgeState)
+      .limit(200);
+
+    for (const row of rows) {
+      const raw = (row.state ?? {}) as any;
+      if (!raw?.enabled) continue;
+
+      const st = ForgeStateSchema.parse(raw);
+      const last = row.updatedAt ? new Date(row.updatedAt as any).getTime() : Date.now();
+      const dtSec = (Date.now() - last) / 1000;
+      if (dtSec < 0.25) continue;
+
+      advanceForge(st, dtSec);
+
+      await db
+        .update(forgeState)
+        .set({ state: st as any, updatedAt: now })
+        .where(and(eq(forgeState.worldId, String(row.worldId)), eq(forgeState.forgeId, String(row.forgeId))));
+
+      if (redis) {
+        try {
+          void redis.set(keyForgeCache(String(row.worldId), String(row.forgeId)), JSON.stringify({ state: st, updatedAt: now.toISOString() }), { EX: TTL_CACHE_S });
+        } catch {}
+      }
+    }
+
+    // renew once more at end
+    await workerRenew();
+  }
 
   async function tryAcquireForgeLock(params: { worldId: string; forgeId: string; guestId: string }) {
     const r = redis;
@@ -252,6 +327,18 @@ export async function registerForgeStateRoutes(app: FastifyInstance) {
       return true;
     }
   }
+
+  // Start background worker (best-effort)
+  if (!workerTimer) {
+    workerTimer = setInterval(() => {
+      workerTick().catch(() => null);
+    }, WORKER_TICK_MS);
+  }
+
+  app.addHook('onClose', async () => {
+    if (workerTimer) clearInterval(workerTimer);
+    workerTimer = null;
+  });
 
   app.get('/api/forge/state', async (req, reply) => {
     const parsed = GetQuerySchema.safeParse(req.query ?? {});
