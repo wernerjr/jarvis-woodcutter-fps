@@ -2245,6 +2245,15 @@ export class Game {
         return
       }
 
+      // For place removals, we can apply immediately on confirmation.
+      // (Unlike trees/rocks which rely on removedIds list, placed removals are represented as "missing" in chunk state.)
+      if (kind === 'placeRemove') {
+        if (rec.timeoutId) clearTimeout(rec.timeoutId)
+        this._pendingWorldActions.delete(key)
+        rec.fn?.()
+        return
+      }
+
       rec.accepted = true
       // If the worldChunk already arrived (object removed), the next chunk apply will trigger fn.
       return
