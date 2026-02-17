@@ -373,6 +373,15 @@ $('#btnQuit').addEventListener('click', () => game.quitToMenu())
 $('#btnPerfToggle').addEventListener('click', () => game.togglePerf())
 $('#btnViewBob').addEventListener('click', () => game.toggleViewBob())
 
+const btnPreview3D = document.querySelector('#btnPreview3D')
+if (btnPreview3D) {
+  btnPreview3D.textContent = `Preview 3D: ${game.preview3dEnabled ? 'ON' : 'OFF'}`
+  btnPreview3D.addEventListener('click', () => {
+    game.togglePreview3D()
+    btnPreview3D.textContent = `Preview 3D: ${game.preview3dEnabled ? 'ON' : 'OFF'}`
+  })
+}
+
 $('#btnControlsBack').addEventListener('click', () => game.closeControls())
 $('#btnInvClose').addEventListener('click', () => game.closeInventory())
 $('#btnInvSort')?.addEventListener('click', () => game.sortInventory())

@@ -133,6 +133,18 @@ export class UI {
     this.els = els
     this._toastUntil = 0
     this._hitUntil = 0
+
+    this.preview3dEnabled = true
+  }
+
+  setPreview3DEnabled(v) {
+    this.preview3dEnabled = !!v
+
+    // If disabling, free preview resources immediately.
+    if (!this.preview3dEnabled) {
+      this.disposeCraftPreview?.()
+      this.disposeForgeTablePreview?.()
+    }
   }
 
   hitmarker(ms = 120) {
@@ -295,8 +307,48 @@ export class UI {
     if (this._forgeTablePrev) this._forgeTablePrev.raf = 0
   }
 
+  disposeCraftPreview() {
+    this._stopCraftPreview()
+    try {
+      const p = this._craftPrev
+      if (p?.obj) p.obj.removeFromParent()
+      // Best-effort dispose
+      if (p?.obj?.traverse) {
+        p.obj.traverse((o) => {
+          if (o?.geometry?.dispose) o.geometry.dispose()
+          if (o?.material) {
+            if (Array.isArray(o.material)) o.material.forEach((m) => m?.dispose?.())
+            else o.material?.dispose?.()
+          }
+        })
+      }
+      p?.renderer?.dispose?.()
+    } catch {}
+    this._craftPrev = null
+  }
+
+  disposeForgeTablePreview() {
+    this._stopForgeTablePreview()
+    try {
+      const p = this._forgeTablePrev
+      if (p?.obj) p.obj.removeFromParent()
+      if (p?.obj?.traverse) {
+        p.obj.traverse((o) => {
+          if (o?.geometry?.dispose) o.geometry.dispose()
+          if (o?.material) {
+            if (Array.isArray(o.material)) o.material.forEach((m) => m?.dispose?.())
+            else o.material?.dispose?.()
+          }
+        })
+      }
+      p?.renderer?.dispose?.()
+    } catch {}
+    this._forgeTablePrev = null
+  }
+
   hideForgeTable() {
     this._stopForgeTablePreview()
+    if (!this.preview3dEnabled) this.disposeForgeTablePreview()
     this.els.forgeTableEl.classList.add('hidden')
   }
 
@@ -311,6 +363,7 @@ export class UI {
 
   hideCrafting() {
     this._stopCraftPreview()
+    if (!this.preview3dEnabled) this.disposeCraftPreview()
     this.els.craftingEl.classList.add('hidden')
   }
 
@@ -522,6 +575,7 @@ export class UI {
   }
 
   async _craftPreviewShow(outputItemId) {
+    if (!this.preview3dEnabled) return
     const els = this._ensureCraftCatalogEls()
     const canvas = els.canvas
     if (!canvas) return
@@ -809,6 +863,7 @@ export class UI {
   }
 
   async _forgeTablePreviewShow(outputItemId) {
+    if (!this.preview3dEnabled) return
     const els = this._ensureForgeTableCatalogEls()
     const canvas = els.canvas
     if (!canvas) return

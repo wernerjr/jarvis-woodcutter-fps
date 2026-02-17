@@ -40,6 +40,14 @@ export class Game {
     this.canvas = canvas
     this.ui = ui
 
+    // UI options
+    try {
+      this.preview3dEnabled = localStorage.getItem('woodcutter_preview_3d') !== '0'
+    } catch {
+      this.preview3dEnabled = true
+    }
+    this.ui.setPreview3DEnabled?.(this.preview3dEnabled)
+
     /** @type {{guestId:string, worldId:string, save:(state:any)=>Promise<void>}|null} */
     this._persistCtx = null
     /** @type {any|null} */
@@ -213,6 +221,27 @@ export class Game {
     this._onKeyDown = (e) => this._onKeyDownAny(e)
     this._onKeyUp = (e) => this._onKeyUpAny(e)
     this._onMouseMoveUI = (e) => this._onMouseMoveUIAny(e)
+  }
+
+  setPreview3DEnabled(v) {
+    this.preview3dEnabled = !!v
+    this.ui.setPreview3DEnabled?.(this.preview3dEnabled)
+
+    // Refresh open UIs so preview/placeholder updates.
+    try {
+      if (this.state === 'crafting') {
+        this.ui.renderCrafting(RECIPES, (id) => this.inventory.count(id), (id) => ITEMS[id], (rid) => this.craft(rid))
+      } else if (this.state === 'forgeTable') {
+        this.ui.renderForgeTable(FORGE_TABLE_RECIPES, (id) => this.inventory.count(id), (id) => ITEMS[id], (rid) => this.craftForgeTable(rid))
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  togglePreview3D() {
+    this.setPreview3DEnabled(!this.preview3dEnabled)
+    try { localStorage.setItem('woodcutter_preview_3d', this.preview3dEnabled ? '1' : '0') } catch {}
   }
 
   start() {
