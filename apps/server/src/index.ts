@@ -6,6 +6,7 @@ import { registerAuthGuestRoutes } from './routes/authGuest.js';
 import { registerPlayerStateRoutes } from './routes/playerState.js';
 import { registerForgeStateRoutes } from './routes/forgeState.js';
 import { registerChestStateRoutes } from './routes/chestState.js';
+import { registerPlayerSettingsRoutes } from './routes/playerSettings.js';
 import { registerWs } from './ws/wsServer.js';
 import { createMpStats, registerMpStatsRoute } from './mp/stats.js';
 import { closeRedis, getRedis } from './redis/client.js';
@@ -45,6 +46,7 @@ app.get('/api/health', async () => {
 
 await registerAuthGuestRoutes(app);
 await registerPlayerStateRoutes(app);
+await registerPlayerSettingsRoutes(app);
 await registerForgeStateRoutes(app);
 await registerChestStateRoutes(app);
 

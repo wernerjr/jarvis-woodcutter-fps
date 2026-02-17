@@ -40,6 +40,16 @@ export async function runMigrations(logger?: { info: (o: any, msg?: string) => v
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "player_settings" (
+        "guest_id" text NOT NULL REFERENCES "guests"("id"),
+        "world_id" text NOT NULL REFERENCES "worlds"("id"),
+        "settings" jsonb NOT NULL DEFAULT '{}'::jsonb,
+        "updated_at" timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT "player_settings_pk" PRIMARY KEY ("guest_id", "world_id")
+      );
+    `);
+
     logger?.info?.({ ms: Date.now() - startedAt }, 'db migrations ok (idempotent)');
   } catch (err) {
     logger?.error?.({ err }, 'db migrations failed');

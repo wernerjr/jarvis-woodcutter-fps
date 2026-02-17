@@ -76,3 +76,20 @@ export const playerState = pgTable(
     pk: primaryKey({ columns: [t.guestId, t.worldId] }),
   })
 );
+
+export const playerSettings = pgTable(
+  'player_settings',
+  {
+    guestId: text('guest_id')
+      .notNull()
+      .references(() => guests.id),
+    worldId: text('world_id')
+      .notNull()
+      .references(() => worlds.id),
+    settings: jsonb('settings').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.guestId, t.worldId] }),
+  })
+);

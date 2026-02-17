@@ -1,7 +1,7 @@
 import './style.css'
 import { Game } from './game/Game.js'
 import { UI } from './game/UI.js'
-import { ensureGuest, loadPlayerState, savePlayerState, getStoredWorldId, setStoredWorldId } from './net/persistence.js'
+import { ensureGuest, loadPlayerState, savePlayerState, loadPlayerSettings, savePlayerSettings, getStoredWorldId, setStoredWorldId } from './net/persistence.js'
 
 const canvas = document.querySelector('#game')
 
@@ -37,6 +37,9 @@ const ui = new UI({
   perfMemRowEl: document.querySelector('#perfMemRow'),
   perfMemEl: document.querySelector('#perfMem'),
   hitmarkerEl: document.querySelector('#hitmarker'),
+  loadingEl: document.querySelector('#loading'),
+  loadingHintEl: document.querySelector('#loadingHint'),
+  loadingBarFillEl: document.querySelector('#loadingBarFill'),
 })
 
 const game = new Game({ canvas, ui })
@@ -52,11 +55,14 @@ if (worldInput) {
   })
 }
 
-// Backend persistence bootstrap (guest + load saved state)
-;(async () => {
-  try {
-    ui.toast('Conectando ao servidor...', 1200)
+// Backend bootstrap happens on Play (shows loading screen)
+let bootPromise = null
+async function bootAndLoadAll() {
+  if (bootPromise) return bootPromise
+  bootPromise = (async () => {
     const desiredWorldId = String(worldInput?.value || '').trim() || undefined
+
+    ui.showLoading('Conectando ao servidor…', 0.15)
     const { guestId, worldId, token } = await ensureGuest({ worldId: desiredWorldId })
 
     game.setPersistenceContext({
@@ -68,17 +74,44 @@ if (worldInput) {
       },
     })
 
-    const state = await loadPlayerState({ guestId, worldId })
-    if (state) {
-      game.setPersistedState(state)
-      ui.toast('Save encontrado.', 1100)
-    } else {
-      ui.toast('Sem save (novo jogador).', 1100)
+    ui.showLoading('Carregando configurações…', 0.35)
+    const settings = await loadPlayerSettings({ guestId, worldId }).catch(() => ({}))
+
+    // Apply settings to client (defaults are false)
+    if (typeof settings?.perfEnabled === 'boolean' && settings.perfEnabled !== game.perfEnabled) game.togglePerf()
+    if (typeof settings?.viewBobEnabled === 'boolean') {
+      // Game defaults to true; align
+      if (settings.viewBobEnabled !== game._viewBobEnabled) game.toggleViewBob()
     }
-  } catch {
-    ui.toast('Offline: backend indisponível.', 1600)
-  }
-})()
+    if (typeof settings?.preview3dEnabled === 'boolean') {
+      game.setPreview3DEnabled(settings.preview3dEnabled)
+      try { localStorage.setItem('woodcutter_preview_3d', settings.preview3dEnabled ? '1' : '0') } catch {}
+    }
+
+    ui.showLoading('Carregando save…', 0.55)
+    const state = await loadPlayerState({ guestId, worldId })
+    if (state) game.setPersistedState(state)
+
+    // Persist settings back (ensures server has current state)
+    try {
+      await savePlayerSettings({
+        guestId,
+        worldId,
+        settings: {
+          perfEnabled: !!game.perfEnabled,
+          viewBobEnabled: !!game._viewBobEnabled,
+          preview3dEnabled: !!game.preview3dEnabled,
+        },
+      })
+    } catch {}
+
+    ui.showLoading('Entrando no mundo…', 0.75)
+
+    return { guestId, worldId }
+  })()
+
+  return bootPromise
+}
 
 // Menu buttons
 const $ = (id) => document.querySelector(id)
@@ -362,7 +395,23 @@ document.querySelectorAll('#hotbar .hotSlot').forEach((el) => {
   })
 })
 
-$('#btnPlay').addEventListener('click', () => game.playFromMenu())
+$('#btnPlay').addEventListener('click', async () => {
+  try {
+    await bootAndLoadAll()
+
+    // Start playing (will connect WS)
+    await game.playFromMenu()
+
+    // Wait initial WS sync (snapshot + first chunk) before removing loading
+    ui.showLoading('Sincronizando mundo…', 0.90)
+    await game.waitInitialSync?.({ timeoutMs: 6000 })
+  } catch (err) {
+    console.error(err)
+    ui.toast('Falha ao carregar (servidor indisponível).', 1600)
+  } finally {
+    ui.hideLoading()
+  }
+})
 $('#btnControls').addEventListener('click', () => game.openControls('menu'))
 $('#btnClose').addEventListener('click', () => game.tryClose())
 

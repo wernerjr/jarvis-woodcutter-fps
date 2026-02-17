@@ -128,7 +128,7 @@ export class UI {
     return `Dur: ${dur ?? '-'}`
   }
 
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, chestEl?: HTMLElement, chestInvGridEl?: HTMLElement, chestSlotsEl?: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement, hitmarkerEl?: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, chestEl?: HTMLElement, chestInvGridEl?: HTMLElement, chestSlotsEl?: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement, hitmarkerEl?: HTMLElement, loadingEl?: HTMLElement, loadingHintEl?: HTMLElement, loadingBarFillEl?: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -186,6 +186,20 @@ export class UI {
     this.els.pauseEl.classList.add('hidden')
     this.els.controlsEl.classList.add('hidden')
     this.els.hudEl.classList.add('hidden')
+    this.els.loadingEl?.classList.add('hidden')
+  }
+
+  showLoading(hint = 'Carregando…', pct = null) {
+    if (this.els.loadingHintEl) this.els.loadingHintEl.textContent = String(hint || 'Carregando…')
+    if (this.els.loadingBarFillEl && typeof pct === 'number') {
+      const p = Math.max(0.05, Math.min(0.98, pct))
+      this.els.loadingBarFillEl.style.width = `${Math.round(p * 100)}%`
+    }
+    this.els.loadingEl?.classList.remove('hidden')
+  }
+
+  hideLoading() {
+    this.els.loadingEl?.classList.add('hidden')
   }
 
   showPause() {

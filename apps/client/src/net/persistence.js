@@ -104,3 +104,26 @@ export async function savePlayerState({ guestId, worldId, state }) {
   }
   return true;
 }
+
+export async function loadPlayerSettings({ guestId, worldId }) {
+  const qs = new URLSearchParams({ guestId, worldId });
+  const res = await apiFetch(`/api/player/settings?${qs.toString()}`, { method: 'GET' });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`load player settings failed: ${res.status} ${text}`);
+  }
+  const data = await res.json();
+  return data?.settings ?? {};
+}
+
+export async function savePlayerSettings({ guestId, worldId, settings }) {
+  const res = await apiFetch('/api/player/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ guestId, worldId, settings }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`save player settings failed: ${res.status} ${text}`);
+  }
+  return true;
+}

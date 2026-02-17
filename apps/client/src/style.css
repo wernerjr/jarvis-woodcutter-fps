@@ -73,6 +73,17 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 .overlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:24px; background: radial-gradient(1000px 600px at 50% 40%, rgba(10,18,10,0.72), rgba(0,0,0,0.80)); pointer-events:none; z-index: 20;}
 .overlay.block{pointer-events:auto;}
 .overlay.hidden{display:none;}
+
+/* Splash background */
+#menu.overlay{background: radial-gradient(1200px 700px at 20% 15%, rgba(74,163,255,.22), transparent 60%),
+              radial-gradient(900px 600px at 85% 25%, rgba(159,245,168,.18), transparent 55%),
+              linear-gradient(180deg, rgba(0,0,0,.72), rgba(0,0,0,.78));}
+
+/* Loading */
+.loadingCard{width:min(520px, 92vw)}
+.loadingTitle{font-size:20px; font-weight:800; margin-bottom:6px}
+.loadingBar{height:10px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.08); margin-top:10px}
+.loadingBarFill{height:100%; width:25%; background:linear-gradient(90deg, rgba(74,163,255,.9), rgba(159,245,168,.9)); border-radius:999px}
 .card{width:min(520px, calc(100vw - 48px)); background:var(--card); border:1px solid var(--stroke); border-radius:16px; padding:18px 18px 16px; box-shadow: 0 18px 70px rgba(0,0,0,.55); backdrop-filter: blur(8px); pointer-events:auto;}
 .card h1{margin:0 0 6px; font-size:22px; letter-spacing:.2px;}
 .card h2{margin:0 0 10px; font-size:18px;}

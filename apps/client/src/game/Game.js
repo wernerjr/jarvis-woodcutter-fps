@@ -1357,6 +1357,21 @@ export class Game {
     }
   }
 
+  async waitInitialSync({ timeoutMs = 5000 } = {}) {
+    // Wait for first snapshot + first chunk after WS connect.
+    if (this._initialSyncOk) return true
+
+    const start = performance.now()
+    while (performance.now() - start < timeoutMs) {
+      if (this._initialSnapshotReceived && this._initialChunkReceived) {
+        this._initialSyncOk = true
+        return true
+      }
+      await new Promise((r) => setTimeout(r, 50))
+    }
+    return false
+  }
+
   async playFromMenu() {
     // Always pick up any updated world selection from menu.
     const worldInput = document.querySelector('#worldId')
@@ -1403,6 +1418,9 @@ export class Game {
     await this._lockPointer()
 
     // Multiplayer (MVP): connect WS when starting to play
+    this._initialSyncOk = false
+    this._initialSnapshotReceived = false
+    this._initialChunkReceived = false
     this._connectWsIfPossible()
 
     this.ui.toast('Corte árvores! (I inventário • 1/2/3 ferramenta • Shift correr • Espaço pular)')
@@ -2714,6 +2732,7 @@ export class Game {
     }
     if (msg.t === 'worldChunk') {
       this._applyWorldChunk(msg)
+      this._initialChunkReceived = true
       return
     }
     if (msg.t === 'snapshot') {
@@ -2731,6 +2750,7 @@ export class Game {
 
       const me = players.find((p) => p.id === this.wsMeId)
       if (me) this._lastServerMe = me
+      this._initialSnapshotReceived = true
       if (me && this.state === 'playing') {
         this._applyServerCorrection(me)
       }
