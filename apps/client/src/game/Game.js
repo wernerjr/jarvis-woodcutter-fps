@@ -1918,7 +1918,38 @@ export class Game {
     const src = this.inventory.slots[from]
     if (!src) return
 
-    const to = this._findStackOrEmptyIdx(this._chestSlots, src.id)
+    const def = ITEMS[src.id]
+    const maxStack = this.inventory?.maxStack ?? 100
+
+    // Stackables: fill existing stacks first. Only use empty slot(s) if available.
+    if (def?.stackable) {
+      // 1) fill existing partial stacks
+      for (let i = 0; i < this._chestSlots.length && src && src.qty > 0; i++) {
+        const d = this._chestSlots[i]
+        if (!d || d.id !== src.id) continue
+        if (d.qty >= maxStack) continue
+        const space = maxStack - d.qty
+        const take = Math.min(space, src.qty)
+        d.qty += take
+        src.qty -= take
+      }
+
+      // 2) if still remaining, move to first empty slot (but only if there is one)
+      while (src && src.qty > 0) {
+        const empty = this._chestSlots.findIndex((s) => !s)
+        if (empty < 0) break // no empty slot: do NOT create a new stack
+        const take = Math.min(maxStack, src.qty)
+        this._chestSlots[empty] = { id: src.id, qty: take }
+        src.qty -= take
+      }
+
+      if (src.qty <= 0) this.inventory.slots[from] = null
+      this._postMoveUpdate()
+      return
+    }
+
+    // Non-stackable: move whole item only if there is an empty chest slot.
+    const to = this._chestSlots.findIndex((s) => !s)
     if (to < 0) {
       this.ui.toast('Baú cheio.', 1000)
       this.sfx.click()
@@ -1985,18 +2016,53 @@ export class Game {
     const f = this._activeForgeId ? this.forges.get(this._activeForgeId) : null
     if (!f) return
 
-    const s = this.inventory.slots[invIdx]
-    if (!s) return
+    const src = this.inventory.slots[invIdx]
+    if (!src) return
 
-    // Prefer fuel if item is fuel, otherwise input if ore.
-    if (s.id === ItemId.LOG || s.id === ItemId.STICK || s.id === ItemId.LEAF) {
-      const idx = this._findStackOrEmptyIdx(f.fuel, s.id)
-      if (idx >= 0) return void this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind: 'fuel', idx })
+    const maxStack = this.inventory?.maxStack ?? 100
+
+    const moveInto = (dstArr, kind) => {
+      const def = ITEMS[src.id]
+
+      // stackable: fill existing, then use empty slot if any
+      if (def?.stackable) {
+        for (let i = 0; i < dstArr.length && src.qty > 0; i++) {
+          const d = dstArr[i]
+          if (!d || d.id !== src.id) continue
+          if (d.qty >= maxStack) continue
+          const space = maxStack - d.qty
+          const take = Math.min(space, src.qty)
+          d.qty += take
+          src.qty -= take
+        }
+
+        while (src.qty > 0) {
+          const empty = dstArr.findIndex((s) => !s)
+          if (empty < 0) break
+          const take = Math.min(maxStack, src.qty)
+          dstArr[empty] = { id: src.id, qty: take }
+          src.qty -= take
+        }
+
+        if (src.qty <= 0) this.inventory.slots[invIdx] = null
+        this._postMoveUpdate()
+        return true
+      }
+
+      // non-stackable: find empty and swap via moveItem
+      const empty = dstArr.findIndex((s) => !s)
+      if (empty < 0) return false
+      this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind, idx: empty })
+      return true
     }
 
-    if (s.id === ItemId.IRON_ORE) {
-      const idx = this._findStackOrEmptyIdx(f.input, s.id)
-      if (idx >= 0) return void this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind: 'in', idx })
+    // Prefer fuel if item is fuel, otherwise input if ore.
+    if (src.id === ItemId.LOG || src.id === ItemId.STICK || src.id === ItemId.LEAF) {
+      return void moveInto(f.fuel, 'fuel')
+    }
+
+    if (src.id === ItemId.IRON_ORE) {
+      return void moveInto(f.input, 'in')
     }
   }
 
