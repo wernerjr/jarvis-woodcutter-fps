@@ -587,30 +587,32 @@ export class Game {
     // Prefer raycast under reticle.
     let best = null
 
-    const trySet = (kind, id, dist, primaryLabel, name) => {
+    const trySet = (kind, id, dist, primaryLabel, name, x = null, z = null) => {
       if (!id) return
-      if (!best || dist < best.dist) best = { kind, id, dist, primaryLabel, name }
+      if (!best || dist < best.dist) best = { kind, id, dist, primaryLabel, name, x, z }
     }
 
     // Forge table
     if (!this._inMine) {
       const ft = this.forgeTables.raycastFromCamera(this.camera)
-      if (ft && ft.distance <= 2.8) trySet('forgeTable', ft.forgeTableId, ft.distance, 'Abrir', 'Mesa de Forja')
+      if (ft && ft.distance <= 2.8) trySet('forgeTable', ft.forgeTableId, ft.distance, 'Abrir', 'Mesa de Forja', ft.point?.x, ft.point?.z)
 
       const f = this.forges.raycastFromCamera(this.camera)
-      if (f && f.distance <= 2.6) trySet('forge', f.forgeId, f.distance, 'Abrir', 'Forja')
+      if (f && f.distance <= 2.6) trySet('forge', f.forgeId, f.distance, 'Abrir', 'Forja', f.point?.x, f.point?.z)
 
       const ch = this.chests.raycastFromCamera?.(this.camera)
-      if (ch && ch.distance <= 2.6) trySet('chest', ch.chestId, ch.distance, 'Abrir', 'Baú')
+      if (ch && ch.distance <= 2.6) trySet('chest', ch.chestId, ch.distance, 'Abrir', 'Baú', ch.point?.x, ch.point?.z)
 
       const c = this.fires.raycastFromCamera?.(this.camera)
       if (c && c.distance <= 2.6) {
         const lit = this.fires.isLit(c.campfireId)
-        trySet('campfire', c.campfireId, c.distance, lit ? 'Apagar' : 'Acender', 'Fogueira')
+        trySet('campfire', c.campfireId, c.distance, lit ? 'Apagar' : 'Acender', 'Fogueira', c.point?.x, c.point?.z)
       }
     }
 
-    return best ? { kind: best.kind, id: best.id, primaryLabel: best.primaryLabel, name: best.name } : null
+    return best
+      ? { kind: best.kind, id: best.id, primaryLabel: best.primaryLabel, name: best.name, x: best.x, z: best.z }
+      : null
   }
 
   _updateTargetHighlight(t) {
