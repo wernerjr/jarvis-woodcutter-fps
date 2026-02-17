@@ -1108,15 +1108,27 @@ export class Game {
           this._cleanupHotbarBroken(slot.id, this.hotbarActive)
         }
 
-        const overflow = this.inventory.add(ItemId.FIBER, 2)
-        if (overflow) {
-          this.ui.toast('Inventário cheio: fibra descartada.', 1200)
+        // Drops: always return 1 seed + 30% chance of an extra seed
+        const fiberOverflow = this.inventory.add(ItemId.FIBER, 2)
+        const seedOverflow1 = this.inventory.add(ItemId.COTTON_SEED, 1)
+        const extraSeed = Math.random() < 0.30
+        const seedOverflow2 = extraSeed ? this.inventory.add(ItemId.COTTON_SEED, 1) : 0
+
+        const dropped = []
+        if (fiberOverflow) dropped.push('fibra')
+        if (seedOverflow1 || seedOverflow2) dropped.push('semente')
+
+        const baseMsg = extraSeed ? 'Colheu: +2 fibra +2 sementes' : 'Colheu: +2 fibra +1 semente'
+        const msg = dropped.length ? `${baseMsg} (excedente descartado)` : baseMsg
+
+        if (fiberOverflow || seedOverflow1 || seedOverflow2) {
           this.sfx.click()
         } else {
-          this.ui.toast('Colheu: +2 fibra', 1000)
           this.sfx.pickup()
-          if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
         }
+
+        this.ui.toast(msg, 1100)
+        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
       })
 
       const sent = this._sendWorldEvent({ kind: 'harvest', plotId, x: snap.x, z: snap.z, at: Date.now() })
