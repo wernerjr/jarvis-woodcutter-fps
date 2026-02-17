@@ -206,14 +206,37 @@
         </div>
       </div>
 
-      <!-- Crafting -->
+      <!-- Crafting (full-screen catalog) -->
       <div id="crafting" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Construção">
-        <div class="card">
-          <h2>Construção</h2>
-          <p class="muted small">Tecla <b>C</b> abre/fecha</p>
-          <div id="craftList" class="craftList"></div>
-          <div class="buttons">
-            <button id="btnCraftClose" class="primary">Close</button>
+        <div class="card craftCatalog">
+          <div class="craftTopbar">
+            <div>
+              <h2>Construção</h2>
+              <p class="muted small">Tecla <b>C</b> abre/fecha</p>
+            </div>
+            <div class="buttons">
+              <button id="btnCraftClose" class="primary">Close</button>
+            </div>
+          </div>
+
+          <div class="craftBody">
+            <div class="craftCats" id="craftCats"></div>
+
+            <div class="craftGridWrap">
+              <div class="craftGrid" id="craftGrid"></div>
+            </div>
+
+            <div class="craftDetail">
+              <canvas id="craftPreview" width="480" height="360"></canvas>
+              <div class="craftDetailInfo">
+                <div class="craftDetailTitle" id="craftDetailTitle">Selecione um item</div>
+                <div class="muted" id="craftDetailDesc"></div>
+                <div class="craftDetailCost" id="craftDetailCost"></div>
+                <div class="buttons">
+                  <button id="btnCraftMake" class="primary" disabled>Construir</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

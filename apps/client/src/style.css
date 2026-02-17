@@ -90,6 +90,36 @@ button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,16
 .controlsList{margin:10px 0 0 18px; color:var(--muted)}
 
 .craftList{display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px;}
+
+/* Crafting catalog (full-screen) */
+.craftCatalog{width:min(1200px, 96vw); max-width:96vw}
+#crafting .card.craftCatalog{padding:16px}
+.craftTopbar{display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
+.craftBody{display:grid; grid-template-columns:180px 1fr 360px; gap:14px; margin-top:12px}
+.craftCats{display:flex; flex-direction:column; gap:8px}
+.craftCatBtn{width:100%; text-align:left; padding:10px 10px; border-radius:10px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.18); color:rgba(255,255,255,.92); cursor:pointer}
+.craftCatBtn.active{border-color:rgba(159,245,168,.35); background:rgba(159,245,168,.10)}
+.craftGridWrap{min-height:480px; max-height:70vh; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px; background:rgba(0,0,0,.12)}
+.craftGrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px}
+.craftCard{border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:10px; background:rgba(0,0,0,.18); cursor:pointer}
+.craftCard.active{border-color:rgba(74,163,255,.35); background:rgba(74,163,255,.10)}
+.craftCardTop{display:flex; align-items:center; gap:10px}
+.craftCardIco{font-size:26px}
+.craftCardName{font-weight:700}
+.craftCardCost{margin-top:8px; font-size:12px; opacity:.8; line-height:1.25}
+.craftDetail{border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px; background:rgba(0,0,0,.12); display:flex; flex-direction:column; gap:10px}
+#craftPreview{width:100%; height:220px; border-radius:10px; background:rgba(0,0,0,.30); border:1px solid rgba(255,255,255,.08)}
+.craftDetailTitle{font-weight:800; font-size:16px}
+.craftDetailCost{margin-top:10px; display:flex; flex-direction:column; gap:6px; font-size:13px}
+.craftCostLine{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 8px; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.14)}
+.craftCostLine.ok{border-color:rgba(159,245,168,.22)}
+.craftCostLine.bad{border-color:rgba(255,120,120,.22)}
+
+@media (max-width: 980px){
+  .craftBody{grid-template-columns:1fr;}
+  .craftCats{flex-direction:row; flex-wrap:wrap}
+  .craftCatBtn{width:auto}
+}
 .craftRow{border:1px solid var(--stroke); border-radius:12px; padding:10px; background: rgba(255,255,255,0.04)}
 .craftTop{display:flex; align-items:center; justify-content:space-between; gap:10px;}
 .craftName{font-weight:800;}

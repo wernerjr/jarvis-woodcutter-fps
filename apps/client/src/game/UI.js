@@ -447,34 +447,319 @@ export class UI {
   }
 
   /** @param {(null|{id:string, qty:number})[]} slots @param {(id:string)=>{name:string, icon:string}} getItem */
-  renderCrafting(recipes, invCount, getItem, onCraft, rootOverride = null) {
-    const root = rootOverride || this.els.craftListEl
-    root.innerHTML = ''
-
-    for (const r of recipes) {
-      const row = document.createElement('div')
-      row.className = 'craftRow'
-
-      const can = r.cost.every((c) => invCount(c.id) >= c.qty)
-      const req = r.cost
-        .map((c) => {
-          const it = getItem(c.id)
-          const have = invCount(c.id)
-          return `${it.icon} ${it.name}: ${have}/${c.qty}`
-        })
-        .join(' • ')
-
-      row.innerHTML = `
-        <div class="craftTop">
-          <div class="craftName">${r.name}</div>
-          <button ${can ? '' : 'disabled'} data-recipe="${r.id}">${can ? 'Construir' : 'Falta recurso'}</button>
-        </div>
-        <div class="craftReq">${req}</div>
-      `
-
-      row.querySelector('button')?.addEventListener('click', () => onCraft(r.id))
-      root.appendChild(row)
+  _ensureCraftCatalogEls() {
+    if (this._craftCatalogEls) return this._craftCatalogEls
+    this._craftCatalogEls = {
+      cats: document.querySelector('#craftCats'),
+      grid: document.querySelector('#craftGrid'),
+      title: document.querySelector('#craftDetailTitle'),
+      desc: document.querySelector('#craftDetailDesc'),
+      cost: document.querySelector('#craftDetailCost'),
+      btn: document.querySelector('#btnCraftMake'),
+      canvas: document.querySelector('#craftPreview'),
     }
+    return this._craftCatalogEls
+  }
+
+  _craftMetaFor(recipe) {
+    const id = String(recipe?.id || '')
+    const outId = String(recipe?.output?.id || '')
+
+    // Category + description (pt-BR)
+    const meta = {
+      cat: 'Utilidade',
+      desc: '',
+      outId,
+    }
+
+    if (id === 'axe_stone' || id === 'pickaxe_stone' || outId.includes('axe') || outId.includes('pickaxe') || outId.includes('hoe')) {
+      meta.cat = 'Ferramentas'
+      meta.desc = 'Ferramenta para coletar recursos com mais eficiência.'
+    } else if (outId === 'campfire') {
+      meta.cat = 'Construções'
+      meta.desc = 'Fogueira para iluminar e interagir.'
+    } else if (outId === 'chest') {
+      meta.cat = 'Construções'
+      meta.desc = 'Armazenamento pessoal para organizar seus itens.'
+    } else if (outId === 'forge' || outId === 'forge_table') {
+      meta.cat = 'Produção'
+      meta.desc = outId === 'forge' ? 'Funde minério usando combustível para produzir barras.' : 'Usa barras para criar ferramentas de metal.'
+    } else if (outId === 'torch') {
+      meta.cat = 'Utilidade'
+      meta.desc = 'Fonte de luz portátil.'
+    } else if (outId === 'rope') {
+      meta.cat = 'Utilidade'
+      meta.desc = 'Material básico para futuras receitas.'
+    }
+
+    return meta
+  }
+
+  _craftPreviewInit() {
+    if (this._craftPreview) return
+    try {
+      // Lazy import to keep initial load smaller.
+      this._craftPreview = { ready: false }
+    } catch {
+      this._craftPreview = null
+    }
+  }
+
+  async _craftPreviewShow(outputItemId) {
+    const els = this._ensureCraftCatalogEls()
+    const canvas = els.canvas
+    if (!canvas) return
+
+    // Lazy-load three only when crafting UI is used.
+    if (!this._three) {
+      const THREE = await import('three')
+      this._three = THREE
+    }
+
+    const THREE = this._three
+
+    if (!this._craftPrev) {
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
+      renderer.setSize(canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height, false)
+
+      const scene = new THREE.Scene()
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 50)
+      camera.position.set(2.6, 1.6, 2.6)
+      camera.lookAt(0, 0.7, 0)
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.65))
+      const d = new THREE.DirectionalLight(0xffffff, 0.85)
+      d.position.set(3, 4, 2)
+      scene.add(d)
+
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(2.2, 32), new THREE.MeshStandardMaterial({ color: 0x121218, roughness: 1.0, metalness: 0.0 }))
+      floor.rotation.x = -Math.PI / 2
+      floor.position.y = 0
+      scene.add(floor)
+
+      this._craftPrev = { renderer, scene, camera, obj: null, raf: 0 }
+
+      const tick = () => {
+        if (!this._craftPrev) return
+        const { renderer, scene, camera, obj } = this._craftPrev
+        const w = canvas.clientWidth || canvas.width
+        const h = canvas.clientHeight || canvas.height
+        renderer.setSize(w, h, false)
+        camera.aspect = Math.max(0.1, w / Math.max(1, h))
+        camera.updateProjectionMatrix()
+        if (obj) obj.rotation.y += 0.012
+        renderer.render(scene, camera)
+        this._craftPrev.raf = requestAnimationFrame(tick)
+      }
+      this._craftPrev.raf = requestAnimationFrame(tick)
+    }
+
+    // replace object
+    const prev = this._craftPrev.obj
+    if (prev) {
+      prev.removeFromParent()
+    }
+
+    const obj = this._makePreviewObject(outputItemId, THREE)
+    obj.position.set(0, 0, 0)
+    this._craftPrev.scene.add(obj)
+    this._craftPrev.obj = obj
+  }
+
+  _makePreviewObject(outputItemId, THREE) {
+    const id = String(outputItemId || '')
+
+    // Simple "real" previews (not ghosts)
+    if (id === 'chest') {
+      const g = new THREE.Group()
+      const wood = new THREE.MeshStandardMaterial({ color: 0x6b3f24, roughness: 0.95 })
+      const metal = new THREE.MeshStandardMaterial({ color: 0x3b3b44, roughness: 0.6, metalness: 0.25 })
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.55, 0.8), wood)
+      base.position.y = 0.28
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.25, 0.8), wood)
+      lid.position.y = 0.68
+      const band = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.08, 0.82), metal)
+      band.position.y = 0.52
+      g.add(base, lid, band)
+      return g
+    }
+
+    if (id === 'forge') {
+      const g = new THREE.Group()
+      const stone = new THREE.MeshStandardMaterial({ color: 0x2a2a2f, roughness: 1.0 })
+      const metal = new THREE.MeshStandardMaterial({ color: 0x3c3c46, roughness: 0.6, metalness: 0.25 })
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.35, 0.7, 14), stone)
+      base.position.y = 0.35
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.15, 0.9, 14), stone)
+      body.position.y = 1.0
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, 0.14, 14), metal)
+      rim.position.y = 1.52
+      g.add(base, body, rim)
+      return g
+    }
+
+    if (id === 'forge_table') {
+      const g = new THREE.Group()
+      const wood = new THREE.MeshStandardMaterial({ color: 0x4b2f1c, roughness: 0.95 })
+      const metal = new THREE.MeshStandardMaterial({ color: 0x51515b, roughness: 0.55, metalness: 0.25 })
+      const top = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.18, 1.1), wood)
+      top.position.y = 0.95
+      const legGeo = new THREE.BoxGeometry(0.16, 0.9, 0.16)
+      const leg1 = new THREE.Mesh(legGeo, wood); leg1.position.set(-0.8, 0.45, -0.45)
+      const leg2 = new THREE.Mesh(legGeo, wood); leg2.position.set(0.8, 0.45, -0.45)
+      const leg3 = new THREE.Mesh(legGeo, wood); leg3.position.set(-0.8, 0.45, 0.45)
+      const leg4 = new THREE.Mesh(legGeo, wood); leg4.position.set(0.8, 0.45, 0.45)
+      const anvil = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.22, 0.42), metal)
+      anvil.position.set(0, 1.12, 0)
+      g.add(top, leg1, leg2, leg3, leg4, anvil)
+      return g
+    }
+
+    if (id === 'campfire') {
+      const g = new THREE.Group()
+      const wood = new THREE.MeshStandardMaterial({ color: 0x5a351f, roughness: 0.95 })
+      const coal = new THREE.MeshStandardMaterial({ color: 0x1a0f08, roughness: 1.0 })
+      const logGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 10)
+      for (let i = 0; i < 3; i++) {
+        const m = new THREE.Mesh(logGeo, wood)
+        m.rotation.z = Math.PI / 2
+        m.rotation.y = (i / 3) * Math.PI
+        m.position.y = 0.18
+        g.add(m)
+      }
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), coal)
+      core.position.y = 0.25
+      g.add(core)
+      return g
+    }
+
+    // Fallback: simple "token" mesh
+    const mat = new THREE.MeshStandardMaterial({ color: 0x4aa3ff, roughness: 0.6, metalness: 0.05 })
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat)
+    m.position.y = 0.6
+    return m
+  }
+
+  renderCrafting(recipes, invCount, getItem, onCraft, rootOverride = null) {
+    // New catalog UI uses #craftCats/#craftGrid/#craftDetail...
+    const els = this._ensureCraftCatalogEls()
+    if (!els?.cats || !els?.grid) {
+      // fallback to old list if DOM not present
+      const root = rootOverride || this.els.craftListEl
+      root.innerHTML = ''
+      for (const r of recipes) {
+        const row = document.createElement('div')
+        row.className = 'craftRow'
+        const can = r.cost.every((c) => invCount(c.id) >= c.qty)
+        const req = r.cost
+          .map((c) => {
+            const it = getItem(c.id)
+            const have = invCount(c.id)
+            return `${it.icon} ${it.name}: ${have}/${c.qty}`
+          })
+          .join(' • ')
+        row.innerHTML = `
+          <div class="craftTop">
+            <div class="craftName">${r.name}</div>
+            <button ${can ? '' : 'disabled'} data-recipe="${r.id}">${can ? 'Construir' : 'Falta recurso'}</button>
+          </div>
+          <div class="craftReq">${req}</div>
+        `
+        row.querySelector('button')?.addEventListener('click', () => onCraft(r.id))
+        root.appendChild(row)
+      }
+      return
+    }
+
+    const metas = recipes.map((r) => ({ r, m: this._craftMetaFor(r) }))
+    const cats = Array.from(new Set(metas.map((x) => x.m.cat)))
+
+    // state in UI instance
+    this._craftState = this._craftState || { cat: cats[0] || 'Ferramentas', activeId: '' }
+    if (!cats.includes(this._craftState.cat)) this._craftState.cat = cats[0] || 'Ferramentas'
+
+    const setActiveRecipe = async (rid) => {
+      this._craftState.activeId = rid
+      // highlight cards
+      els.grid.querySelectorAll('.craftCard').forEach((el) => {
+        el.classList.toggle('active', el.getAttribute('data-recipe') === rid)
+      })
+
+      const rec = recipes.find((x) => String(x.id) === String(rid))
+      if (!rec) return
+      const meta = this._craftMetaFor(rec)
+
+      els.title.textContent = rec.name
+      els.desc.textContent = meta.desc || ''
+
+      // cost lines
+      els.cost.innerHTML = ''
+      const can = rec.cost.every((c) => invCount(c.id) >= c.qty)
+      for (const c of rec.cost) {
+        const it = getItem(c.id)
+        const have = invCount(c.id)
+        const ok = have >= c.qty
+        const line = document.createElement('div')
+        line.className = 'craftCostLine ' + (ok ? 'ok' : 'bad')
+        line.innerHTML = `<div>${it?.icon ?? ''} ${it?.name ?? c.id}</div><div>${have}/${c.qty}</div>`
+        els.cost.appendChild(line)
+      }
+
+      els.btn.disabled = !can
+      els.btn.textContent = can ? 'Construir' : 'Falta recurso'
+      els.btn.onclick = () => onCraft(rec.id)
+
+      await this._craftPreviewShow(meta.outId)
+    }
+
+    // categories
+    els.cats.innerHTML = ''
+    for (const c of cats) {
+      const b = document.createElement('button')
+      b.className = 'craftCatBtn' + (c === this._craftState.cat ? ' active' : '')
+      b.textContent = c
+      b.addEventListener('click', () => {
+        this._craftState.cat = c
+        this.renderCrafting(recipes, invCount, getItem, onCraft, rootOverride)
+      })
+      els.cats.appendChild(b)
+    }
+
+    // grid
+    els.grid.innerHTML = ''
+    const list = metas.filter((x) => x.m.cat === this._craftState.cat)
+    for (const { r } of list) {
+      const out = getItem(r.output.id)
+      const can = r.cost.every((c) => invCount(c.id) >= c.qty)
+      const costLine = r.cost.map((c) => {
+        const it = getItem(c.id)
+        return `${it.icon} ${c.qty}`
+      }).join(' ')
+
+      const card = document.createElement('div')
+      card.className = 'craftCard'
+      card.setAttribute('data-recipe', r.id)
+      card.innerHTML = `
+        <div class="craftCardTop">
+          <div class="craftCardIco">${out?.icon ?? ''}</div>
+          <div>
+            <div class="craftCardName">${r.name}</div>
+            <div class="muted small">${can ? 'Disponível' : 'Faltam recursos'}</div>
+          </div>
+        </div>
+        <div class="craftCardCost">${costLine}</div>
+      `
+      card.addEventListener('click', () => setActiveRecipe(r.id))
+      els.grid.appendChild(card)
+    }
+
+    // Auto-select first in category
+    const nextId = this._craftState.activeId && list.some((x) => x.r.id === this._craftState.activeId)
+      ? this._craftState.activeId
+      : (list[0]?.r?.id || '')
+
+    if (nextId) void setActiveRecipe(nextId)
   }
 
   renderForgeTable(recipes, invCount, getItem, onCraft) {
