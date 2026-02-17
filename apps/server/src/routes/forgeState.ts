@@ -3,10 +3,13 @@ import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { forgeState } from '../db/schema.js';
+import { getRedis } from '../redis/client.js';
+import crypto from 'node:crypto';
 
 const GetQuerySchema = z.object({
   worldId: z.string().min(1),
   forgeId: z.string().min(3).max(128),
+  guestId: z.string().min(8),
 });
 
 const ItemSlotSchema = z
@@ -31,8 +34,19 @@ const ForgeStateSchema = z
 const PutBodySchema = z.object({
   worldId: z.string().min(1),
   forgeId: z.string().min(3).max(128),
+  guestId: z.string().min(8),
+  lockToken: z.string().min(8),
   state: z.record(z.any()),
 });
+
+const RenewBodySchema = z.object({
+  worldId: z.string().min(1),
+  forgeId: z.string().min(3).max(128),
+  guestId: z.string().min(8),
+  lockToken: z.string().min(8),
+});
+
+const ReleaseBodySchema = RenewBodySchema;
 
 const ItemId = {
   LOG: 'log',
@@ -193,11 +207,75 @@ function advanceForge(st: any, dtSec: number) {
 }
 
 export async function registerForgeStateRoutes(app: FastifyInstance) {
+  const redisP = getRedis();
+  let redis: Awaited<typeof redisP> | null = null;
+  redisP.then((c) => (redis = c)).catch(() => (redis = null));
+
+  const TTL_CACHE_S = 60 * 60; // 60m
+  const TTL_LOCK_S = 10; // 10s (renew)
+
+  const keyForgeCache = (worldId: string, forgeId: string) => `cache:forge:${worldId}:${forgeId}`;
+  const keyForgeLock = (worldId: string, forgeId: string) => `lock:forge:${worldId}:${forgeId}`;
+
+  async function tryAcquireForgeLock(params: { worldId: string; forgeId: string; guestId: string }) {
+    const r = redis;
+    if (!r) return { ok: true as const, token: `nolock:${params.guestId}:${crypto.randomUUID()}` };
+
+    const k = keyForgeLock(params.worldId, params.forgeId);
+    const token = `${params.guestId}:${crypto.randomUUID()}`;
+
+    try {
+      const ok = await r.set(k, token, { NX: true, EX: TTL_LOCK_S });
+      if (ok === 'OK') return { ok: true as const, token };
+
+      // allow re-entry if same guest holds the lock
+      const cur = await r.get(k);
+      if (cur && String(cur).startsWith(`${params.guestId}:`)) {
+        await r.set(k, String(cur), { XX: true, EX: TTL_LOCK_S });
+        return { ok: true as const, token: String(cur) };
+      }
+
+      return { ok: false as const };
+    } catch {
+      return { ok: true as const, token };
+    }
+  }
+
+  async function assertLock(params: { worldId: string; forgeId: string; lockToken: string }) {
+    const r = redis;
+    if (!r) return true;
+    const k = keyForgeLock(params.worldId, params.forgeId);
+    try {
+      const cur = await r.get(k);
+      return String(cur || '') === String(params.lockToken || '');
+    } catch {
+      return true;
+    }
+  }
+
   app.get('/api/forge/state', async (req, reply) => {
     const parsed = GetQuerySchema.safeParse(req.query ?? {});
     if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_query' });
 
-    const { worldId, forgeId } = parsed.data;
+    const { worldId, forgeId, guestId } = parsed.data;
+
+    // Acquire lock first (prevents 2 sessions from fighting)
+    const lock = await tryAcquireForgeLock({ worldId, forgeId, guestId });
+    if (!lock.ok) return reply.status(423).send({ ok: false, error: 'locked' });
+
+    const r = redis;
+    if (r) {
+      try {
+        const cached = await r.get(keyForgeCache(worldId, forgeId));
+        if (cached) {
+          const parsed = JSON.parse(cached) as any;
+          const st = ForgeStateSchema.parse(parsed?.state ?? {});
+          return { ok: true, worldId, forgeId, lockToken: lock.token, state: st, updatedAt: parsed?.updatedAt ?? null };
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     try {
       const rows = await db
@@ -209,8 +287,16 @@ export async function registerForgeStateRoutes(app: FastifyInstance) {
       const now = new Date();
       if (rows.length === 0) {
         // Create empty state
-        await db.insert(forgeState).values({ worldId, forgeId, state: {}, updatedAt: now });
-        return { ok: true, worldId, forgeId, state: ForgeStateSchema.parse({}), updatedAt: now.toISOString() };
+        const st = ForgeStateSchema.parse({});
+        await db.insert(forgeState).values({ worldId, forgeId, state: st as any, updatedAt: now });
+
+        if (r) {
+          try {
+            void r.set(keyForgeCache(worldId, forgeId), JSON.stringify({ state: st, updatedAt: now.toISOString() }), { EX: TTL_CACHE_S });
+          } catch {}
+        }
+
+        return { ok: true, worldId, forgeId, lockToken: lock.token, state: st, updatedAt: now.toISOString() };
       }
 
       const raw = (rows[0].state ?? {}) as any;
@@ -227,7 +313,13 @@ export async function registerForgeStateRoutes(app: FastifyInstance) {
         .set({ state: st as any, updatedAt: now })
         .where(and(eq(forgeState.worldId, worldId), eq(forgeState.forgeId, forgeId)));
 
-      return { ok: true, worldId, forgeId, state: st, updatedAt: now.toISOString() };
+      if (r) {
+        try {
+          void r.set(keyForgeCache(worldId, forgeId), JSON.stringify({ state: st, updatedAt: now.toISOString() }), { EX: TTL_CACHE_S });
+        } catch {}
+      }
+
+      return { ok: true, worldId, forgeId, lockToken: lock.token, state: st, updatedAt: now.toISOString() };
     } catch (err) {
       req.log.error({ err }, 'get forge state failed');
       return reply.status(503).send({ ok: false, error: 'db_unavailable' });
@@ -238,7 +330,7 @@ export async function registerForgeStateRoutes(app: FastifyInstance) {
     const parsed = PutBodySchema.safeParse(req.body ?? {});
     if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_body' });
 
-    const { worldId, forgeId } = parsed.data;
+    const { worldId, forgeId, lockToken } = parsed.data;
 
     let st: any;
     try {
@@ -248,18 +340,72 @@ export async function registerForgeStateRoutes(app: FastifyInstance) {
     }
 
     try {
+      const okLock = await assertLock({ worldId, forgeId, lockToken });
+      if (!okLock) return reply.status(423).send({ ok: false, error: 'locked' });
+
+      const now = new Date();
       await db
         .insert(forgeState)
-        .values({ worldId, forgeId, state: st, updatedAt: new Date() })
+        .values({ worldId, forgeId, state: st, updatedAt: now })
         .onConflictDoUpdate({
           target: [forgeState.worldId, forgeState.forgeId],
-          set: { state: st, updatedAt: new Date() },
+          set: { state: st, updatedAt: now },
         });
+
+      if (redis) {
+        try {
+          void redis
+            .multi()
+            .set(keyForgeCache(worldId, forgeId), JSON.stringify({ state: st, updatedAt: now.toISOString() }), { EX: TTL_CACHE_S })
+            .set(keyForgeLock(worldId, forgeId), String(lockToken), { XX: true, EX: TTL_LOCK_S })
+            .exec();
+        } catch {}
+      }
 
       return { ok: true };
     } catch (err) {
       req.log.error({ err }, 'put forge state failed');
       return reply.status(503).send({ ok: false, error: 'db_unavailable' });
+    }
+  });
+
+  app.post('/api/forge/lock/renew', async (req, reply) => {
+    const parsed = RenewBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_body' });
+
+    const { worldId, forgeId, lockToken } = parsed.data;
+
+    const r = redis;
+    if (!r) return { ok: true };
+
+    try {
+      const k = keyForgeLock(worldId, forgeId);
+      const cur = await r.get(k);
+      if (String(cur || '') !== String(lockToken || '')) return reply.status(423).send({ ok: false, error: 'locked' });
+      await r.set(k, String(lockToken), { XX: true, EX: TTL_LOCK_S });
+      return { ok: true };
+    } catch {
+      return { ok: true };
+    }
+  });
+
+  app.post('/api/forge/lock/release', async (req, reply) => {
+    const parsed = ReleaseBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_body' });
+
+    const { worldId, forgeId, lockToken } = parsed.data;
+
+    const r = redis;
+    if (!r) return { ok: true };
+
+    try {
+      const k = keyForgeLock(worldId, forgeId);
+      const cur = await r.get(k);
+      if (String(cur || '') !== String(lockToken || '')) return reply.status(423).send({ ok: false, error: 'locked' });
+      await r.del(k);
+      return { ok: true };
+    } catch {
+      return { ok: true };
     }
   });
 }

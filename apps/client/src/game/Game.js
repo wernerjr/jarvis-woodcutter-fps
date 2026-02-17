@@ -137,7 +137,19 @@ export class Game {
     this._activeForgeId = null
     this._activeForgeTableId = null
     this._activeChestId = null
+
+    // Locks (Redis) for shared resources (best-effort)
+    this._forgeLockToken = null
+    this._forgeLockTimer = 0
     this._chestLockToken = null
+    this._chestLockTimer = 0
+
+    // Recently-locked targets (to show lock-only UI on hold-F)
+    this._lockedTargets = new Map()
+
+    // Debounced persistence for player state (inventory/hotbar)
+    this._playerSaveTimer = 0
+
     this._chestSlots = Array.from({ length: 15 }, () => null)
 
     this._ghost = new CampfireGhost()
@@ -484,6 +496,12 @@ export class Game {
 
   _wheelActionsFor(target) {
     if (!target) return []
+
+    // If we recently detected this target is locked by someone else,
+    // show a lock-only wheel (no action buttons).
+    if ((target.kind === 'chest' || target.kind === 'forge') && this._isTargetLocked(target.kind, target.id)) {
+      return [{ id: 'locked', label: '🔒' }]
+    }
 
     if (target.kind === 'campfire') {
       const lit = this.fires.isLit(target.id)
@@ -1462,9 +1480,29 @@ export class Game {
     // Load server-side forge state (offline catch-up) best-effort.
     if (this._persistCtx?.worldId) {
       try {
-        const { loadForgeState } = await import('../net/forgeState.js')
-        const st = await loadForgeState({ worldId: this._persistCtx.worldId, forgeId })
+        const { loadForgeState, renewForgeLock } = await import('../net/forgeState.js')
+        const res = await loadForgeState({ worldId: this._persistCtx.worldId, forgeId, guestId: this._persistCtx.guestId })
+        if (res?.ok === false && res?.error === 'locked') {
+          this.ui.toast('Forja em uso.', 1100)
+          this._activeForgeId = null
+          this._forgeLockToken = null
+          this._markTargetLocked('forge', forgeId)
+          await this.returnToGameMode()
+          return
+        }
+        const st = res?.state ?? res
+        if (res?.lockToken) this._forgeLockToken = String(res.lockToken)
         this.forges.applyState?.(forgeId, st)
+
+        // Renew lock while forge UI is open
+        if (this._forgeLockTimer) clearInterval(this._forgeLockTimer)
+        if (this._forgeLockToken) {
+          this._forgeLockTimer = window.setInterval(() => {
+            if (this.state !== 'forge') return
+            if (!this._persistCtx?.worldId || !this._persistCtx?.guestId || !this._activeForgeId || !this._forgeLockToken) return
+            renewForgeLock({ worldId: this._persistCtx.worldId, forgeId: this._activeForgeId, guestId: this._persistCtx.guestId, lockToken: this._forgeLockToken }).catch(() => null)
+          }, 4000)
+        }
       } catch {
         // keep local state if backend is unavailable
       }
@@ -1511,6 +1549,7 @@ export class Game {
       const res = await loadChestState({ worldId: this._persistCtx.worldId, chestId, guestId: this._persistCtx.guestId })
       if (!res?.ok) {
         this.ui.toast(res?.error === 'locked' ? 'Trancado (em uso).' : 'Trancado.', 1100)
+        if (res?.error === 'locked') this._markTargetLocked('chest', chestId)
         this._activeChestId = null
         this._chestLockToken = null
         await this.returnToGameMode()
@@ -1746,7 +1785,25 @@ export class Game {
       // ignore
     }
 
+    const prevForgeId = this._activeForgeId
+    const prevLock = this._forgeLockToken
+
+    if (this._forgeLockTimer) {
+      clearInterval(this._forgeLockTimer)
+      this._forgeLockTimer = 0
+    }
+
     this._activeForgeId = null
+    this._forgeLockToken = null
+
+    // Release lock best-effort
+    try {
+      if (prevForgeId && prevLock && this._persistCtx?.worldId && this._persistCtx?.guestId) {
+        const { releaseForgeLock } = await import('../net/forgeState.js')
+        void releaseForgeLock({ worldId: this._persistCtx.worldId, forgeId: prevForgeId, guestId: this._persistCtx.guestId, lockToken: prevLock })
+      }
+    } catch {}
+
     await this.returnToGameMode()
   }
 
@@ -2141,13 +2198,41 @@ export class Game {
     this._postMoveUpdate(sIdx, dIdx)
   }
 
+  _markTargetLocked(kind, id, ms = 6000) {
+    try {
+      const k = `${String(kind)}:${String(id)}`
+      this._lockedTargets.set(k, Date.now() + ms)
+    } catch {}
+  }
+
+  _isTargetLocked(kind, id) {
+    const k = `${String(kind)}:${String(id)}`
+    const until = this._lockedTargets.get(k) || 0
+    if (!until) return false
+    if (Date.now() > until) {
+      this._lockedTargets.delete(k)
+      return false
+    }
+    return true
+  }
+
+  _queuePlayerSave() {
+    if (!this._persistCtx?.save) return
+    if (this._playerSaveTimer) clearTimeout(this._playerSaveTimer)
+    this._playerSaveTimer = window.setTimeout(() => {
+      this._playerSaveTimer = 0
+      void this.saveNow()
+    }, 500)
+  }
+
   _queueForgeSave(forgeId = null) {
     if (this.state !== 'forge') return
     const fid = String(forgeId || this._activeForgeId || '')
     if (!fid) return
-    if (!this._persistCtx?.worldId) return
+    if (!this._persistCtx?.worldId || !this._persistCtx?.guestId) return
 
     const worldId = this._persistCtx.worldId
+    const guestId = this._persistCtx.guestId
 
     if (this._forgeSaveTimer) clearTimeout(this._forgeSaveTimer)
     this._forgeSaveTimer = window.setTimeout(async () => {
@@ -2155,8 +2240,14 @@ export class Game {
       try {
         const st = this.forges.exportState?.(fid)
         if (!st) return
+        const lockToken = this._forgeLockToken
+        if (!lockToken) return
         const { saveForgeState } = await import('../net/forgeState.js')
-        await saveForgeState({ worldId, forgeId: fid, state: st })
+        const res = await saveForgeState({ worldId, forgeId: fid, guestId, lockToken, state: st })
+        if (res?.ok === false && res?.error === 'locked') {
+          this.ui.toast('Forja trancou (sessão perdida).', 1200)
+          this._markTargetLocked('forge', fid)
+        }
       } catch {
         // silent
       }
@@ -2199,6 +2290,9 @@ export class Game {
     // Persist forge/chest state server-side (debounced)
     if (this.state === 'forge') this._queueForgeSave(this._activeForgeId)
     if (this.state === 'chest') this._queueChestSave(this._activeChestId)
+
+    // Persist player state more aggressively when transferring items (prevents item loss).
+    if (this.state === 'forge' || this.state === 'chest') this._queuePlayerSave()
   }
 
   // ----------------- persistence -----------------

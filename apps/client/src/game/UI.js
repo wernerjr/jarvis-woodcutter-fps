@@ -63,8 +63,8 @@ export class UI {
     const wheel = root.querySelector('.wheel')
     if (!wheel) return
 
-    // Clear previous buttons
-    for (const el of Array.from(wheel.querySelectorAll('.wheelBtn'))) el.remove()
+    // Clear previous buttons/lock
+    for (const el of Array.from(wheel.querySelectorAll('.wheelBtn,.wheelLock'))) el.remove()
 
     if (!actions || actions.length === 0) {
       this._wheelActions = []
@@ -80,12 +80,25 @@ export class UI {
 
     const n = actions.length
     wheel.setAttribute('data-n', String(n))
-    wheel.style.border = '1px solid rgba(255,255,255,.12)'
+
+    const lockOnly = n === 1 && actions[0]?.id === 'locked'
+    wheel.style.border = lockOnly ? 'none' : '1px solid rgba(255,255,255,.12)'
 
     // Make a square-ish grid: cols = ceil(sqrt(n))
     const cols = Math.max(1, Math.ceil(Math.sqrt(n)))
     wheel.style.display = 'grid'
     wheel.style.gridTemplateColumns = `repeat(${cols}, 1fr)`
+
+    if (lockOnly) {
+      const el = document.createElement('div')
+      el.className = 'wheelLock'
+      el.textContent = actions[0]?.label || '🔒'
+      el.style.fontSize = '44px'
+      el.style.padding = '18px 24px'
+      el.style.opacity = '0.95'
+      wheel.appendChild(el)
+      return
+    }
 
     for (const a of actions) {
       const btn = document.createElement('button')
