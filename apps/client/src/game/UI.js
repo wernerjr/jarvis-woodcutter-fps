@@ -281,7 +281,22 @@ export class UI {
     this.els.hudEl.classList.remove('hidden')
   }
 
+  _stopCraftPreview() {
+    try {
+      if (this._craftPrev?.raf) cancelAnimationFrame(this._craftPrev.raf)
+    } catch {}
+    if (this._craftPrev) this._craftPrev.raf = 0
+  }
+
+  _stopForgeTablePreview() {
+    try {
+      if (this._forgeTablePrev?.raf) cancelAnimationFrame(this._forgeTablePrev.raf)
+    } catch {}
+    if (this._forgeTablePrev) this._forgeTablePrev.raf = 0
+  }
+
   hideForgeTable() {
+    this._stopForgeTablePreview()
     this.els.forgeTableEl.classList.add('hidden')
   }
 
@@ -295,6 +310,7 @@ export class UI {
   }
 
   hideCrafting() {
+    this._stopCraftPreview()
     this.els.craftingEl.classList.add('hidden')
   }
 
