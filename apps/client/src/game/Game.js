@@ -1882,7 +1882,8 @@ export class Game {
     const modelTool = tool === 'campfire' || tool === 'forge' || tool === 'forgeTable' ? 'hand' : tool
     const modelItem = modelTool === 'axe' ? (toolItemId === ItemId.AXE_METAL ? 'axe_metal' : 'axe_stone')
       : modelTool === 'pickaxe' ? (toolItemId === ItemId.PICKAXE_METAL ? 'pickaxe_metal' : 'pickaxe_stone')
-        : null
+        : modelTool === 'hoe' ? 'hoe_metal'
+          : null
 
     this.player.setTool(modelTool, modelItem)
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
@@ -3038,7 +3039,7 @@ export class Game {
         this.player.handAction()
         this._tryInteract()
         this._actionCooldown = 0.22
-      } else if (this.tool === 'axe' || this.tool === 'pickaxe') {
+      } else if (this.tool === 'axe' || this.tool === 'pickaxe' || this.tool === 'hoe') {
         // Require correct item id in active slot.
         const s = this.hotbar[this.hotbarActive]
         if (this.tool === 'axe' && !this._isAxeId(s?.id)) {
@@ -3046,6 +3047,9 @@ export class Game {
           this._actionCooldown = 0.25
         } else if (this.tool === 'pickaxe' && !this._isPickaxeId(s?.id)) {
           this.ui.toast('Equipe uma picareta.', 900)
+          this._actionCooldown = 0.25
+        } else if (this.tool === 'hoe' && s?.id !== ItemId.HOE_METAL) {
+          this.ui.toast('Equipe uma enxada.', 900)
           this._actionCooldown = 0.25
         } else if (!this.player.isSwinging()) {
           this.player.swing()

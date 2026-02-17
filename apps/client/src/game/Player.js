@@ -69,6 +69,7 @@ export class Player {
       axe_metal: this._makeMetalAxe(),
       pickaxe_stone: this._makeStonePickaxe(),
       pickaxe_metal: this._makeMetalPickaxe(),
+      hoe_metal: this._makeMetalHoe(),
     }
 
     for (const m of Object.values(this._toolModels)) {
@@ -522,9 +523,39 @@ export class Player {
     return model
   }
 
+  _makeMetalHoe() {
+    const model = new THREE.Group()
+
+    const handleGeo = new THREE.CylinderGeometry(0.028, 0.042, 0.88, 8)
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x3a2416, roughness: 1.0 })
+    const handle = new THREE.Mesh(handleGeo, handleMat)
+    handle.position.set(0, 0.34, 0)
+    handle.rotation.z = 0.06
+
+    // Simple hoe head (flat blade perpendicular to handle)
+    const headGeo = new THREE.BoxGeometry(0.42, 0.06, 0.16)
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xf0f4f8, roughness: 0.16, metalness: 1.0 })
+    const head = new THREE.Mesh(headGeo, headMat)
+    head.position.set(0.06, 0.69, 0.02)
+    head.rotation.y = Math.PI / 2
+
+    model.add(handle)
+    model.add(head)
+
+    const fxAnchor = new THREE.Object3D()
+    fxAnchor.name = 'fxAnchor'
+    fxAnchor.position.set(0.22, 0.69, 0)
+    model.add(fxAnchor)
+    model.userData.fxAnchor = fxAnchor
+
+    model.position.set(0.0, -0.12, -0.02)
+    model.rotation.set(-0.30, 0.42, 0.10)
+    return model
+  }
+
   setTool(toolId, toolItemId = null) {
     // Show models based on tool.
-    if (this._toolPivot) this._toolPivot.visible = toolId === 'axe' || toolId === 'pickaxe'
+    if (this._toolPivot) this._toolPivot.visible = toolId === 'axe' || toolId === 'pickaxe' || toolId === 'hoe'
 
     for (const [id, m] of Object.entries(this._toolModels || {})) {
       m.visible = !!toolItemId && id === toolItemId
