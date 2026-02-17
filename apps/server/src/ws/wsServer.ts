@@ -96,6 +96,9 @@ type WorldEventMsg =
   | { t: 'worldEvent'; v: 1; kind: 'rockCollect'; rockId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'stickCollect'; stickId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'bushCollect'; bushId: string; x: number; z: number; at: number }
+  | { t: 'worldEvent'; v: 1; kind: 'plotTill'; plotId: string; x: number; z: number; at: number }
+  | { t: 'worldEvent'; v: 1; kind: 'plant'; plotId: string; seedId: string; x: number; z: number; at: number }
+  | { t: 'worldEvent'; v: 1; kind: 'harvest'; plotId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'oreBreak'; oreId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'place'; placeKind: 'campfire' | 'forge' | 'forgeTable' | 'chest'; id: string; x: number; z: number; at: number };
 
@@ -161,6 +164,7 @@ type WorldChunkMsg = {
     removedBushes: string[];
     removedOres: string[];
     placed: Array<{ id: string; type: 'campfire' | 'forge' | 'forgeTable' | 'chest'; x: number; z: number }>;
+    farmPlots: Array<{ id: string; x: number; z: number; tilledAt: number; seedId?: string | null; plantedAt?: number | null; growMs?: number | null }>;
   };
 };
 
@@ -270,6 +274,28 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
       const bushRespawnUntil = normalizeRespawns(st, 'bushRespawnUntil', 'removedBushes');
       const oreRespawnUntil = normalizeRespawns(st, 'oreRespawnUntil', 'removedOres');
 
+      const farmRaw = (st?.farmPlots ?? null) as any
+      const farmPlots: Array<{ id: string; x: number; z: number; tilledAt: number; seedId?: string | null; plantedAt?: number | null; growMs?: number | null }> = []
+      if (farmRaw && typeof farmRaw === 'object' && !Array.isArray(farmRaw)) {
+        for (const [k, v] of Object.entries(farmRaw)) {
+          const id = String(k)
+          const p = v as any
+          const x = Number(p?.x)
+          const z = Number(p?.z)
+          const tilledAt = Number(p?.tilledAt)
+          if (!id || !Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(tilledAt)) continue
+          farmPlots.push({
+            id,
+            x,
+            z,
+            tilledAt,
+            seedId: p?.seedId != null ? String(p.seedId) : null,
+            plantedAt: p?.plantedAt != null ? Number(p.plantedAt) : null,
+            growMs: p?.growMs != null ? Number(p.growMs) : null,
+          })
+        }
+      }
+
       // Schedule respawn broadcasts for any timed entities in this chunk.
       const schedule = (kind: RespawnKind, id: string, until: number) => {
         if (!Number.isFinite(until) || until === Number.POSITIVE_INFINITY) return;
@@ -308,6 +334,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
                 .map((p: any) => ({ id: String(p?.id), type: p?.type, x: Number(p?.x), z: Number(p?.z) }))
                 .filter((p: any) => p.id && (p.type === 'campfire' || p.type === 'forge' || p.type === 'forgeTable' || p.type === 'chest') && Number.isFinite(p.x) && Number.isFinite(p.z))
             : [],
+          farmPlots,
         },
       };
     }
@@ -320,7 +347,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
       chunkZ,
       version: 0,
       rawState: {},
-      state: { removedTrees: [], removedRocks: [], removedSticks: [], removedBushes: [], removedOres: [], placed: [] },
+      state: { removedTrees: [], removedRocks: [], removedSticks: [], removedBushes: [], removedOres: [], placed: [], farmPlots: [] },
     };
   }
 
@@ -729,6 +756,9 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
             msg.kind === 'rockCollect' ? String((msg as any).rockId || '') :
             msg.kind === 'stickCollect' ? String((msg as any).stickId || '') :
             msg.kind === 'bushCollect' ? String((msg as any).bushId || '') :
+            msg.kind === 'plotTill' ? String((msg as any).plotId || '') :
+            msg.kind === 'plant' ? String((msg as any).plotId || '') :
+            msg.kind === 'harvest' ? String((msg as any).plotId || '') :
             msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
             String((msg as any).id || ''));
 
@@ -757,6 +787,9 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
             msg.kind === 'rockCollect' ? String((msg as any).rockId || '') :
             msg.kind === 'stickCollect' ? String((msg as any).stickId || '') :
             msg.kind === 'bushCollect' ? String((msg as any).bushId || '') :
+            msg.kind === 'plotTill' ? String((msg as any).plotId || '') :
+            msg.kind === 'plant' ? String((msg as any).plotId || '') :
+            msg.kind === 'harvest' ? String((msg as any).plotId || '') :
             msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
             String((msg as any).id || ''));
 
@@ -781,6 +814,9 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
             const stickRespawnUntil = normalizeRespawns(next, 'stickRespawnUntil', 'removedSticks');
             const bushRespawnUntil = normalizeRespawns(next, 'bushRespawnUntil', 'removedBushes');
             const oreRespawnUntil = normalizeRespawns(next, 'oreRespawnUntil', 'removedOres');
+
+            // Farming plots (persisted in chunk state)
+            next.farmPlots = (next.farmPlots && typeof next.farmPlots === 'object' && !Array.isArray(next.farmPlots)) ? next.farmPlots : {};
 
             const schedule = (kind: RespawnKind, id: string, delayMs: number) => {
               const tk = timerKey(st.worldId, cx, cz, kind, id);
@@ -855,6 +891,81 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
                 schedule('bush', id, BUSH_RESPAWN_MS);
                 setResult('bushCollect', id, true);
               }
+            } else if (msg.kind === 'plotTill') {
+              const plotId = String((msg as any).plotId || '');
+              if (!plotId) {
+                setResult('plotTill', '', false, 'invalid');
+              } else {
+                const x0 = Number(x);
+                const z0 = Number(z);
+                const tx = Math.round(x0);
+                const tz = Math.round(z0);
+                const id = `${tx}:${tz}`;
+
+                // Ensure client can't spoof plotId away from coords.
+                if (plotId !== id) {
+                  setResult('plotTill', plotId, false, 'invalid');
+                } else {
+                  // Create/refresh tilled plot. Overwrite planted state.
+                  next.farmPlots[id] = {
+                    x: tx,
+                    z: tz,
+                    tilledAt: t,
+                    seedId: null,
+                    plantedAt: null,
+                    growMs: null,
+                  };
+                  setResult('plotTill', id, true);
+                }
+              }
+            } else if (msg.kind === 'plant') {
+              const plotId = String((msg as any).plotId || '');
+              const seedId = String((msg as any).seedId || '');
+              if (!plotId || !seedId) {
+                setResult('plant', plotId || '', false, 'invalid');
+              } else {
+                const p = next.farmPlots?.[plotId];
+                if (!p) {
+                  setResult('plant', plotId, false, 'invalid');
+                } else if (p.seedId) {
+                  // already planted
+                  setResult('plant', plotId, false, 'duplicate');
+                } else {
+                  // Growth: 5-8 minutes (ms)
+                  const growMs = (5 * 60_000) + Math.floor(Math.random() * (3 * 60_000 + 1));
+                  next.farmPlots[plotId] = {
+                    ...p,
+                    seedId,
+                    plantedAt: t,
+                    growMs,
+                  };
+                  setResult('plant', plotId, true);
+                }
+              }
+            } else if (msg.kind === 'harvest') {
+              const plotId = String((msg as any).plotId || '');
+              if (!plotId) {
+                setResult('harvest', '', false, 'invalid');
+              } else {
+                const p = next.farmPlots?.[plotId];
+                if (!p || !p.seedId || !p.plantedAt || !p.growMs) {
+                  setResult('harvest', plotId, false, 'invalid');
+                } else {
+                  const readyAt = Number(p.plantedAt) + Number(p.growMs);
+                  if (readyAt > t) {
+                    setResult('harvest', plotId, false, 'invalid');
+                  } else {
+                    // Clear plant, keep tilled.
+                    next.farmPlots[plotId] = {
+                      ...p,
+                      seedId: null,
+                      plantedAt: null,
+                      growMs: null,
+                    };
+                    setResult('harvest', plotId, true);
+                  }
+                }
+              }
             } else if (msg.kind === 'oreBreak') {
               const id = String((msg as any).oreId || '');
               if (!id) {
@@ -919,6 +1030,18 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
                 removedBushes: activeRemoved(bushRespawnUntil),
                 removedOres: activeRemoved(oreRespawnUntil),
                 placed: next.placed,
+                farmPlots: Object.entries(next.farmPlots || {})
+                  .map(([id, p]: any) => ({
+                    id: String(id),
+                    x: Number(p?.x),
+                    z: Number(p?.z),
+                    tilledAt: Number(p?.tilledAt),
+                    seedId: p?.seedId != null ? String(p.seedId) : null,
+                    plantedAt: p?.plantedAt != null ? Number(p.plantedAt) : null,
+                    growMs: p?.growMs != null ? Number(p.growMs) : null,
+                  }))
+                  .filter((p: any) => p.id && Number.isFinite(p.x) && Number.isFinite(p.z) && Number.isFinite(p.tilledAt)),
+
               },
             };
 

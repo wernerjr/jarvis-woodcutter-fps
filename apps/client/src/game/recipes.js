@@ -8,6 +8,7 @@ export const RecipeId = {
   FORGE: 'forge',
   FORGE_TABLE: 'forge_table',
   CHEST: 'chest',
+  ROPE: 'rope',
 }
 
 export const DURABILITY = {
@@ -15,6 +16,7 @@ export const DURABILITY = {
   AXE_METAL_MAX: 280,
   PICKAXE_STONE_MAX: 120,
   PICKAXE_METAL_MAX: 300,
+  HOE_METAL_MAX: 260,
   TORCH_MAX: 180, // seconds
 }
 
@@ -23,6 +25,7 @@ export const TOOL_STATS = {
   axe_metal: { dmg: 18, maxDur: DURABILITY.AXE_METAL_MAX },
   pickaxe_stone: { dmg: 10, maxDur: DURABILITY.PICKAXE_STONE_MAX },
   pickaxe_metal: { dmg: 15, maxDur: DURABILITY.PICKAXE_METAL_MAX },
+  hoe_metal: { dmg: 0, maxDur: DURABILITY.HOE_METAL_MAX },
 }
 
 export const RECIPES = [
@@ -106,6 +109,14 @@ export const RECIPES = [
       { id: ItemId.STONE, qty: 4 },
     ],
   },
+  {
+    id: RecipeId.ROPE,
+    name: 'Corda',
+    output: { id: ItemId.ROPE, qty: 1 },
+    cost: [
+      { id: ItemId.FIBER, qty: 3 },
+    ],
+  },
 ]
 
 export const FORGE_TABLE_RECIPES = [
@@ -139,6 +150,24 @@ export const FORGE_TABLE_RECIPES = [
     cost: [
       { id: ItemId.IRON_INGOT, qty: 4 },
       { id: ItemId.STICK, qty: 4 },
+    ],
+  },
+  {
+    id: 'hoe_metal',
+    name: 'Enxada de Metal',
+    output: {
+      id: ItemId.HOE_METAL,
+      qty: 1,
+      meta: {
+        tool: 'hoe',
+        tier: 'metal',
+        dur: TOOL_STATS.hoe_metal.maxDur,
+        maxDur: TOOL_STATS.hoe_metal.maxDur,
+      },
+    },
+    cost: [
+      { id: ItemId.IRON_INGOT, qty: 2 },
+      { id: ItemId.STICK, qty: 1 },
     ],
   },
 ]

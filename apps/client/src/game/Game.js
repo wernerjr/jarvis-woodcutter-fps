@@ -6,6 +6,7 @@ import { TreeManager } from './TreeManager.js'
 import { RockManager } from './RockManager.js'
 import { StickManager } from './StickManager.js'
 import { BushManager } from './BushManager.js'
+import { FarmManager } from './FarmManager.js'
 import { GrassManager } from './GrassManager.js'
 import { RiverManager } from './RiverManager.js'
 import { LakeManager } from './LakeManager.js'
@@ -76,6 +77,7 @@ export class Game {
     this.rocks = new RockManager({ scene: this.scene })
     this.sticks = new StickManager({ scene: this.scene })
     this.bushes = new BushManager({ scene: this.scene })
+    this.farm = new FarmManager({ scene: this.scene })
     this.fires = new CampfireManager({ scene: this.scene })
     this.forges = new ForgeManager({ scene: this.scene })
     this.forgeTables = new ForgeTableManager({ scene: this.scene })
@@ -99,6 +101,7 @@ export class Game {
       trees: new Set(),
       rocks: new Set(),
       bushes: new Set(),
+      farm: new Set(),
       ores: new Set(),
       campfires: new Set(),
       forges: new Set(),
@@ -221,6 +224,8 @@ export class Game {
     this.sticks.init({ seed: 1991, count: 46, radius: 45 })
     this.bushes.init({ seed: 3033, count: 26, radius: 46 })
 
+    // Farm plots are server-authoritative; start empty until chunks arrive.
+
     this.mine.init()
     // Hide interior while in the world (prevents reaching it by walking out of bounds).
     this.mine.setInteriorVisible(false)
@@ -256,6 +261,7 @@ export class Game {
 
       if (this.tool === 'axe') this._tryChop()
       else if (this.tool === 'pickaxe') this._tryMine()
+      else if (this.tool === 'hoe') this._tryHoe()
     })
 
     this._running = true
@@ -1059,6 +1065,133 @@ export class Game {
     return Math.floor(Math.random() * (max - min + 1)) + min
   }
 
+  _tryHoe() {
+    if (this.state !== 'playing') return
+    if (document.pointerLockElement !== this.canvas) return
+
+    if (this._inMine) {
+      this.ui.toast('Não dá pra arar/plantar na mina.', 1100)
+      this.sfx.click()
+      return
+    }
+
+    const slot = this.hotbar[this.hotbarActive]
+    const meta = slot?.meta
+    const isHoe = slot?.id === ItemId.HOE_METAL
+    if (!slot || !isHoe || !meta || meta.dur <= 0) {
+      this.ui.toast('Sua enxada quebrou.', 1100)
+      this.hotbar[this.hotbarActive] = null
+      if (slot?.id) this._cleanupHotbarBroken(slot.id, this.hotbarActive)
+      return
+    }
+
+    const p = raycastGround(this.camera)
+    if (!p) return
+
+    const snap = this.farm.snap(p.x, p.z)
+    const plotId = snap.id
+    const st = this.farm.getPlot(plotId)
+
+    // Decide action: harvest > plant > till
+    const ready = this.farm.isReady(st)
+
+    if (st?.seedId && ready) {
+      const key = `harvest:${plotId}`
+      const pendingKey = `harvest:${plotId}`
+      this._setPendingWorldAction(pendingKey, () => {
+        // Consume durability on confirmed action
+        meta.dur = Math.max(0, meta.dur - 1)
+        this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+        if (meta.dur <= 0) {
+          this.ui.toast('Enxada quebrou!', 1200)
+          this.hotbar[this.hotbarActive] = null
+          this._cleanupHotbarBroken(slot.id, this.hotbarActive)
+        }
+
+        const overflow = this.inventory.add(ItemId.FIBER, 2)
+        if (overflow) {
+          this.ui.toast('Inventário cheio: fibra descartada.', 1200)
+          this.sfx.click()
+        } else {
+          this.ui.toast('Colheu: +2 fibra', 1000)
+          this.sfx.pickup()
+          if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+        }
+      })
+
+      const sent = this._sendWorldEvent({ kind: 'harvest', plotId, x: snap.x, z: snap.z, at: Date.now() })
+      if (!sent) {
+        const rec = this._pendingWorldActions.get(pendingKey)
+        if (rec?.timeoutId) clearTimeout(rec.timeoutId)
+        this._pendingWorldActions.delete(pendingKey)
+        this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+      }
+
+      return
+    }
+
+    if (st?.tilledAt && !st?.seedId) {
+      if (this.inventory.count(ItemId.COTTON_SEED) <= 0) {
+        this.ui.toast('Você precisa de semente de algodão.', 1100)
+        this.sfx.click()
+        return
+      }
+
+      const key = `plant:${plotId}`
+      this._setPendingWorldAction(key, () => {
+        // Consume 1 seed
+        const ok = this.inventory.remove(ItemId.COTTON_SEED, 1)
+        if (!ok) return
+
+        // Consume durability
+        meta.dur = Math.max(0, meta.dur - 1)
+        this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+        if (meta.dur <= 0) {
+          this.ui.toast('Enxada quebrou!', 1200)
+          this.hotbar[this.hotbarActive] = null
+          this._cleanupHotbarBroken(slot.id, this.hotbarActive)
+        }
+
+        this.ui.toast('Plantou algodão.', 900)
+        this.sfx.pickup()
+        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      })
+
+      const sent = this._sendWorldEvent({ kind: 'plant', plotId, seedId: ItemId.COTTON_SEED, x: snap.x, z: snap.z, at: Date.now() })
+      if (!sent) {
+        const rec = this._pendingWorldActions.get(key)
+        if (rec?.timeoutId) clearTimeout(rec.timeoutId)
+        this._pendingWorldActions.delete(key)
+        this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+      }
+
+      return
+    }
+
+    // Till new plot (or refresh tilled)
+    const key = `plotTill:${plotId}`
+    this._setPendingWorldAction(key, () => {
+      meta.dur = Math.max(0, meta.dur - 1)
+      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+      if (meta.dur <= 0) {
+        this.ui.toast('Enxada quebrou!', 1200)
+        this.hotbar[this.hotbarActive] = null
+        this._cleanupHotbarBroken(slot.id, this.hotbarActive)
+      }
+
+      this.ui.toast('Solo arado.', 800)
+      this.sfx.hit?.('wood')
+    })
+
+    const sent = this._sendWorldEvent({ kind: 'plotTill', plotId, x: snap.x, z: snap.z, at: Date.now() })
+    if (!sent) {
+      const rec = this._pendingWorldActions.get(key)
+      if (rec?.timeoutId) clearTimeout(rec.timeoutId)
+      this._pendingWorldActions.delete(key)
+      this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+    }
+  }
+
   async playFromMenu() {
     // Always pick up any updated world selection from menu.
     const worldInput = document.querySelector('#worldId')
@@ -1778,6 +1911,7 @@ export class Game {
     else if (s.id === ItemId.FORGE) this.setTool('forge')
     else if (s.id === ItemId.FORGE_TABLE) this.setTool('forgeTable')
     else if (s.id === ItemId.CHEST) this.setTool('chest')
+    else if (s.id === ItemId.HOE_METAL) this.setTool('hoe')
     else this.setTool('hand')
 
     if (this.state === 'playing') {
@@ -1796,7 +1930,9 @@ export class Game {
                     ? 'Mesa de forja selecionada.'
                     : this.tool === 'chest'
                       ? 'Baú selecionado.'
-                      : 'Mão equipada.'
+                      : this.tool === 'hoe'
+                        ? 'Enxada equipada.'
+                        : 'Mão equipada.'
       this.ui.toast(msg, 900)
     }
   }
@@ -2129,6 +2265,7 @@ export class Game {
     const removedRocks = Array.isArray(st.removedRocks) ? st.removedRocks : []
     const removedSticks = Array.isArray(st.removedSticks) ? st.removedSticks : []
     const removedBushes = Array.isArray(st.removedBushes) ? st.removedBushes : []
+    const farmPlots = Array.isArray(st.farmPlots) ? st.farmPlots : []
     const removedOres = Array.isArray(st.removedOres) ? st.removedOres : []
     const placed = Array.isArray(st.placed) ? st.placed : []
 
@@ -2186,6 +2323,22 @@ export class Game {
       }
     }
     this.bushes.applyChunkState(msg.chunkX, msg.chunkZ, removedBushes)
+
+    // Farm plots (server-authoritative): apply full chunk state every time.
+    for (const p of farmPlots) {
+      const sid = String(p?.id || '')
+      if (!sid) continue
+      for (const kind of ['plotTill', 'plant', 'harvest']) {
+        const k = `${kind}:${sid}`
+        const rec = this._pendingWorldActions.get(k)
+        if (rec?.accepted) {
+          if (rec.timeoutId) clearTimeout(rec.timeoutId)
+          this._pendingWorldActions.delete(k)
+          rec.fn()
+        }
+      }
+    }
+    this.farm.applyChunkState(msg.chunkX, msg.chunkZ, farmPlots)
 
     // Ores can respawn (server-authoritative): apply full chunk state every time.
     for (const id of removedOres) {
@@ -2894,6 +3047,8 @@ export class Game {
     this.trees.update(simDt)
     this.rocks.update(simDt)
     this.sticks.update(simDt)
+    this.bushes.update(simDt)
+    this.farm.update(simDt)
     this.fires.update(simDt)
     this.forges.update(forgeDt, this.camera)
     this.ores.update(simDt)
