@@ -516,10 +516,31 @@ export class Game {
 
     this.ui.setWheelActions?.(actions)
     this.ui.showWheel?.()
-    this.ui.setInteractHint('Solte F em uma opção')
+    this.ui.setInteractHint('Clique em uma opção (ou solte F em cima)')
 
     // Default selection.
     this._wheelAction = null
+
+    // Enable click-to-act on buttons.
+    try {
+      const root = this.ui?.els?.actionWheelEl
+      const wheel = root?.querySelector?.('.wheel')
+      if (wheel) {
+        for (const btn of Array.from(wheel.querySelectorAll('.wheelBtn'))) {
+          const actionId = btn.getAttribute('data-action')
+          btn.addEventListener('mouseenter', () => {
+            this._wheelAction = actionId
+          })
+          btn.addEventListener('click', (e) => {
+            e.preventDefault?.()
+            this._wheelAction = actionId
+            this._closeWheel(true)
+          })
+        }
+      }
+    } catch {
+      // ignore
+    }
   }
 
   _closeWheel(runAction) {
