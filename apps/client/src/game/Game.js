@@ -2413,6 +2413,12 @@ export class Game {
 
   _applyServerCorrection(me) {
     const now = Date.now()
+
+    // PERF/feel: avoid constant tiny corrections that "fight" the local movement.
+    // Apply reconciliation at a limited rate.
+    if (now < (this._reconNextAt || 0)) return
+    this._reconNextAt = now + 80
+
     if (now < (this._reconCooldownUntil || 0)) {
       // When pressed against geometry, reconciliation tends to jitter.
       // Keep yaw gently aligned but avoid positional corrections for a short cooldown.
@@ -2430,7 +2436,8 @@ export class Game {
     const dist = Math.hypot(dx, dz)
 
     // Deadzone avoids micro-jitter when close enough.
-    const deadzone = 0.18
+    // Slightly larger to prevent constant small pulls that feel like movement stutter.
+    const deadzone = 0.45
     if (dist < deadzone) {
       // still align yaw a bit
       const yawT = me.yaw || 0
@@ -2468,7 +2475,9 @@ export class Game {
     }
 
     this.player.position.copy(next)
-    this.player.velocity.set(0, 0, 0)
+
+    // Only hard-reset velocity on big corrections; otherwise it feels like "sticky" movement.
+    if (dist > 1.2) this.player.velocity.set(0, 0, 0)
 
     const yawT = me.yaw || 0
     const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
