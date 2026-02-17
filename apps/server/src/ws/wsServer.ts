@@ -691,6 +691,110 @@ return 1
 
   const worldBoundaryColliders = buildWorldBoundaryColliders();
 
+  // ---- Mine collision (server-side) ----
+  // Must match client MineManager (mineOrigin + curve points + collider generation).
+  const MINE_ORIGIN = { x: -120, z: 95 };
+  const MINE_TENSION = 0.22;
+  const MINE_TUNNEL_RADIUS = 2.3;
+  const MINE_WALL_R = 0.85;
+  const MINE_OFF = MINE_TUNNEL_RADIUS - 0.35;
+
+  const MINE_CTRL = [
+    { x: MINE_ORIGIN.x + 1.0, z: MINE_ORIGIN.z + 0.0 },
+    { x: MINE_ORIGIN.x + 9.0, z: MINE_ORIGIN.z + 2.2 },
+    { x: MINE_ORIGIN.x + 18.0, z: MINE_ORIGIN.z + 8.2 },
+    { x: MINE_ORIGIN.x + 30.0, z: MINE_ORIGIN.z + 3.4 },
+    { x: MINE_ORIGIN.x + 42.0, z: MINE_ORIGIN.z - 4.8 },
+    { x: MINE_ORIGIN.x + 56.0, z: MINE_ORIGIN.z - 1.6 },
+    { x: MINE_ORIGIN.x + 68.0, z: MINE_ORIGIN.z + 6.0 },
+  ];
+
+  function hermite(p1: any, p2: any, m1: any, m2: any, t: number) {
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const h00 = 2 * t3 - 3 * t2 + 1;
+    const h10 = t3 - 2 * t2 + t;
+    const h01 = -2 * t3 + 3 * t2;
+    const h11 = t3 - t2;
+    return {
+      x: h00 * p1.x + h10 * m1.x + h01 * p2.x + h11 * m2.x,
+      z: h00 * p1.z + h10 * m1.z + h01 * p2.z + h11 * m2.z,
+    };
+  }
+
+  function hermiteTangent(p1: any, p2: any, m1: any, m2: any, t: number) {
+    const t2 = t * t;
+    const dh00 = 6 * t2 - 6 * t;
+    const dh10 = 3 * t2 - 4 * t + 1;
+    const dh01 = -6 * t2 + 6 * t;
+    const dh11 = 3 * t2 - 2 * t;
+    return {
+      x: dh00 * p1.x + dh10 * m1.x + dh01 * p2.x + dh11 * m2.x,
+      z: dh00 * p1.z + dh10 * m1.z + dh01 * p2.z + dh11 * m2.z,
+    };
+  }
+
+  function minePointAt(t: number) {
+    const pts = MINE_CTRL;
+    const n = pts.length;
+    const segs = n - 1;
+    const u = Math.max(0, Math.min(1, t)) * segs;
+    const i = Math.min(segs - 1, Math.floor(u));
+    const lt = u - i;
+
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(n - 1, i + 2)];
+
+    const m1 = { x: (p2.x - p0.x) * MINE_TENSION, z: (p2.z - p0.z) * MINE_TENSION };
+    const m2 = { x: (p3.x - p1.x) * MINE_TENSION, z: (p3.z - p1.z) * MINE_TENSION };
+
+    const p = hermite(p1, p2, m1, m2, lt);
+    const tan = hermiteTangent(p1, p2, m1, m2, lt);
+    return { p, tan };
+  }
+
+  function norm2(v: any) {
+    const d = Math.hypot(v.x, v.z) || 1;
+    return { x: v.x / d, z: v.z / d };
+  }
+
+  function buildMineColliders() {
+    const out: Array<{ x: number; z: number; r: number }> = [];
+    const samples = 26;
+    for (let i = 0; i <= samples; i++) {
+      const t = i / samples;
+      const { p, tan } = minePointAt(t);
+      const side = norm2({ x: tan.z, z: -tan.x });
+      out.push({ x: p.x + side.x * MINE_OFF, z: p.z + side.z * MINE_OFF, r: MINE_WALL_R });
+      out.push({ x: p.x - side.x * MINE_OFF, z: p.z - side.z * MINE_OFF, r: MINE_WALL_R });
+
+      if (i < samples) {
+        const t2 = (i + 0.5) / samples;
+        const { p: p2, tan: tan2 } = minePointAt(t2);
+        const side2 = norm2({ x: tan2.z, z: -tan2.x });
+        out.push({ x: p2.x + side2.x * MINE_OFF, z: p2.z + side2.z * MINE_OFF, r: MINE_WALL_R });
+        out.push({ x: p2.x - side2.x * MINE_OFF, z: p2.z - side2.z * MINE_OFF, r: MINE_WALL_R });
+      }
+    }
+
+    const end = minePointAt(1).p;
+    out.push({ x: end.x, z: end.z, r: 2.2 });
+
+    out.push({ x: MINE_ORIGIN.x + 1.0, z: MINE_ORIGIN.z + 2.4, r: 0.8 });
+    out.push({ x: MINE_ORIGIN.x + 1.0, z: MINE_ORIGIN.z - 2.4, r: 0.8 });
+
+    return out;
+  }
+
+  const mineColliders = buildMineColliders();
+
+  function isInMineXZ(x: number, z: number) {
+    // Bounding box around mine corridors (rough, but fast)
+    return x >= MINE_ORIGIN.x - 10 && x <= MINE_ORIGIN.x + 85 && z >= MINE_ORIGIN.z - 25 && z <= MINE_ORIGIN.z + 30;
+  }
+
   function resolveCollisionsXZ(next: { x: number; z: number }, colliders: Collider[], radius: number) {
     for (let iter = 0; iter < 6; iter++) {
       let any = false;
@@ -727,7 +831,7 @@ return 1
       st.input = undefined;
     }
 
-    const placedColliders = getNearbyPlacedColliders(st.worldId, st.x, st.z);
+    const placedColliders = !isInMineXZ(st.x, st.z) ? getNearbyPlacedColliders(st.worldId, st.x, st.z) : [];
 
     if (st.input) {
       const inp2 = st.input;
@@ -760,9 +864,10 @@ return 1
       st.x += rx * speed * dt;
       st.z += rz * speed * dt;
 
-      // Collision: keep within boundary + placed structures (server-authoritative).
+      // Collision: keep within boundary + placed structures (server-authoritative) + mine walls.
       resolveCollisionsXZ(st, worldBoundaryColliders, capsuleR);
       if (placedColliders.length) resolveCollisionsXZ(st, placedColliders, capsuleR);
+      if (isInMineXZ(st.x, st.z)) resolveCollisionsXZ(st, mineColliders, capsuleR);
 
       // jump (edge on client; server trusts boolean)
       if (inp2!.keys.jump && st.onGround) {
