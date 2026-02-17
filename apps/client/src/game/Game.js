@@ -780,14 +780,17 @@ export class Game {
             this.ui.toast('Inventário cheio (baú descartado).', 1200)
           }
           this.chests.remove(id)
+          this._unregisterPlacedLocal('chest', id)
         } else if (placeKind === 'forge') {
           const overflow = this.inventory.add(ItemId.FORGE, 1)
           if (overflow) this.ui.toast('Inventário cheio (forja descartada).', 1200)
           this.forges.remove(id)
+          this._unregisterPlacedLocal('forge', id)
         } else if (placeKind === 'forgeTable') {
           const overflow = this.inventory.add(ItemId.FORGE_TABLE, 1)
           if (overflow) this.ui.toast('Inventário cheio (mesa descartada).', 1200)
           this.forgeTables.remove(id)
+          this._unregisterPlacedLocal('forgeTable', id)
         }
 
         this.ui.toast('Recolhido.', 900)
@@ -852,10 +855,19 @@ export class Game {
 
       const key = `placeRemove:${id}`
       this._setPendingWorldAction(key, () => {
-        if (placeKind === 'chest') this.chests.remove(id)
-        else if (placeKind === 'forge') this.forges.remove(id)
-        else if (placeKind === 'forgeTable') this.forgeTables.remove(id)
-        else if (placeKind === 'campfire') this.fires.remove(id)
+        if (placeKind === 'chest') {
+          this.chests.remove(id)
+          this._unregisterPlacedLocal('chest', id)
+        } else if (placeKind === 'forge') {
+          this.forges.remove(id)
+          this._unregisterPlacedLocal('forge', id)
+        } else if (placeKind === 'forgeTable') {
+          this.forgeTables.remove(id)
+          this._unregisterPlacedLocal('forgeTable', id)
+        } else if (placeKind === 'campfire') {
+          this.fires.remove(id)
+          this._unregisterPlacedLocal('campfire', id)
+        }
 
         this.ui.toast('Destruído.', 900)
       })
@@ -2908,6 +2920,7 @@ export class Game {
 
     this._setPendingWorldAction(key, () => {
       this.forgeTables.place({ x: this._ghostX, z: this._ghostZ }, placeId)
+      this._registerPlacedLocal('forgeTable', placeId, this._ghostX, this._ghostZ)
 
       // Consume current hotbar stack
       slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
@@ -2960,6 +2973,33 @@ export class Game {
     this._chestGhost.setPos(x, z)
   }
 
+  _chunkOfPos(x, z) {
+    const chunkSize = 32
+    return { cx: Math.floor(x / chunkSize), cz: Math.floor(z / chunkSize) }
+  }
+
+  _registerPlacedLocal(type, id, x, z) {
+    const { cx, cz } = this._chunkOfPos(x, z)
+    const ck = `${cx}:${cz}`
+    const prev = this._placedByChunk.get(ck) || new Map()
+    prev.set(String(id), { type, x, z })
+    this._placedByChunk.set(ck, prev)
+
+    if (type === 'campfire') this._appliedWorld.campfires.add(String(id))
+    else if (type === 'forge') this._appliedWorld.forges.add(String(id))
+    else if (type === 'forgeTable') this._appliedWorld.forgeTables.add(String(id))
+    else if (type === 'chest') this._appliedWorld.chests.add(String(id))
+  }
+
+  _unregisterPlacedLocal(type, id) {
+    const sid = String(id)
+    for (const m of this._placedByChunk.values()) m.delete(sid)
+    if (type === 'campfire') this._appliedWorld.campfires.delete(sid)
+    else if (type === 'forge') this._appliedWorld.forges.delete(sid)
+    else if (type === 'forgeTable') this._appliedWorld.forgeTables.delete(sid)
+    else if (type === 'chest') this._appliedWorld.chests.delete(sid)
+  }
+
   _placeChestAtGhost() {
     const slot = this.hotbar[this.hotbarActive]
     if (!slot || slot.id !== ItemId.CHEST) return
@@ -2968,7 +3008,10 @@ export class Game {
     const key = `place:${placeId}`
 
     this._setPendingWorldAction(key, () => {
+      // Place locally for responsiveness, but also mark as applied + register in chunk map
+      // to avoid duplicates and to allow later removals to work.
       this.chests.place({ x: this._ghostX, z: this._ghostZ }, placeId)
+      this._registerPlacedLocal('chest', placeId, this._ghostX, this._ghostZ)
 
       slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
       if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
@@ -2997,6 +3040,7 @@ export class Game {
 
     this._setPendingWorldAction(key, () => {
       this.forges.place({ x: this._ghostX, z: this._ghostZ }, placeId)
+      this._registerPlacedLocal('forge', placeId, this._ghostX, this._ghostZ)
 
       // Consume current hotbar stack
       slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
@@ -3026,6 +3070,7 @@ export class Game {
 
     this._setPendingWorldAction(key, () => {
       this.fires.place({ x: this._ghostX, y: 0, z: this._ghostZ }, placeId)
+      this._registerPlacedLocal('campfire', placeId, this._ghostX, this._ghostZ)
 
       // Consume only the currently selected hotbar stack.
       slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
