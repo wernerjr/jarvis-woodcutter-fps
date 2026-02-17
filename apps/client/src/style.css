@@ -119,7 +119,7 @@ body.state-menu #hud{display:none;}
 
 /* Action wheel (now: buttons grid) */
 #wheel{display:none;}
-#actionWheel.overlay{background:rgba(0,0,0,.45)}
+#actionWheel.overlay{background:rgba(0,0,0,.45); pointer-events:auto;}
 
 .wheel{
   position:relative;
