@@ -88,10 +88,28 @@ export class ChestManager {
   }
 
   remove(id) {
-    const c = this._chests.get(String(id))
-    if (!c) return false
-    c.mesh.removeFromParent()
-    this._chests.delete(String(id))
+    const sid = String(id)
+    const c = this._chests.get(sid)
+    if (c) {
+      c.mesh.removeFromParent()
+      this._chests.delete(sid)
+    }
+
+    // Hard cleanup: remove any orphan meshes that still carry this chestId but are
+    // not in the map (can happen if we placed twice due to chunk reconciliation).
+    try {
+      const toRemove = []
+      this.scene.traverse((obj) => {
+        if (obj?.userData?.chestId && String(obj.userData.chestId) === sid) {
+          // remove at the mesh root that holds chestId
+          toRemove.push(obj)
+        }
+      })
+      for (const obj of toRemove) obj.removeFromParent()
+    } catch {
+      // ignore
+    }
+
     return true
   }
 }
