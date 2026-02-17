@@ -1186,20 +1186,22 @@ return 1
                 // Id is globally unique per player in current client; treat duplicates as no-op.
                 setResult('place', id, false, 'duplicate');
               } else {
-                next.placed.push({ id, type, x, z });
-
-                // Create server-side chest record at placement time (personal by default).
+                // Chest placement must create its DB record; otherwise we'd have a "ghost chest"
+                // that exists in chunk state but cannot be opened/removed safely.
                 if (type === 'chest') {
                   try {
                     await db
                       .insert(chestState)
                       .values({ worldId: st.worldId, chestId: id, ownerId: st.guestId, state: { slots: Array.from({ length: 15 }, () => null) }, updatedAt: new Date() })
                       .onConflictDoNothing();
-                  } catch {
-                    // best-effort; if DB write fails, chest open will 404
+                  } catch (err) {
+                    app.log.error({ err, event: 'ws_place_chest_db_failed', worldId: st.worldId, chestId: id, ownerId: st.guestId }, 'chest placement failed (db)');
+                    setResult('place', id, false, 'invalid');
+                    return;
                   }
                 }
 
+                next.placed.push({ id, type, x, z });
                 setResult('place', id, true);
               }
             } else if (msg.kind === 'placeRemove') {
