@@ -2709,8 +2709,9 @@ export class Game {
       if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     })
 
-    const px = hit.point?.x ?? this.player.position.x
-    const pz = hit.point?.z ?? this.player.position.z
+    // IMPORTANT: use root position for chunking (hit.point can be across chunk border on large hitbox)
+    const px = Number.isFinite(hit.x) ? hit.x : (hit.point?.x ?? this.player.position.x)
+    const pz = Number.isFinite(hit.z) ? hit.z : (hit.point?.z ?? this.player.position.z)
     const sent = this._sendWorldEvent({ kind: 'bushCollect', bushId, x: px, z: pz, at: Date.now() })
     if (!sent) {
       const rec = this._pendingWorldActions.get(key)

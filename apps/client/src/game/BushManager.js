@@ -107,7 +107,14 @@ export class BushManager {
     const bushId = obj?.userData?.id
     if (!bushId) return null
 
-    return { bushId: String(bushId), distance: hits[0].distance, point: hits[0].point?.clone?.() }
+    // Use the root position for server chunking (avoid boundary issues from hit point on large hitbox).
+    return {
+      bushId: String(bushId),
+      distance: hits[0].distance,
+      point: hits[0].point?.clone?.(),
+      x: obj.position?.x ?? 0,
+      z: obj.position?.z ?? 0,
+    }
   }
 
   collect(bushId, { world = false } = {}) {
