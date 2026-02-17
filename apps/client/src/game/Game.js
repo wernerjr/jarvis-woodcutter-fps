@@ -109,6 +109,10 @@ export class Game {
       chests: new Set(),
     }
 
+    // Track placed structures per chunk so removals (server-authoritative) can be applied.
+    // ck -> Map<id,type>
+    this._placedByChunk = new Map()
+
     this._inMine = false
     this._fadeEl = null
     this._fade = { active: false, t: 0, dur: 0.22, phase: 'in' }
@@ -708,40 +712,64 @@ export class Game {
     if (!t) return false
     if (t.kind === 'campfire') return false
 
-    // Chest: only allow pickup if empty.
-    if (t.kind === 'chest') {
-      if (this.state === 'chest' && this._activeChestId === t.id) return false
-      // best-effort: if we haven't loaded slots, ask server quickly.
-      if (!this._persistCtx?.worldId || !this._persistCtx?.guestId) {
-        this.ui.toast('Offline: não pode recolher baú.', 1000)
-        return false
-      }
-      try {
-        // NOTE: blocking sync not ideal, but pickup is rare.
-      } catch {}
-      // We will enforce empty on server on GET/PUT later; for now, client-side: refuse if we have cached non-empty.
-      // (If unknown, allow pickup but chest will be empty anyway if never used.)
-      const known = this._activeChestId === t.id ? this._chestSlots : null
-      if (known && known.some((s) => s && s.qty > 0)) {
-        this.ui.toast('Baú não está vazio.', 1000)
-        return false
+    const pickup = true
+
+    // Multiplayer: removal must be server-authoritative so everyone updates.
+    if (this._wsConnected && this.ws) {
+      const placeKind = t.kind
+      const id = String(t.id)
+
+      // Chest: best-effort local checks before asking server.
+      if (t.kind === 'chest') {
+        if (this.state === 'chest' && this._activeChestId === t.id) return false
+        const known = this._activeChestId === t.id ? this._chestSlots : null
+        if (known && known.some((s) => s && s.qty > 0)) {
+          this.ui.toast('Baú não está vazio.', 1000)
+          return false
+        }
+        if (this.inventory.count(ItemId.CHEST) >= 9999) {
+          this.ui.toast('Inventário cheio.', 1000)
+          return false
+        }
       }
 
-      const overflow = this.inventory.add(ItemId.CHEST, 1)
-      if (overflow) {
-        this.ui.toast('Inventário cheio.', 1000)
-        return false
+      const key = `placeRemove:${id}`
+      this._setPendingWorldAction(key, () => {
+        // Apply local effects only on confirm.
+        if (placeKind === 'chest') {
+          const overflow = this.inventory.add(ItemId.CHEST, 1)
+          if (overflow) {
+            this.ui.toast('Inventário cheio (baú descartado).', 1200)
+          }
+          this.chests.remove(id)
+        } else if (placeKind === 'forge') {
+          const overflow = this.inventory.add(ItemId.FORGE, 1)
+          if (overflow) this.ui.toast('Inventário cheio (forja descartada).', 1200)
+          this.forges.remove(id)
+        } else if (placeKind === 'forgeTable') {
+          const overflow = this.inventory.add(ItemId.FORGE_TABLE, 1)
+          if (overflow) this.ui.toast('Inventário cheio (mesa descartada).', 1200)
+          this.forgeTables.remove(id)
+        }
+
+        this.ui.toast('Recolhido.', 900)
+      })
+
+      const sent = this._sendWorldEvent({ kind: 'placeRemove', placeKind, id, pickup, x: t.x, z: t.z, at: Date.now() })
+      if (!sent) {
+        const rec = this._pendingWorldActions.get(key)
+        if (rec?.timeoutId) clearTimeout(rec.timeoutId)
+        this._pendingWorldActions.delete(key)
+        this.ui.toast('Sem conexão com o servidor (WS).', 1100)
       }
 
-      const removed = this.chests.remove(t.id)
-      if (!removed) {
-        this.inventory.remove(ItemId.CHEST, 1)
-        this.ui.toast('Falha ao recolher.', 1000)
-        return false
-      }
-
-      this.ui.toast('Recolhido.', 900)
       return true
+    }
+
+    // Offline fallback (single-player only)
+    if (t.kind === 'chest') {
+      this.ui.toast('Offline: não pode recolher baú.', 1000)
+      return false
     }
 
     const itemId = t.kind === 'forge' ? ItemId.FORGE : t.kind === 'forgeTable' ? ItemId.FORGE_TABLE : null
@@ -768,6 +796,44 @@ export class Game {
   _destroyStructure(t) {
     if (!t) return
 
+    const pickup = false
+
+    // Multiplayer: removal must be server-authoritative so everyone updates.
+    if (this._wsConnected && this.ws) {
+      const placeKind = t.kind
+      const id = String(t.id)
+
+      // Chest: best-effort local checks.
+      if (t.kind === 'chest') {
+        const known = this._activeChestId === t.id ? this._chestSlots : null
+        if (known && known.some((s) => s && s.qty > 0)) {
+          this.ui.toast('Baú não está vazio.', 1000)
+          return
+        }
+      }
+
+      const key = `placeRemove:${id}`
+      this._setPendingWorldAction(key, () => {
+        if (placeKind === 'chest') this.chests.remove(id)
+        else if (placeKind === 'forge') this.forges.remove(id)
+        else if (placeKind === 'forgeTable') this.forgeTables.remove(id)
+        else if (placeKind === 'campfire') this.fires.remove(id)
+
+        this.ui.toast('Destruído.', 900)
+      })
+
+      const sent = this._sendWorldEvent({ kind: 'placeRemove', placeKind, id, pickup, x: t.x, z: t.z, at: Date.now() })
+      if (!sent) {
+        const rec = this._pendingWorldActions.get(key)
+        if (rec?.timeoutId) clearTimeout(rec.timeoutId)
+        this._pendingWorldActions.delete(key)
+        this.ui.toast('Sem conexão com o servidor (WS).', 1100)
+      }
+
+      return
+    }
+
+    // Offline fallback
     if (t.kind === 'chest') {
       const known = this._activeChestId === t.id ? this._chestSlots : null
       if (known && known.some((s) => s && s.qty > 0)) {
@@ -2368,30 +2434,66 @@ export class Game {
 
     this.ores.applyChunkState(msg.chunkX, msg.chunkZ, removedOres)
 
+    const ck = `${Number(msg.chunkX)}:${Number(msg.chunkZ)}`
+    const prev = this._placedByChunk.get(ck) || new Map()
+    const nextMap = new Map()
+
+    // Build next map from authoritative state
     for (const p of placed) {
       const type = String(p?.type || '')
       const id = String(p?.id || '')
       const x = Number(p?.x)
       const z = Number(p?.z)
       if (!type || !id || !Number.isFinite(x) || !Number.isFinite(z)) continue
+      nextMap.set(id, { type, x, z })
+    }
+
+    // Apply removals (present before, missing now)
+    for (const [id, info] of prev) {
+      if (nextMap.has(id)) continue
+      const type = info?.type
+      if (type === 'campfire') {
+        this.fires.remove(id)
+        this._appliedWorld.campfires.delete(id)
+      } else if (type === 'forge') {
+        this.forges.remove(id)
+        this._appliedWorld.forges.delete(id)
+      } else if (type === 'forgeTable') {
+        this.forgeTables.remove(id)
+        this._appliedWorld.forgeTables.delete(id)
+      } else if (type === 'chest') {
+        this.chests.remove(id)
+        this._appliedWorld.chests.delete(id)
+      }
+    }
+
+    // Apply adds/updates
+    for (const [id, info] of nextMap) {
+      const type = info.type
+      const x = info.x
+      const z = info.z
 
       if (type === 'campfire') {
-        if (this._appliedWorld.campfires.has(id)) continue
-        this._appliedWorld.campfires.add(id)
-        this.fires.place({ x, y: 0, z }, id)
+        if (!this._appliedWorld.campfires.has(id)) {
+          this._appliedWorld.campfires.add(id)
+          this.fires.place({ x, y: 0, z }, id)
+        }
       } else if (type === 'forge') {
-        if (this._appliedWorld.forges.has(id)) continue
-        this._appliedWorld.forges.add(id)
-        this.forges.place({ x, z }, id)
+        if (!this._appliedWorld.forges.has(id)) {
+          this._appliedWorld.forges.add(id)
+          this.forges.place({ x, z }, id)
+        }
       } else if (type === 'forgeTable') {
-        if (this._appliedWorld.forgeTables.has(id)) continue
-        this._appliedWorld.forgeTables.add(id)
-        this.forgeTables.place({ x, z }, id)
-        this._hasForgeTableBuilt = true
+        if (!this._appliedWorld.forgeTables.has(id)) {
+          this._appliedWorld.forgeTables.add(id)
+          this.forgeTables.place({ x, z }, id)
+          this._hasForgeTableBuilt = true
+        }
       } else if (type === 'chest') {
-        if (this._appliedWorld.chests.has(id)) continue
-        this._appliedWorld.chests.add(id)
-        this.chests.place({ x, z }, id)
+        if (!this._appliedWorld.chests.has(id)) {
+          this._appliedWorld.chests.add(id)
+          this.chests.place({ x, z }, id)
+        }
       }
 
       const k = `place:${id}`
@@ -2402,6 +2504,11 @@ export class Game {
         rec.fn()
       }
     }
+
+    // Store authoritative state for this chunk
+    const prevStored = new Map()
+    for (const [id, info] of nextMap) prevStored.set(id, { type: info.type })
+    this._placedByChunk.set(ck, prevStored)
   }
 
   _sendWsInput(dt) {

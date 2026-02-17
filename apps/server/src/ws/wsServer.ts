@@ -100,7 +100,8 @@ type WorldEventMsg =
   | { t: 'worldEvent'; v: 1; kind: 'plant'; plotId: string; seedId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'harvest'; plotId: string; x: number; z: number; at: number }
   | { t: 'worldEvent'; v: 1; kind: 'oreBreak'; oreId: string; x: number; z: number; at: number }
-  | { t: 'worldEvent'; v: 1; kind: 'place'; placeKind: 'campfire' | 'forge' | 'forgeTable' | 'chest'; id: string; x: number; z: number; at: number };
+  | { t: 'worldEvent'; v: 1; kind: 'place'; placeKind: 'campfire' | 'forge' | 'forgeTable' | 'chest'; id: string; x: number; z: number; at: number }
+  | { t: 'worldEvent'; v: 1; kind: 'placeRemove'; placeKind: 'campfire' | 'forge' | 'forgeTable' | 'chest'; id: string; pickup: boolean; x: number; z: number; at: number };
 
 type ClientMsg = JoinMsg | InputMsg | TeleportMsg | WorldEventMsg;
 
@@ -770,6 +771,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
             msg.kind === 'plotTill' ? String((msg as any).plotId || '') :
             msg.kind === 'plant' ? String((msg as any).plotId || '') :
             msg.kind === 'harvest' ? String((msg as any).plotId || '') :
+            msg.kind === 'placeRemove' ? String((msg as any).id || '') :
             msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
             String((msg as any).id || ''));
 
@@ -801,6 +803,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
             msg.kind === 'plotTill' ? String((msg as any).plotId || '') :
             msg.kind === 'plant' ? String((msg as any).plotId || '') :
             msg.kind === 'harvest' ? String((msg as any).plotId || '') :
+            msg.kind === 'placeRemove' ? String((msg as any).id || '') :
             msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
             String((msg as any).id || ''));
 
@@ -1016,6 +1019,74 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
                 }
 
                 setResult('place', id, true);
+              }
+            } else if (msg.kind === 'placeRemove') {
+              const id = String((msg as any).id || '');
+              const placeKind = (msg as any).placeKind;
+              const pickup = !!(msg as any).pickup;
+              const type = placeKind === 'campfire' || placeKind === 'forge' || placeKind === 'forgeTable' || placeKind === 'chest' ? placeKind : null;
+              if (!id || !type) {
+                setResult('placeRemove', id || '', false, 'invalid');
+              } else {
+                const idx = next.placed.findIndex((p: any) => String(p?.id) === id && String(p?.type) === type);
+                if (idx < 0) {
+                  setResult('placeRemove', id, false, 'invalid');
+                } else {
+                  // If chest is "locked" (ownership), only the owner may remove/pickup.
+                  if (type === 'chest') {
+                    try {
+                      const rows = await db
+                        .select({ ownerId: chestState.ownerId, state: chestState.state })
+                        .from(chestState)
+                        .where(and(eq(chestState.worldId, st.worldId), eq(chestState.chestId, id)))
+                        .limit(1);
+
+                      if (!rows.length) {
+                        setResult('placeRemove', id, false, 'invalid');
+                      } else if (String(rows[0].ownerId) !== String(st.guestId)) {
+                        setResult('placeRemove', id, false, 'invalid');
+                      } else {
+                        if (pickup) {
+                          // Only allow pickup if empty.
+                          const slots = Array.isArray((rows[0].state as any)?.slots) ? (rows[0].state as any).slots : [];
+                          const nonEmpty = slots.some((s: any) => s && Number(s.qty || 0) > 0);
+                          if (nonEmpty) {
+                            setResult('placeRemove', id, false, 'invalid');
+                          } else {
+                            next.placed.splice(idx, 1);
+                            try {
+                              await db.delete(chestState).where(and(eq(chestState.worldId, st.worldId), eq(chestState.chestId, id)));
+                            } catch {
+                              // best-effort
+                            }
+                            setResult('placeRemove', id, true);
+                          }
+                        } else {
+                          // destroy: allow only if empty (same rule, for now)
+                          const slots = Array.isArray((rows[0].state as any)?.slots) ? (rows[0].state as any).slots : [];
+                          const nonEmpty = slots.some((s: any) => s && Number(s.qty || 0) > 0);
+                          if (nonEmpty) {
+                            setResult('placeRemove', id, false, 'invalid');
+                          } else {
+                            next.placed.splice(idx, 1);
+                            try {
+                              await db.delete(chestState).where(and(eq(chestState.worldId, st.worldId), eq(chestState.chestId, id)));
+                            } catch {
+                              // best-effort
+                            }
+                            setResult('placeRemove', id, true);
+                          }
+                        }
+                      }
+                    } catch {
+                      setResult('placeRemove', id, false, 'invalid');
+                    }
+                  } else {
+                    // Other structures: allow any player for now.
+                    next.placed.splice(idx, 1);
+                    setResult('placeRemove', id, true);
+                  }
+                }
               }
             }
 
