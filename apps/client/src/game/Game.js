@@ -1864,6 +1864,19 @@ export class Game {
     return Array.isArray(this._chestSlots) ? this._chestSlots.findIndex((s) => !s) : -1
   }
 
+  _findStackOrEmptyIdx(arr, itemId) {
+    if (!Array.isArray(arr) || !itemId) return -1
+    const def = ITEMS[itemId]
+    const maxStack = this.inventory?.maxStack ?? 100
+
+    if (def?.stackable) {
+      const stackIdx = arr.findIndex((s) => s && s.id === itemId && s.qty < maxStack)
+      if (stackIdx >= 0) return stackIdx
+    }
+
+    return arr.findIndex((s) => !s)
+  }
+
   invQuickToHotbar(invIdx) {
     if (this.state !== 'inventory') return
     const idx = Number(invIdx)
@@ -1902,7 +1915,10 @@ export class Game {
     const from = Number(invIdx)
     if (Number.isNaN(from)) return
 
-    const to = this._firstEmptyChestIdx()
+    const src = this.inventory.slots[from]
+    if (!src) return
+
+    const to = this._findStackOrEmptyIdx(this._chestSlots, src.id)
     if (to < 0) {
       this.ui.toast('Baú cheio.', 1000)
       this.sfx.click()
@@ -1974,13 +1990,13 @@ export class Game {
 
     // Prefer fuel if item is fuel, otherwise input if ore.
     if (s.id === ItemId.LOG || s.id === ItemId.STICK || s.id === ItemId.LEAF) {
-      const empty = f.fuel.findIndex((x) => !x)
-      if (empty >= 0) return void this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind: 'fuel', idx: empty })
+      const idx = this._findStackOrEmptyIdx(f.fuel, s.id)
+      if (idx >= 0) return void this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind: 'fuel', idx })
     }
 
     if (s.id === ItemId.IRON_ORE) {
-      const empty = f.input.findIndex((x) => !x)
-      if (empty >= 0) return void this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind: 'in', idx: empty })
+      const idx = this._findStackOrEmptyIdx(f.input, s.id)
+      if (idx >= 0) return void this.moveItem({ from: 'inv', idx: invIdx }, { to: 'forge', kind: 'in', idx })
     }
   }
 
