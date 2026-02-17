@@ -2926,16 +2926,26 @@ export class Game {
 
     // Client-side prediction keeps the game responsive and preserves collision feel.
     // Server snapshots correct drift.
-    const colliders = this.state === 'playing'
-      ? this.trees
-          .getTrunkColliders()
-          .concat(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
-          .concat(this._inMine ? [] : this.forges.getColliders())
-          .concat(this._inMine ? [] : this.forgeTables.getColliders())
-          .concat(this._inMine ? [] : this.chests.getColliders())
-          .concat(this._inMine ? [] : this.river.getColliders())
-          // Lake is decorative; collision boundary is enforced by the river.
-      : []
+    // PERF: avoid allocating lots of temporary arrays every frame (concat creates new arrays).
+    if (!this._collidersBuf) this._collidersBuf = []
+    const colliders = this.state === 'playing' ? this._collidersBuf : []
+    if (this.state === 'playing') {
+      colliders.length = 0
+      const pushAll = (items) => {
+        if (!items || !items.length) return
+        for (let i = 0; i < items.length; i++) colliders.push(items[i])
+      }
+
+      pushAll(this.trees.getTrunkColliders())
+      pushAll(this._inMine ? this.mine.getMineColliders() : this.mine.getWorldColliders())
+      if (!this._inMine) {
+        pushAll(this.forges.getColliders())
+        pushAll(this.forgeTables.getColliders())
+        pushAll(this.chests.getColliders())
+        pushAll(this.river.getColliders())
+        // Lake is decorative; collision boundary is enforced by the river.
+      }
+    }
 
     const groundY = this._inMine ? this.mine.getFloorYAt(this.player.position.x, this.player.position.z) : 0
 
