@@ -128,6 +128,15 @@ invGrid.addEventListener('drop', (e) => {
   game.moveItem(payload, { to: 'inv', idx: toIdx })
 })
 
+invGrid.addEventListener('dblclick', (e) => {
+  if (!document.body.classList.contains('inventory-open')) return
+  const slot = e.target?.closest?.('.invSlot')
+  if (!slot) return
+  const idx = Number(slot.dataset.index)
+  if (Number.isNaN(idx)) return
+  game.invQuickToHotbar(idx)
+})
+
 // Drag/drop + click: embedded forge inventory <-> forge slots
 const forgeRoot = document.querySelector('#forge')
 
@@ -164,6 +173,15 @@ chestInvGrid?.addEventListener('drop', (e) => {
   game.moveItem(payload, { to: 'inv', idx: toIdx })
 })
 
+chestInvGrid?.addEventListener('dblclick', (e) => {
+  if (!document.body.classList.contains('chest-open')) return
+  const slot = e.target?.closest?.('.invSlot')
+  if (!slot) return
+  const idx = Number(slot.dataset.index)
+  if (Number.isNaN(idx)) return
+  game.chestQuickAddFromInventory(idx)
+})
+
 chestRoot?.addEventListener('dragstart', (e) => {
   if (!document.body.classList.contains('chest-open')) return
   const slot = e.target?.closest?.('.forgeSlot')
@@ -197,6 +215,16 @@ chestRoot?.addEventListener('drop', (e) => {
   game.moveItem(payload, { to: 'chest', kind, idx })
 })
 
+chestRoot?.addEventListener('dblclick', (e) => {
+  if (!document.body.classList.contains('chest-open')) return
+  const slot = e.target?.closest?.('.forgeSlot')
+  if (!slot) return
+  const kind = slot.dataset.kind
+  const idx = Number(slot.dataset.index)
+  if (kind !== 'chest' || Number.isNaN(idx)) return
+  game.chestQuickBackToInventory(idx)
+})
+
 const forgeInvGrid = document.querySelector('#forgeInvGrid')
 forgeInvGrid?.addEventListener('dragstart', (e) => {
   if (!document.body.classList.contains('forge-open')) return
@@ -225,6 +253,15 @@ forgeInvGrid?.addEventListener('drop', (e) => {
   game.moveItem(payload, { to: 'inv', idx: toIdx })
 })
 forgeInvGrid?.addEventListener('click', (e) => {
+  if (!document.body.classList.contains('forge-open')) return
+  const slot = e.target?.closest?.('.invSlot')
+  if (!slot) return
+  const idx = Number(slot.dataset.index)
+  if (Number.isNaN(idx)) return
+  game.forgeQuickAddFromInventory(idx)
+})
+
+forgeInvGrid?.addEventListener('dblclick', (e) => {
   if (!document.body.classList.contains('forge-open')) return
   const slot = e.target?.closest?.('.invSlot')
   if (!slot) return
@@ -316,6 +353,13 @@ document.querySelectorAll('#hotbar .hotSlot').forEach((el) => {
     if (Number.isNaN(hotIdx)) return
     game.selectHotbar(hotIdx)
   })
+
+  el.addEventListener('dblclick', () => {
+    if (!document.body.classList.contains('inventory-open')) return
+    const hotIdx = Number(el.getAttribute('data-idx'))
+    if (Number.isNaN(hotIdx)) return
+    game.hotbarQuickToInventory(hotIdx)
+  })
 })
 
 $('#btnPlay').addEventListener('click', () => game.playFromMenu())
@@ -331,13 +375,16 @@ $('#btnViewBob').addEventListener('click', () => game.toggleViewBob())
 
 $('#btnControlsBack').addEventListener('click', () => game.closeControls())
 $('#btnInvClose').addEventListener('click', () => game.closeInventory())
+$('#btnInvSort')?.addEventListener('click', () => game.sortInventory())
 $('#btnCraftClose').addEventListener('click', () => game.closeCrafting())
 $('#btnForgeClose').addEventListener('click', () => game.closeForge())
 $('#btnForgeCollect').addEventListener('click', () => game.collectAllForgeOutput())
 $('#btnForgeStart').addEventListener('click', () => game.toggleForgeEnabled())
 
 $('#btnForgeTableClose').addEventListener('click', () => game.closeForgeTable())
+
 $('#btnChestClose').addEventListener('click', () => game.closeChest())
+$('#btnChestSort')?.addEventListener('click', () => game.sortChest())
 
 // Start at main menu
 ui.showMenu()

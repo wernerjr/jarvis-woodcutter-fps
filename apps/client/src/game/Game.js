@@ -1856,6 +1856,114 @@ export class Game {
     await this.returnToGameMode()
   }
 
+  _firstEmptyInvIdx() {
+    return this.inventory?.slots?.findIndex((s) => !s) ?? -1
+  }
+
+  _firstEmptyChestIdx() {
+    return Array.isArray(this._chestSlots) ? this._chestSlots.findIndex((s) => !s) : -1
+  }
+
+  invQuickToHotbar(invIdx) {
+    if (this.state !== 'inventory') return
+    const idx = Number(invIdx)
+    if (Number.isNaN(idx)) return
+
+    let hotIdx = Number(this.hotbarActive)
+    if (!Number.isFinite(hotIdx) || hotIdx <= 0) hotIdx = 1
+
+    // If target is occupied, try find an empty hotbar slot.
+    if (this.hotbar[hotIdx]) {
+      const empty = this.hotbar.findIndex((s, i) => i !== 0 && !s)
+      if (empty > 0) hotIdx = empty
+    }
+
+    if (hotIdx <= 0) return
+    this.moveItem({ from: 'inv', idx }, { to: 'hot', idx: hotIdx })
+  }
+
+  hotbarQuickToInventory(hotIdx) {
+    if (this.state !== 'inventory') return
+    const idx = Number(hotIdx)
+    if (Number.isNaN(idx) || idx === 0) return
+
+    const to = this._firstEmptyInvIdx()
+    if (to < 0) {
+      this.ui.toast('Inventário cheio.', 1000)
+      this.sfx.click()
+      return
+    }
+
+    this.moveItem({ from: 'hot', idx }, { to: 'inv', idx: to })
+  }
+
+  chestQuickAddFromInventory(invIdx) {
+    if (this.state !== 'chest') return
+    const from = Number(invIdx)
+    if (Number.isNaN(from)) return
+
+    const to = this._firstEmptyChestIdx()
+    if (to < 0) {
+      this.ui.toast('Baú cheio.', 1000)
+      this.sfx.click()
+      return
+    }
+
+    this.moveItem({ from: 'inv', idx: from }, { to: 'chest', kind: 'chest', idx: to })
+  }
+
+  chestQuickBackToInventory(chestIdx) {
+    if (this.state !== 'chest') return
+    const from = Number(chestIdx)
+    if (Number.isNaN(from)) return
+
+    const to = this._firstEmptyInvIdx()
+    if (to < 0) {
+      this.ui.toast('Inventário cheio.', 1000)
+      this.sfx.click()
+      return
+    }
+
+    this.moveItem({ from: 'chest', kind: 'chest', idx: from }, { to: 'inv', idx: to })
+  }
+
+  _sortSlotsByName(slots) {
+    const list = Array.isArray(slots) ? slots.slice() : []
+    const items = list.filter((s) => s)
+    const empties = list.length - items.length
+
+    items.sort((a, b) => {
+      const an = String(ITEMS[a.id]?.name ?? a.id)
+      const bn = String(ITEMS[b.id]?.name ?? b.id)
+      const c = an.localeCompare(bn, 'pt-BR')
+      if (c !== 0) return c
+      const c2 = String(a.id).localeCompare(String(b.id))
+      if (c2 !== 0) return c2
+      return (a.qty || 0) - (b.qty || 0)
+    })
+
+    while (items.length < list.length) items.push(null)
+    // Ensure exact length
+    items.length = list.length
+    return items
+  }
+
+  sortInventory() {
+    this.inventory.slots = this._sortSlotsByName(this.inventory.slots)
+    this.ui.toast('Inventário ordenado.', 900)
+    this._postMoveUpdate()
+    this._queuePlayerSave()
+  }
+
+  sortChest() {
+    if (this.state !== 'chest') return
+    this._chestSlots = this._sortSlotsByName(this._chestSlots)
+    this.ui.toast('Baú ordenado.', 900)
+    this._postMoveUpdate()
+    this._queueChestSave(this._activeChestId)
+    this._queuePlayerSave()
+  }
+
   forgeQuickAddFromInventory(invIdx) {
     if (this.state !== 'forge') return
     const f = this._activeForgeId ? this.forges.get(this._activeForgeId) : null
