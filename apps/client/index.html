@@ -196,12 +196,35 @@
 
       <!-- Forge Table (metal crafting station) -->
       <div id="forgeTable" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Mesa de Forja">
-        <div class="card">
-          <h2>Mesa de Forja</h2>
-          <p class="muted small">Ferramentas de metal (usa barras da forja).</p>
-          <div id="forgeTableList" class="craftList"></div>
-          <div class="buttons">
-            <button id="btnForgeTableClose" class="primary">Close</button>
+        <div class="card craftCatalog">
+          <div class="craftTopbar">
+            <div>
+              <h2>Mesa de Forja</h2>
+              <p class="muted small">Ferramentas de metal (usa barras da forja).</p>
+            </div>
+            <div class="buttons">
+              <button id="btnForgeTableClose" class="primary">Close</button>
+            </div>
+          </div>
+
+          <div class="craftBody">
+            <div class="craftCats" id="forgeTableCats"></div>
+
+            <div class="craftGridWrap">
+              <div class="craftGrid" id="forgeTableGrid"></div>
+            </div>
+
+            <div class="craftDetail">
+              <canvas id="forgeTablePreview" width="480" height="360"></canvas>
+              <div class="craftDetailInfo">
+                <div class="craftDetailTitle" id="forgeTableDetailTitle">Selecione um item</div>
+                <div class="muted" id="forgeTableDetailDesc"></div>
+                <div class="craftDetailCost" id="forgeTableDetailCost"></div>
+                <div class="buttons">
+                  <button id="btnForgeTableMake" class="primary" disabled>Forjar</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

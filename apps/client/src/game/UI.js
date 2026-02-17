@@ -762,8 +762,185 @@ export class UI {
     if (nextId) void setActiveRecipe(nextId)
   }
 
+  _ensureForgeTableCatalogEls() {
+    if (this._forgeTableCatalogEls) return this._forgeTableCatalogEls
+    this._forgeTableCatalogEls = {
+      cats: document.querySelector('#forgeTableCats'),
+      grid: document.querySelector('#forgeTableGrid'),
+      title: document.querySelector('#forgeTableDetailTitle'),
+      desc: document.querySelector('#forgeTableDetailDesc'),
+      cost: document.querySelector('#forgeTableDetailCost'),
+      btn: document.querySelector('#btnForgeTableMake'),
+      canvas: document.querySelector('#forgeTablePreview'),
+    }
+    return this._forgeTableCatalogEls
+  }
+
+  _forgeTableMetaFor(recipe) {
+    const outId = String(recipe?.output?.id || '')
+
+    const meta = {
+      cat: 'Ferramentas',
+      desc: 'Ferramenta de metal: mais dano e durabilidade.',
+      outId,
+    }
+
+    if (outId === 'axe_metal') meta.desc = 'Machado de metal: corta árvores mais rápido.'
+    else if (outId === 'pickaxe_metal') meta.desc = 'Picareta de metal: quebra rochas/minério mais rápido.'
+    else if (outId === 'hoe_metal') meta.desc = 'Enxada de metal: arar e colher plantações.'
+
+    return meta
+  }
+
+  async _forgeTablePreviewShow(outputItemId) {
+    const els = this._ensureForgeTableCatalogEls()
+    const canvas = els.canvas
+    if (!canvas) return
+
+    if (!this._three) {
+      const THREE = await import('three')
+      this._three = THREE
+    }
+    const THREE = this._three
+
+    if (!this._forgeTablePrev) {
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
+      renderer.setSize(canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height, false)
+
+      const scene = new THREE.Scene()
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 50)
+      camera.position.set(2.6, 1.6, 2.6)
+      camera.lookAt(0, 0.7, 0)
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.65))
+      const d = new THREE.DirectionalLight(0xffffff, 0.85)
+      d.position.set(3, 4, 2)
+      scene.add(d)
+
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(2.2, 32), new THREE.MeshStandardMaterial({ color: 0x121218, roughness: 1.0, metalness: 0.0 }))
+      floor.rotation.x = -Math.PI / 2
+      floor.position.y = 0
+      scene.add(floor)
+
+      this._forgeTablePrev = { renderer, scene, camera, obj: null, raf: 0 }
+
+      const tick = () => {
+        if (!this._forgeTablePrev) return
+        const { renderer, scene, camera, obj } = this._forgeTablePrev
+        const w = canvas.clientWidth || canvas.width
+        const h = canvas.clientHeight || canvas.height
+        renderer.setSize(w, h, false)
+        camera.aspect = Math.max(0.1, w / Math.max(1, h))
+        camera.updateProjectionMatrix()
+        if (obj) obj.rotation.y += 0.012
+        renderer.render(scene, camera)
+        this._forgeTablePrev.raf = requestAnimationFrame(tick)
+      }
+      this._forgeTablePrev.raf = requestAnimationFrame(tick)
+    }
+
+    const prev = this._forgeTablePrev.obj
+    if (prev) prev.removeFromParent()
+
+    const obj = this._makePreviewObject(outputItemId, THREE)
+    obj.position.set(0, 0, 0)
+    this._forgeTablePrev.scene.add(obj)
+    this._forgeTablePrev.obj = obj
+  }
+
   renderForgeTable(recipes, invCount, getItem, onCraft) {
-    this.renderCrafting(recipes, invCount, getItem, onCraft, this.els.forgeTableListEl)
+    const els = this._ensureForgeTableCatalogEls()
+    if (!els?.cats || !els?.grid) {
+      // fallback
+      this.renderCrafting(recipes, invCount, getItem, onCraft, this.els.forgeTableListEl)
+      return
+    }
+
+    const metas = recipes.map((r) => ({ r, m: this._forgeTableMetaFor(r) }))
+    const cats = Array.from(new Set(metas.map((x) => x.m.cat)))
+
+    this._forgeTableState = this._forgeTableState || { cat: cats[0] || 'Ferramentas', activeId: '' }
+    if (!cats.includes(this._forgeTableState.cat)) this._forgeTableState.cat = cats[0] || 'Ferramentas'
+
+    const setActiveRecipe = async (rid) => {
+      this._forgeTableState.activeId = rid
+      els.grid.querySelectorAll('.craftCard').forEach((el) => {
+        el.classList.toggle('active', el.getAttribute('data-recipe') === rid)
+      })
+
+      const rec = recipes.find((x) => String(x.id) === String(rid))
+      if (!rec) return
+      const meta = this._forgeTableMetaFor(rec)
+
+      els.title.textContent = rec.name
+      els.desc.textContent = meta.desc || ''
+
+      els.cost.innerHTML = ''
+      const can = rec.cost.every((c) => invCount(c.id) >= c.qty)
+      for (const c of rec.cost) {
+        const it = getItem(c.id)
+        const have = invCount(c.id)
+        const ok = have >= c.qty
+        const line = document.createElement('div')
+        line.className = 'craftCostLine ' + (ok ? 'ok' : 'bad')
+        line.innerHTML = `<div>${it?.icon ?? ''} ${it?.name ?? c.id}</div><div>${have}/${c.qty}</div>`
+        els.cost.appendChild(line)
+      }
+
+      els.btn.disabled = !can
+      els.btn.textContent = can ? 'Forjar' : 'Faltam recursos'
+      els.btn.onclick = () => onCraft(rec.id)
+
+      await this._forgeTablePreviewShow(meta.outId)
+    }
+
+    // categories (single or few)
+    els.cats.innerHTML = ''
+    for (const c of cats) {
+      const b = document.createElement('button')
+      b.className = 'craftCatBtn' + (c === this._forgeTableState.cat ? ' active' : '')
+      b.textContent = c
+      b.addEventListener('click', () => {
+        this._forgeTableState.cat = c
+        this.renderForgeTable(recipes, invCount, getItem, onCraft)
+      })
+      els.cats.appendChild(b)
+    }
+
+    // grid
+    els.grid.innerHTML = ''
+    const list = metas.filter((x) => x.m.cat === this._forgeTableState.cat)
+    for (const { r } of list) {
+      const out = getItem(r.output.id)
+      const can = r.cost.every((c) => invCount(c.id) >= c.qty)
+      const costLine = r.cost.map((c) => {
+        const it = getItem(c.id)
+        return `${it.icon} ${c.qty}`
+      }).join(' ')
+
+      const card = document.createElement('div')
+      card.className = 'craftCard'
+      card.setAttribute('data-recipe', r.id)
+      card.innerHTML = `
+        <div class="craftCardTop">
+          <div class="craftCardIco">${out?.icon ?? ''}</div>
+          <div>
+            <div class="craftCardName">${r.name}</div>
+            <div class="muted small">${can ? 'Disponível' : 'Faltam recursos'}</div>
+          </div>
+        </div>
+        <div class="craftCardCost">${costLine}</div>
+      `
+      card.addEventListener('click', () => setActiveRecipe(r.id))
+      els.grid.appendChild(card)
+    }
+
+    const nextId = this._forgeTableState.activeId && list.some((x) => x.r.id === this._forgeTableState.activeId)
+      ? this._forgeTableState.activeId
+      : (list[0]?.r?.id || '')
+
+    if (nextId) void setActiveRecipe(nextId)
   }
 
   renderInventory(slots, getItem) {
