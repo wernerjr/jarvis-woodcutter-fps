@@ -197,6 +197,14 @@ export class UI {
   }
 
   showHUD() {
+    // Ensure any preview render loops are stopped when leaving menus.
+    this._stopCraftPreview?.()
+    this._stopForgeTablePreview?.()
+    if (!this.preview3dEnabled) {
+      this.disposeCraftPreview?.()
+      this.disposeForgeTablePreview?.()
+    }
+
     document.body.classList.remove('state-menu')
     document.body.classList.remove('forge-open')
     document.body.classList.remove('chest-open')
