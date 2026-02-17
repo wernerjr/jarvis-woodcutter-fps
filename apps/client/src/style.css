@@ -141,6 +141,8 @@ body.forge-open #inventory.overlay{display:none;}
 .forgeHeader{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
 
 .forgeWide{flex:1; display:grid; grid-template-columns: 1.4fr 1.0fr 1.0fr; gap:16px; margin-top:10px; min-height:0}
+/* Chest modal: 50/50 between inventory and chest */
+#chest .forgeWide{grid-template-columns: 1fr 1fr}
 .forgeBlock{padding:14px; border:1px solid rgba(255,255,255,.10); border-radius:14px; background:rgba(0,0,0,.16); min-height:0; overflow:auto}
 .forgeBlockTitle{font-weight:800; letter-spacing:.2px; margin-bottom:8px}
 

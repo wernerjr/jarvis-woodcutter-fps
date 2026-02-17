@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-15T21:46:00Z",
+  "updatedAt": "2026-02-17T12:23:00Z",
   "statusLegend": {
     "epic": ["todo", "doing", "done"],
     "story": ["todo", "doing", "done"]
@@ -10,12 +10,12 @@
     {
       "id": "P5",
       "title": "Storage pessoal + arbustos + agricultura (algodão/fibra/corda)",
-      "status": "todo",
+      "status": "doing",
       "stories": [
         {
           "id": "P5-S1",
           "title": "Baú pessoal: craft + colocar + abrir só o dono + recolher/destruir só vazio",
-          "status": "doing",
+          "status": "done",
           "objective": "Adicionar um baú colocável para o jogador guardar itens, com acesso exclusivo do dono.",
           "description": "Criar um novo item/estrutura 'Baú'. O jogador crafta e coloca no mundo. Cada baú nasce com um ownerId (player/guestId) e só esse owner pode abrir e mover itens. Outros jogadores ao interagir devem ver um feedback simples ('Trancado'). Recolher (pickup) e destruir só é permitido se o baú estiver vazio.",
           "acceptanceCriteria": [
