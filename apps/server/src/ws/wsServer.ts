@@ -403,6 +403,17 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
         removedBushes: activeRemoved(bushRespawnUntil),
         removedOres: activeRemoved(oreRespawnUntil),
         placed: Array.isArray(next.placed) ? next.placed : [],
+        farmPlots: Object.entries(next.farmPlots || {})
+          .map(([id, p]: any) => ({
+            id: String(id),
+            x: Number(p?.x),
+            z: Number(p?.z),
+            tilledAt: Number(p?.tilledAt),
+            seedId: p?.seedId != null ? String(p.seedId) : null,
+            plantedAt: p?.plantedAt != null ? Number(p.plantedAt) : null,
+            growMs: p?.growMs != null ? Number(p.growMs) : null,
+          }))
+          .filter((p: any) => p.id && Number.isFinite(p.x) && Number.isFinite(p.z) && Number.isFinite(p.tilledAt)),
       },
     };
 
