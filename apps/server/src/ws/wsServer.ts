@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { worldChunkState, chestState } from '../db/schema.js';
 import { env } from '../env.js';
+import { getRedis } from '../redis/client.js';
 import crypto from 'node:crypto';
 
 function mkRateLimiter({ ratePerSec, burst }: { ratePerSec: number; burst: number }) {
@@ -203,6 +204,16 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
   const mpStats = opts.mpStats;
   const logThrottle = createLogThrottle();
 
+  const redisP = getRedis();
+  let redis: Awaited<typeof redisP> | null = null;
+  redisP.then((c) => (redis = c)).catch(() => (redis = null));
+
+  const REDIS_TTL_PLAYER_STATE_S = 15;
+  const REDIS_TTL_ROOM_PLAYERS_S = 30;
+
+  const keyPlayerState = (playerId: string) => `player:state:${playerId}`;
+  const keyRoomPlayers = (worldId: string) => `room:${worldId}:players`;
+
   // Respawn rules (server-authoritative)
   const ROCK_RESPAWN_MS = 30_000;
   const STICK_RESPAWN_MS = 30_000;
@@ -215,10 +226,10 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
 
   type RespawnKind = 'rock' | 'stick' | 'bush' | 'tree' | 'ore';
 
-  /** playerId -> state */
+  /** playerId -> state (somente players conectados neste pod) */
   const players = new Map<string, PlayerState>();
-  /** worldId -> set(playerId) */
-  const rooms = new Map<string, Set<string>>();
+  /** worldId -> set(playerId) (somente players conectados neste pod; usado para filtrar broadcasts) */
+  const roomsLocal = new Map<string, Set<string>>();
 
   const chunkSize = 32;
   const chunkOf = (x: number, z: number) => ({
@@ -450,11 +461,42 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
     }
   }
 
-  function broadcastSnapshot(worldId: string) {
-    const ids = rooms.get(worldId);
-    if (!ids || ids.size === 0) return;
+  async function broadcastSnapshot(worldId: string) {
+    const local = roomsLocal.get(worldId);
+    if (!local || local.size === 0) return;
+
+    const r = redis;
+    if (!r) return;
 
     const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    let ids: string[] = [];
+    try {
+      ids = (await r.sMembers(keyRoomPlayers(worldId))).map(String);
+    } catch {
+      return;
+    }
+    if (!ids.length) return;
+
+    const keys = ids.map((id) => keyPlayerState(id));
+
+    let rawStates: Array<string | null> = [];
+    try {
+      rawStates = await r.mGet(keys);
+    } catch {
+      return;
+    }
+
+    const parsed = rawStates
+      .map((s) => {
+        if (!s) return null;
+        try {
+          return JSON.parse(s) as any;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean) as Array<{ id: string; x: number; y: number; z: number; yaw: number }>;
 
     const payload: ServerSnapshotMsg = env.WOODCUTTER_SNAPSHOT_COMPACT
       ? {
@@ -462,19 +504,17 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
           v: 1,
           c: 1,
           worldId,
-          players: Array.from(ids)
-            .map((id) => players.get(id))
-            .filter(Boolean)
-            .map((p) => [p!.id, round2(p!.x), round2(p!.y), round2(p!.z), round2(p!.yaw)] as [string, number, number, number, number]),
+          players: parsed
+            .filter((p) => p && typeof p.id === 'string')
+            .map((p) => [String(p.id), round2(Number(p.x) || 0), round2(Number(p.y) || 0), round2(Number(p.z) || 0), round2(Number(p.yaw) || 0)] as [string, number, number, number, number]),
         }
       : {
           t: 'snapshot',
           v: 1,
           worldId,
-          players: Array.from(ids)
-            .map((id) => players.get(id))
-            .filter(Boolean)
-            .map((p) => ({ id: p!.id, x: round2(p!.x), y: round2(p!.y), z: round2(p!.z), yaw: round2(p!.yaw) })),
+          players: parsed
+            .filter((p) => p && typeof p.id === 'string')
+            .map((p) => ({ id: String(p.id), x: round2(Number(p.x) || 0), y: round2(Number(p.y) || 0), z: round2(Number(p.z) || 0), yaw: round2(Number(p.yaw) || 0) })),
         };
 
     const txt = JSON.stringify(payload);
@@ -622,10 +662,36 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
       stepPlayer(st, dt);
     }
 
+    // Persist volatile player state to Redis (TTL-renewal in tick)
+    if (redis) {
+      try {
+        const m = redis.multi();
+        for (const st of players.values()) {
+          const payload = {
+            id: st.id,
+            worldId: st.worldId,
+            x: st.x,
+            y: st.y,
+            z: st.z,
+            yaw: st.yaw,
+            pitch: st.pitch,
+            vy: st.vy,
+            onGround: st.onGround,
+            lastAtMs: st.lastAtMs,
+            lastSeq: st.lastSeq,
+          };
+          m.set(keyPlayerState(st.id), JSON.stringify(payload), { EX: REDIS_TTL_PLAYER_STATE_S });
+        }
+        void m.exec();
+      } catch {
+        // best-effort
+      }
+    }
+
     // Snapshot step
     if (snapAcc >= snapDt) {
       snapAcc = 0;
-      for (const worldId of rooms.keys()) broadcastSnapshot(worldId);
+      for (const worldId of roomsLocal.keys()) void broadcastSnapshot(worldId);
     }
   }, Math.floor(1000 / simHz));
 
@@ -716,8 +782,43 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
 
         players.set(id, st);
 
-        if (!rooms.has(msg.worldId)) rooms.set(msg.worldId, new Set());
-        rooms.get(msg.worldId)!.add(id);
+        // Redis: write initial player state (so other pods/clients can see immediately)
+        if (redis) {
+          try {
+            const payload = {
+              id: st.id,
+              worldId: st.worldId,
+              x: st.x,
+              y: st.y,
+              z: st.z,
+              yaw: st.yaw,
+              pitch: st.pitch,
+              vy: st.vy,
+              onGround: st.onGround,
+              lastAtMs: st.lastAtMs,
+              lastSeq: st.lastSeq,
+            };
+            void redis.set(keyPlayerState(st.id), JSON.stringify(payload), { EX: REDIS_TTL_PLAYER_STATE_S });
+          } catch {
+            // best-effort
+          }
+        }
+
+        if (!roomsLocal.has(msg.worldId)) roomsLocal.set(msg.worldId, new Set());
+        roomsLocal.get(msg.worldId)!.add(id);
+
+        // Redis: membership (TTL-renewal on join)
+        if (redis) {
+          try {
+            void redis
+              .multi()
+              .sAdd(keyRoomPlayers(msg.worldId), id)
+              .expire(keyRoomPlayers(msg.worldId), REDIS_TTL_ROOM_PLAYERS_S)
+              .exec();
+          } catch {
+            // best-effort
+          }
+        }
 
         mpStats?.onJoin(msg.worldId);
         app.log.info({ event: 'ws_join', remoteAddress, worldId: msg.worldId, playerId: id }, 'ws player joined');
@@ -1173,6 +1274,20 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
         st.lastSeq = msg.seq;
 
         st.input = msg;
+
+        // Redis: renew room membership TTL on fresh input (keeps room list warm)
+        if (redis) {
+          try {
+            void redis
+              .multi()
+              .sAdd(keyRoomPlayers(st.worldId), pid)
+              .expire(keyRoomPlayers(st.worldId), REDIS_TTL_ROOM_PLAYERS_S)
+              .exec();
+          } catch {
+            // best-effort
+          }
+        }
+
         return;
       }
     });
@@ -1192,9 +1307,18 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
       }
 
       // Remove from room
-      const ids = rooms.get(st.worldId);
+      const ids = roomsLocal.get(st.worldId);
       ids?.delete(pid);
-      if (ids && ids.size === 0) rooms.delete(st.worldId);
+      if (ids && ids.size === 0) roomsLocal.delete(st.worldId);
+
+      // Redis: best-effort remove from room set (otherwise TTL will clear).
+      if (redis) {
+        try {
+          void redis.sRem(keyRoomPlayers(st.worldId), pid);
+        } catch {
+          // best-effort
+        }
+      }
 
       mpStats?.onLeave(st.worldId);
       mpStats?.onConnClose();
