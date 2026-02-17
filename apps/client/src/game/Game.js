@@ -529,6 +529,11 @@ export class Game {
     // If chest/forge might be locked, do a quick status check so we can show lock-only UI.
     try {
       if ((target?.kind === 'forge') && this._persistCtx?.worldId && this._persistCtx?.guestId) {
+        const { getChestAccess } = await import('../net/chestState.js')
+        const st = await getChestAccess({ worldId: this._persistCtx.worldId, chestId: target.id, guestId: this._persistCtx.guestId })
+        if (st?.ok && st.access === 'forbidden') actions = [{ id: 'locked', label: '🔒' }]
+      }
+      if ((target?.kind === 'forge') && this._persistCtx?.worldId && this._persistCtx?.guestId) {
         const { getForgeLockStatus } = await import('../net/forgeState.js')
         const st = await getForgeLockStatus({ worldId: this._persistCtx.worldId, forgeId: target.id, guestId: this._persistCtx.guestId })
         if (st?.ok && st.locked) actions = [{ id: 'locked', label: '🔒' }]

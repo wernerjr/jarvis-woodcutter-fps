@@ -27,6 +27,13 @@ export async function saveChestState({ worldId, chestId, guestId, lockToken, sta
   return { ok: true }
 }
 
+export async function getChestAccess({ worldId, chestId, guestId }) {
+  const qs = new URLSearchParams({ worldId, chestId, guestId })
+  const res = await apiFetch(`/api/chest/access?${qs.toString()}`, { method: 'GET' })
+  if (!res.ok) return { ok: false }
+  return await res.json()
+}
+
 export async function getChestLockStatus({ worldId, chestId, guestId }) {
   const qs = new URLSearchParams({ worldId, chestId, guestId })
   const res = await apiFetch(`/api/chest/lock/status?${qs.toString()}`, { method: 'GET' })
