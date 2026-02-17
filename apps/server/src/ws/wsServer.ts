@@ -300,7 +300,101 @@ return 1
       .map(([id]) => String(id));
   }
 
+  // Redis: cache de chunk state (TTL 30m)
+  const REDIS_TTL_CHUNK_CACHE_S = 30 * 60;
+  const keyChunkCache = (worldId: string, chunkX: number, chunkZ: number) => `cache:chunk:${worldId}:${chunkX}:${chunkZ}`;
+
+  function deriveChunk(params: { worldId: string; chunkX: number; chunkZ: number; version: number; rawState: any }) {
+    const { worldId, chunkX, chunkZ, version } = params;
+    const st = (params.rawState ?? {}) as any;
+
+    const treeRespawnUntil = normalizeRespawns(st, 'treeRespawnUntil', 'removedTrees');
+    const rockRespawnUntil = normalizeRespawns(st, 'rockRespawnUntil', 'removedRocks');
+    const stickRespawnUntil = normalizeRespawns(st, 'stickRespawnUntil', 'removedSticks');
+    const bushRespawnUntil = normalizeRespawns(st, 'bushRespawnUntil', 'removedBushes');
+    const oreRespawnUntil = normalizeRespawns(st, 'oreRespawnUntil', 'removedOres');
+
+    const farmRaw = (st?.farmPlots ?? null) as any;
+    const farmPlots: Array<{ id: string; x: number; z: number; tilledAt: number; seedId?: string | null; plantedAt?: number | null; growMs?: number | null }> = [];
+    if (farmRaw && typeof farmRaw === 'object' && !Array.isArray(farmRaw)) {
+      for (const [k, v] of Object.entries(farmRaw)) {
+        const id = String(k);
+        const p = v as any;
+        const x = Number(p?.x);
+        const z = Number(p?.z);
+        const tilledAt = Number(p?.tilledAt);
+        if (!id || !Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(tilledAt)) continue;
+        farmPlots.push({
+          id,
+          x,
+          z,
+          tilledAt,
+          seedId: p?.seedId != null ? String(p.seedId) : null,
+          plantedAt: p?.plantedAt != null ? Number(p.plantedAt) : null,
+          growMs: p?.growMs != null ? Number(p.growMs) : null,
+        });
+      }
+    }
+
+    // Schedule respawn broadcasts for any timed entities in this chunk.
+    const schedule = (kind: RespawnKind, id: string, until: number) => {
+      if (!Number.isFinite(until) || until === Number.POSITIVE_INFINITY) return;
+      const tk = timerKey(worldId, chunkX, chunkZ, kind, id);
+      if (respawnTimers.has(tk)) return;
+      const delay = Math.max(0, until - nowMs());
+      const h = setTimeout(() => {
+        respawnTimers.delete(tk);
+        expireEntityIfNeeded({ worldId, chunkX, chunkZ, kind, id }).catch(() => null);
+      }, delay);
+      respawnTimers.set(tk, h);
+    };
+
+    for (const [id, until] of Object.entries(treeRespawnUntil)) schedule('tree', id, until);
+    for (const [id, until] of Object.entries(rockRespawnUntil)) schedule('rock', id, until);
+    for (const [id, until] of Object.entries(stickRespawnUntil)) schedule('stick', id, until);
+    for (const [id, until] of Object.entries(bushRespawnUntil)) schedule('bush', id, until);
+    for (const [id, until] of Object.entries(oreRespawnUntil)) schedule('ore', id, until);
+
+    return {
+      worldId,
+      chunkX,
+      chunkZ,
+      version: Number(version ?? 0),
+      // Full persisted state (used for writes).
+      rawState: st,
+      // Client-facing state (derived).
+      state: {
+        removedTrees: activeRemoved(treeRespawnUntil),
+        removedRocks: activeRemoved(rockRespawnUntil),
+        removedSticks: activeRemoved(stickRespawnUntil),
+        removedBushes: activeRemoved(bushRespawnUntil),
+        removedOres: activeRemoved(oreRespawnUntil),
+        placed: Array.isArray(st.placed)
+          ? st.placed
+              .map((p: any) => ({ id: String(p?.id), type: p?.type, x: Number(p?.x), z: Number(p?.z) }))
+              .filter((p: any) => p.id && (p.type === 'campfire' || p.type === 'forge' || p.type === 'forgeTable' || p.type === 'chest') && Number.isFinite(p.x) && Number.isFinite(p.z))
+          : [],
+        farmPlots,
+      },
+    };
+  }
+
   async function getChunk(worldId: string, chunkX: number, chunkZ: number) {
+    const r = redis;
+    if (r) {
+      try {
+        const cached = await r.get(keyChunkCache(worldId, chunkX, chunkZ));
+        if (cached) {
+          const parsed = JSON.parse(cached) as any;
+          const version = Number(parsed?.version ?? 0);
+          const rawState = (parsed?.state ?? {}) as any;
+          return deriveChunk({ worldId, chunkX, chunkZ, version, rawState });
+        }
+      } catch {
+        // ignore cache errors
+      }
+    }
+
     const row = await db
       .select()
       .from(worldChunkState)
@@ -308,89 +402,32 @@ return 1
       .limit(1);
 
     if (row[0]) {
-      const st = (row[0].state ?? {}) as any;
+      const version = Number(row[0].version ?? 0);
+      const rawState = (row[0].state ?? {}) as any;
 
-      const treeRespawnUntil = normalizeRespawns(st, 'treeRespawnUntil', 'removedTrees');
-      const rockRespawnUntil = normalizeRespawns(st, 'rockRespawnUntil', 'removedRocks');
-      const stickRespawnUntil = normalizeRespawns(st, 'stickRespawnUntil', 'removedSticks');
-      const bushRespawnUntil = normalizeRespawns(st, 'bushRespawnUntil', 'removedBushes');
-      const oreRespawnUntil = normalizeRespawns(st, 'oreRespawnUntil', 'removedOres');
-
-      const farmRaw = (st?.farmPlots ?? null) as any
-      const farmPlots: Array<{ id: string; x: number; z: number; tilledAt: number; seedId?: string | null; plantedAt?: number | null; growMs?: number | null }> = []
-      if (farmRaw && typeof farmRaw === 'object' && !Array.isArray(farmRaw)) {
-        for (const [k, v] of Object.entries(farmRaw)) {
-          const id = String(k)
-          const p = v as any
-          const x = Number(p?.x)
-          const z = Number(p?.z)
-          const tilledAt = Number(p?.tilledAt)
-          if (!id || !Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(tilledAt)) continue
-          farmPlots.push({
-            id,
-            x,
-            z,
-            tilledAt,
-            seedId: p?.seedId != null ? String(p.seedId) : null,
-            plantedAt: p?.plantedAt != null ? Number(p.plantedAt) : null,
-            growMs: p?.growMs != null ? Number(p.growMs) : null,
-          })
+      if (r) {
+        try {
+          void r.set(keyChunkCache(worldId, chunkX, chunkZ), JSON.stringify({ version, state: rawState }), { EX: REDIS_TTL_CHUNK_CACHE_S });
+        } catch {
+          // ignore
         }
       }
 
-      // Schedule respawn broadcasts for any timed entities in this chunk.
-      const schedule = (kind: RespawnKind, id: string, until: number) => {
-        if (!Number.isFinite(until) || until === Number.POSITIVE_INFINITY) return;
-        const tk = timerKey(worldId, chunkX, chunkZ, kind, id);
-        if (respawnTimers.has(tk)) return;
-        const delay = Math.max(0, until - nowMs());
-        const h = setTimeout(() => {
-          respawnTimers.delete(tk);
-          expireEntityIfNeeded({ worldId, chunkX, chunkZ, kind, id }).catch(() => null);
-        }, delay);
-        respawnTimers.set(tk, h);
-      };
-
-      for (const [id, until] of Object.entries(treeRespawnUntil)) schedule('tree', id, until);
-      for (const [id, until] of Object.entries(rockRespawnUntil)) schedule('rock', id, until);
-      for (const [id, until] of Object.entries(stickRespawnUntil)) schedule('stick', id, until);
-      for (const [id, until] of Object.entries(bushRespawnUntil)) schedule('bush', id, until);
-      for (const [id, until] of Object.entries(oreRespawnUntil)) schedule('ore', id, until);
-
-      return {
-        worldId,
-        chunkX,
-        chunkZ,
-        version: Number(row[0].version ?? 0),
-        // Full persisted state (used for writes).
-        rawState: st,
-        // Client-facing state (derived).
-        state: {
-          removedTrees: activeRemoved(treeRespawnUntil),
-          removedRocks: activeRemoved(rockRespawnUntil),
-          removedSticks: activeRemoved(stickRespawnUntil),
-          removedBushes: activeRemoved(bushRespawnUntil),
-          removedOres: activeRemoved(oreRespawnUntil),
-          placed: Array.isArray(st.placed)
-            ? st.placed
-                .map((p: any) => ({ id: String(p?.id), type: p?.type, x: Number(p?.x), z: Number(p?.z) }))
-                .filter((p: any) => p.id && (p.type === 'campfire' || p.type === 'forge' || p.type === 'forgeTable' || p.type === 'chest') && Number.isFinite(p.x) && Number.isFinite(p.z))
-            : [],
-          farmPlots,
-        },
-      };
+      return deriveChunk({ worldId, chunkX, chunkZ, version, rawState });
     }
 
     // Create empty chunk row.
     await db.insert(worldChunkState).values({ worldId, chunkX, chunkZ, version: 0, state: {} });
-    return {
-      worldId,
-      chunkX,
-      chunkZ,
-      version: 0,
-      rawState: {},
-      state: { removedTrees: [], removedRocks: [], removedSticks: [], removedBushes: [], removedOres: [], placed: [], farmPlots: [] },
-    };
+
+    if (r) {
+      try {
+        void r.set(keyChunkCache(worldId, chunkX, chunkZ), JSON.stringify({ version: 0, state: {} }), { EX: REDIS_TTL_CHUNK_CACHE_S });
+      } catch {
+        // ignore
+      }
+    }
+
+    return deriveChunk({ worldId, chunkX, chunkZ, version: 0, rawState: {} });
   }
 
   async function expireEntityIfNeeded(params: { worldId: string; chunkX: number; chunkZ: number; kind: RespawnKind; id: string }) {
@@ -477,6 +514,15 @@ return 1
         target: [worldChunkState.worldId, worldChunkState.chunkX, worldChunkState.chunkZ],
         set: { version: next.version, state: next.state, updatedAt: new Date() },
       });
+
+    // Redis cache update/invalidation (best-effort)
+    if (redis) {
+      try {
+        void redis.set(keyChunkCache(next.worldId, next.chunkX, next.chunkZ), JSON.stringify({ version: next.version, state: next.state }), { EX: REDIS_TTL_CHUNK_CACHE_S });
+      } catch {
+        // ignore
+      }
+    }
   }
 
   function broadcastWorldChunk(worldId: string, chunkX: number, chunkZ: number, msg: WorldChunkMsg) {
