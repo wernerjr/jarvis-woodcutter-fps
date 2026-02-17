@@ -413,7 +413,65 @@ $('#btnPlay').addEventListener('click', async () => {
   }
 })
 $('#btnControls').addEventListener('click', () => game.openControls('menu'))
+$('#btnMenuOptions')?.addEventListener('click', () => {
+  // Open options overlay
+  document.querySelector('#options')?.classList.remove('hidden')
+  document.querySelector('#menu')?.classList.add('hidden')
+
+  // Sync labels
+  const b1 = document.querySelector('#btnOptPerf')
+  const b2 = document.querySelector('#btnOptViewBob')
+  const b3 = document.querySelector('#btnOptPreview3D')
+  if (b1) b1.textContent = `Performance: ${game.perfEnabled ? 'ON' : 'OFF'}`
+  if (b2) b2.textContent = `View bob: ${game._viewBobEnabled ? 'ON' : 'OFF'}`
+  if (b3) b3.textContent = `Preview 3D: ${game.preview3dEnabled ? 'ON' : 'OFF'}`
+})
 $('#btnClose').addEventListener('click', () => game.tryClose())
+
+// Options menu
+$('#btnOptBack')?.addEventListener('click', () => {
+  document.querySelector('#options')?.classList.add('hidden')
+  document.querySelector('#menu')?.classList.remove('hidden')
+})
+
+const persistSettingsDebounced = (() => {
+  let t = 0
+  return () => {
+    if (!game._persistCtx?.guestId || !game._persistCtx?.worldId) return
+    if (t) clearTimeout(t)
+    t = setTimeout(() => {
+      t = 0
+      savePlayerSettings({
+        guestId: game._persistCtx.guestId,
+        worldId: game._persistCtx.worldId,
+        settings: {
+          perfEnabled: !!game.perfEnabled,
+          viewBobEnabled: !!game._viewBobEnabled,
+          preview3dEnabled: !!game.preview3dEnabled,
+        },
+      }).catch(() => null)
+    }, 350)
+  }
+})()
+
+$('#btnOptPerf')?.addEventListener('click', () => {
+  game.togglePerf()
+  const b = document.querySelector('#btnOptPerf')
+  if (b) b.textContent = `Performance: ${game.perfEnabled ? 'ON' : 'OFF'}`
+  persistSettingsDebounced()
+})
+$('#btnOptViewBob')?.addEventListener('click', () => {
+  game.toggleViewBob()
+  const b = document.querySelector('#btnOptViewBob')
+  if (b) b.textContent = `View bob: ${game._viewBobEnabled ? 'ON' : 'OFF'}`
+  persistSettingsDebounced()
+})
+$('#btnOptPreview3D')?.addEventListener('click', () => {
+  game.togglePreview3D()
+  const b = document.querySelector('#btnOptPreview3D')
+  if (b) b.textContent = `Preview 3D: ${game.preview3dEnabled ? 'ON' : 'OFF'}`
+  persistSettingsDebounced()
+})
 
 $('#btnResume').addEventListener('click', () => game.resume())
 $('#btnRestart').addEventListener('click', () => game.restart())

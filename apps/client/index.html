@@ -64,6 +64,7 @@
 
           <div class="buttons">
             <button id="btnPlay" class="primary">Play</button>
+            <button id="btnMenuOptions">Opções</button>
             <button id="btnControls">Controls</button>
             <button id="btnClose">Exit</button>
           </div>
@@ -87,6 +88,19 @@
         <div class="wheel" aria-hidden="true">
           <div class="wheelCenter">F</div>
           <!-- segments/labels are injected dynamically -->
+        </div>
+      </div>
+
+      <!-- Options menu (from main menu) -->
+      <div id="options" class="overlay block hidden" role="dialog" aria-modal="true" aria-label="Opções">
+        <div class="card">
+          <h2>Opções</h2>
+          <div class="buttons">
+            <button id="btnOptPerf">Performance: OFF</button>
+            <button id="btnOptViewBob">View bob: ON</button>
+            <button id="btnOptPreview3D">Preview 3D: OFF</button>
+            <button id="btnOptBack" class="primary">Back</button>
+          </div>
         </div>
       </div>
 
@@ -293,20 +307,20 @@
       <div id="controls" class="overlay block hidden" role="dialog" aria-modal="true" aria-label="Controles">
         <div class="card">
           <h2>Controles</h2>
-          <ul class="controlsList">
-            <li><b>WASD</b>: mover</li>
-            <li><b>Mouse</b>: olhar</li>
-            <li><b>Clique esquerdo</b>: cortar (perto da árvore)</li>
-            <li><b>ESC</b>: pausar</li>
-            <li><b>I</b>: inventário</li>
-            <li><b>1–0</b>: hotbar</li>
-            <li><b>Segurar clique</b>: ação (depende da hotbar)</li>
-            <li><b>Shift</b>: correr</li>
-            <li><b>C</b>: construção</li>
-            <li><b>Arrastar</b>: inventário ↔ hotbar (com inventário aberto)</li>
-            <li><b>F</b>: acender/apagar fogueira (tocha/mão)</li>
-            <li><b>Espaço</b>: pular</li>
-          </ul>
+          <div class="controlsGrid">
+            <div class="ctl"><div class="k">WASD</div><div class="d">Mover</div></div>
+            <div class="ctl"><div class="k">Mouse</div><div class="d">Olhar</div></div>
+            <div class="ctl"><div class="k">Clique Esq.</div><div class="d">Cortar (perto da árvore)</div></div>
+            <div class="ctl"><div class="k">ESC</div><div class="d">Pausar</div></div>
+            <div class="ctl"><div class="k">I</div><div class="d">Inventário</div></div>
+            <div class="ctl"><div class="k">1–0</div><div class="d">Hotbar</div></div>
+            <div class="ctl"><div class="k">Segurar clique</div><div class="d">Ação (depende da hotbar)</div></div>
+            <div class="ctl"><div class="k">Shift</div><div class="d">Correr</div></div>
+            <div class="ctl"><div class="k">C</div><div class="d">Construção</div></div>
+            <div class="ctl"><div class="k">Arrastar</div><div class="d">Inventário ↔ hotbar</div></div>
+            <div class="ctl"><div class="k">F</div><div class="d">Fogueira / Ações</div></div>
+            <div class="ctl"><div class="k">Espaço</div><div class="d">Pular</div></div>
+          </div>
           <div class="buttons">
             <button id="btnControlsBack" class="primary">Back</button>
           </div>

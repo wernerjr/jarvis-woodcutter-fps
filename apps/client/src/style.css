@@ -100,6 +100,12 @@ button:hover{border-color: rgba(159,245,168,0.35); background: rgba(255,255,255,
 button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,168,0.10)}
 .controlsList{margin:10px 0 0 18px; color:var(--muted)}
 
+.controlsGrid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin-top:10px}
+.ctl{border:1px solid var(--stroke); border-radius:14px; padding:10px 12px; background:rgba(0,0,0,.14)}
+.ctl .k{font-weight:800; font-size:13px; margin-bottom:4px}
+.ctl .d{color:var(--muted); font-size:12px; line-height:1.25}
+@media (max-width: 700px){ .controlsGrid{grid-template-columns:1fr;} }
+
 .craftList{display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px;}
 
 /* Crafting catalog (full-screen) */
