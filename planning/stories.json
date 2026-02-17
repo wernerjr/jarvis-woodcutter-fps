@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "project": "jarvis-woodcutter-fps",
+  "updatedAt": "2026-02-17T16:27:00Z",
+  "statusLegend": {
+    "epic": ["todo", "doing", "done"],
+    "story": ["todo", "doing", "done"]
+  },
+  "epics": [
+    {
+      "id": "P5",
+      "title": "Storage pessoal + arbustos + agricultura (algodão/fibra/corda)",
+      "status": "done",
+      "notes": [
+        "Arquivo original movido para planning/finalizados/.",
+        "Inclui: baú 50/50 UI, arbustos multiplayer, agricultura (enxada/plantio/colheita), roda->botões, placeRemove server-authoritative, seed drop ajustado."
+      ],
+      "stories": [
+        { "id": "P5-S1", "title": "Baú pessoal", "status": "done" },
+        { "id": "P5-S2", "title": "Arbustos", "status": "done" },
+        { "id": "P5-S3", "title": "Agricultura (algodão)", "status": "done" }
+      ]
+    },
+    {
+      "id": "P6",
+      "title": "Redis: mover estado de alta frequência/volátil (multi-pod ready)",
+      "status": "doing",
+      "objective": "Reduzir rubberband/desync e preparar escalabilidade futura (Kubernetes).",
+      "definition": {
+        "principles": [
+          "DB continua fonte da verdade para dados persistentes (chests/chunks).",
+          "Redis usado para estado rápido/volátil + cache + locks.",
+          "Design compatível com múltiplos pods, mesmo que hoje rode 1 instância."
+        ],
+        "recommendedRates": {
+          "serverSimHz": 20,
+          "serverSnapshotHz": 20,
+          "clientInputHz": 20
+        },
+        "recommendedTTLs": {
+          "playerState": "15s",
+          "playerLastInput": "2s",
+          "roomPlayers": "30s",
+          "worldEventRateLimit": "10s",
+          "chunkCache": "30m",
+          "chestCache": "60m",
+          "chestLock": "10s (renew)"
+        }
+      },
+      "stories": [
+        {
+          "id": "P6-S1",
+          "title": "Redis: player:state + room players (base multiplayer)",
+          "status": "todo",
+          "acceptanceCriteria": [
+            "Servidor escreve player:state no Redis (TTL 15s) e renova em tick.",
+            "Servidor mantém room:{worldId}:players no Redis (TTL 30s), renova em input/join.",
+            "Snapshot passa a usar Redis como fonte para players (ou espelhamento consistente).",
+            "Rubberband reduzido e drift fica estável em testes com 1 e 2 players."
+          ]
+        },
+        {
+          "id": "P6-S2",
+          "title": "Redis: rate limiting worldEvent (multi-pod safe)",
+          "status": "todo",
+          "acceptanceCriteria": [
+            "Limiter de worldEvent por player passa a usar Redis (TTL 10s).",
+            "Mesmo comportamento com 1 pod; sem regressão de gameplay."
+          ]
+        },
+        {
+          "id": "P6-S3",
+          "title": "Redis: cache de chunk state (worldChunkState) + invalidação", 
+          "status": "todo",
+          "acceptanceCriteria": [
+            "Leitura de chunk tenta Redis primeiro (TTL 30m); fallback DB.",
+            "Escrita de chunk atualiza Redis após persistir no DB.",
+            "Join/catch-up ficam mais rápidos (menos hits no DB)."
+          ]
+        },
+        {
+          "id": "P6-S4",
+          "title": "Redis: chest cache + lock (concorrência + performance)",
+          "status": "todo",
+          "acceptanceCriteria": [
+            "GET/PUT de chest usam cache Redis (TTL 60m) com fallback DB.",
+            "Lock por chest (TTL 10s, renew) evita 2 sessões simultâneas abrirem/escreverem em paralelo.",
+            "Persistência final continua no DB (flush no close ou intervalos)."
+          ]
+        }
+      ]
+    }
+  ]
+}
