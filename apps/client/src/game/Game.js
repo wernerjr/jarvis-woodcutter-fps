@@ -42,9 +42,11 @@ export class Game {
 
     // UI options
     try {
-      this.preview3dEnabled = localStorage.getItem('woodcutter_preview_3d') !== '0'
+      const v = localStorage.getItem('woodcutter_preview_3d')
+      if (v === null) localStorage.setItem('woodcutter_preview_3d', '0')
+      this.preview3dEnabled = localStorage.getItem('woodcutter_preview_3d') === '1'
     } catch {
-      this.preview3dEnabled = true
+      this.preview3dEnabled = false
     }
     this.ui.setPreview3DEnabled?.(this.preview3dEnabled)
 

@@ -526,6 +526,7 @@ export class UI {
       cost: document.querySelector('#craftDetailCost'),
       btn: document.querySelector('#btnCraftMake'),
       canvas: document.querySelector('#craftPreview'),
+      icon: document.querySelector('#craftPreviewIcon'),
     }
     return this._craftCatalogEls
   }
@@ -780,6 +781,11 @@ export class UI {
       els.btn.textContent = can ? 'Construir' : 'Falta recurso'
       els.btn.onclick = () => onCraft(rec.id)
 
+      // Preview: 3D or big icon
+      if (els.icon) els.icon.textContent = getItem(meta.outId)?.icon ?? ''
+      if (els.canvas) els.canvas.style.display = this.preview3dEnabled ? '' : 'none'
+      if (els.icon) els.icon.style.display = this.preview3dEnabled ? 'none' : ''
+
       await this._craftPreviewShow(meta.outId)
     }
 
@@ -842,6 +848,7 @@ export class UI {
       cost: document.querySelector('#forgeTableDetailCost'),
       btn: document.querySelector('#btnForgeTableMake'),
       canvas: document.querySelector('#forgeTablePreview'),
+      icon: document.querySelector('#forgeTablePreviewIcon'),
     }
     return this._forgeTableCatalogEls
   }
@@ -962,6 +969,11 @@ export class UI {
       els.btn.disabled = !can
       els.btn.textContent = can ? 'Forjar' : 'Faltam recursos'
       els.btn.onclick = () => onCraft(rec.id)
+
+      // Preview: 3D or big icon
+      if (els.icon) els.icon.textContent = getItem(meta.outId)?.icon ?? ''
+      if (els.canvas) els.canvas.style.display = this.preview3dEnabled ? '' : 'none'
+      if (els.icon) els.icon.style.display = this.preview3dEnabled ? 'none' : ''
 
       await this._forgeTablePreviewShow(meta.outId)
     }
