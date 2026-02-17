@@ -210,9 +210,39 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
 
   const REDIS_TTL_PLAYER_STATE_S = 15;
   const REDIS_TTL_ROOM_PLAYERS_S = 30;
+  const REDIS_TTL_WORLD_EVENT_RL_S = 10;
 
   const keyPlayerState = (playerId: string) => `player:state:${playerId}`;
   const keyRoomPlayers = (worldId: string) => `room:${worldId}:players`;
+  const keyWorldEventRatelimit = (worldId: string, playerId: string) => `rl:worldEvent:${worldId}:${playerId}`;
+
+  const WORLD_EVENT_RL_LUA = `
+local v = redis.call('INCR', KEYS[1])
+if v == 1 then
+  redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1]))
+end
+if v > tonumber(ARGV[2]) then
+  return 0
+end
+return 1
+`;
+
+  async function allowWorldEvent(worldId: string, playerId: string) {
+    const r = redis;
+    if (!r) return true; // best-effort: if Redis down, don't block gameplay
+
+    const maxInWindow = env.WOODCUTTER_WORLD_EVENT_RATE_PER_SEC * REDIS_TTL_WORLD_EVENT_RL_S + env.WOODCUTTER_WORLD_EVENT_BURST;
+
+    try {
+      const res = await r.eval(WORLD_EVENT_RL_LUA, {
+        keys: [keyWorldEventRatelimit(worldId, playerId)],
+        arguments: [String(REDIS_TTL_WORLD_EVENT_RL_S), String(maxInWindow)],
+      });
+      return Number(res) === 1;
+    } catch {
+      return true;
+    }
+  }
 
   // Respawn rules (server-authoritative)
   const ROCK_RESPAWN_MS = 30_000;
@@ -705,6 +735,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
     mpStats?.onConnOpen();
     app.log.info({ event: 'ws_open', remoteAddress }, 'ws connection opened');
 
+    // WorldEvent rate limit: multi-pod safe via Redis (fallback: local token bucket).
     const worldEventLimiter = mkRateLimiter({
       ratePerSec: env.WOODCUTTER_WORLD_EVENT_RATE_PER_SEC,
       burst: env.WOODCUTTER_WORLD_EVENT_BURST,
@@ -860,26 +891,30 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
         if (!st) return;
         if (msg.v !== 1) return;
 
-        if (!worldEventLimiter.allow(1)) {
-          if (logThrottle.shouldLog(`rate:${pid}`, 1000)) {
-            app.log.warn({ event: 'ws_worldEvent_throttled', remoteAddress, worldId: st.worldId, playerId: pid }, 'worldEvent throttled');
-          }
-          const id =
-            (msg.kind === 'treeCut' ? String((msg as any).treeId || '') :
-            msg.kind === 'rockCollect' ? String((msg as any).rockId || '') :
-            msg.kind === 'stickCollect' ? String((msg as any).stickId || '') :
-            msg.kind === 'bushCollect' ? String((msg as any).bushId || '') :
-            msg.kind === 'plotTill' ? String((msg as any).plotId || '') :
-            msg.kind === 'plant' ? String((msg as any).plotId || '') :
-            msg.kind === 'harvest' ? String((msg as any).plotId || '') :
-            msg.kind === 'placeRemove' ? String((msg as any).id || '') :
-            msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
-            String((msg as any).id || ''));
+        // Redis limiter is async; handle worldEvent in a detached async flow.
+        void (async () => {
+          const allowedRedis = await allowWorldEvent(st.worldId, pid);
+          const allowedLocal = worldEventLimiter.allow(1);
+          if (!(allowedRedis && allowedLocal)) {
+            if (logThrottle.shouldLog(`rate:${pid}`, 1000)) {
+              app.log.warn({ event: 'ws_worldEvent_throttled', remoteAddress, worldId: st.worldId, playerId: pid }, 'worldEvent throttled');
+            }
+            const id =
+              (msg.kind === 'treeCut' ? String((msg as any).treeId || '') :
+              msg.kind === 'rockCollect' ? String((msg as any).rockId || '') :
+              msg.kind === 'stickCollect' ? String((msg as any).stickId || '') :
+              msg.kind === 'bushCollect' ? String((msg as any).bushId || '') :
+              msg.kind === 'plotTill' ? String((msg as any).plotId || '') :
+              msg.kind === 'plant' ? String((msg as any).plotId || '') :
+              msg.kind === 'harvest' ? String((msg as any).plotId || '') :
+              msg.kind === 'placeRemove' ? String((msg as any).id || '') :
+              msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
+              String((msg as any).id || ''));
 
-          const out: WorldEventResultMsg = { t: 'worldEventResult', v: 1, kind: msg.kind, id, ok: false, reason: 'invalid' };
-          if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(out));
-          return;
-        }
+            const out: WorldEventResultMsg = { t: 'worldEventResult', v: 1, kind: msg.kind, id, ok: false, reason: 'invalid' };
+            if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(out));
+            return;
+          }
 
         const clampNum = (n: any) => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 
@@ -1232,6 +1267,7 @@ export function registerWs(app: FastifyInstance, opts: { mpStats?: import('../mp
           })
           .catch(() => null);
 
+        })();
         return;
       }
 
