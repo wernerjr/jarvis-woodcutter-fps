@@ -295,6 +295,7 @@ export class UI {
 
   _stopCraftPreview() {
     try {
+      if (this._craftPrev) this._craftPrev.running = false
       if (this._craftPrev?.raf) cancelAnimationFrame(this._craftPrev.raf)
     } catch {}
     if (this._craftPrev) this._craftPrev.raf = 0
@@ -302,6 +303,7 @@ export class UI {
 
   _stopForgeTablePreview() {
     try {
+      if (this._forgeTablePrev) this._forgeTablePrev.running = false
       if (this._forgeTablePrev?.raf) cancelAnimationFrame(this._forgeTablePrev.raf)
     } catch {}
     if (this._forgeTablePrev) this._forgeTablePrev.raf = 0
@@ -609,10 +611,11 @@ export class UI {
       floor.position.y = 0
       scene.add(floor)
 
-      this._craftPrev = { renderer, scene, camera, obj: null, raf: 0 }
+      this._craftPrev = { renderer, scene, camera, obj: null, raf: 0, running: true, tick: null }
 
       const tick = () => {
         if (!this._craftPrev) return
+        if (!this._craftPrev.running) return
         const { renderer, scene, camera, obj } = this._craftPrev
         const w = canvas.clientWidth || canvas.width
         const h = canvas.clientHeight || canvas.height
@@ -623,7 +626,15 @@ export class UI {
         renderer.render(scene, camera)
         this._craftPrev.raf = requestAnimationFrame(tick)
       }
+      this._craftPrev.tick = tick
       this._craftPrev.raf = requestAnimationFrame(tick)
+    } else {
+      // Resume loop if it was stopped
+      if (this._craftPrev && !this._craftPrev.running) {
+        this._craftPrev.running = true
+        const tfn = this._craftPrev.tick
+        if (tfn) this._craftPrev.raf = requestAnimationFrame(tfn)
+      }
     }
 
     // replace object
@@ -901,10 +912,11 @@ export class UI {
       floor.position.y = 0
       scene.add(floor)
 
-      this._forgeTablePrev = { renderer, scene, camera, obj: null, raf: 0 }
+      this._forgeTablePrev = { renderer, scene, camera, obj: null, raf: 0, running: true, tick: null }
 
       const tick = () => {
         if (!this._forgeTablePrev) return
+        if (!this._forgeTablePrev.running) return
         const { renderer, scene, camera, obj } = this._forgeTablePrev
         const w = canvas.clientWidth || canvas.width
         const h = canvas.clientHeight || canvas.height
@@ -915,7 +927,14 @@ export class UI {
         renderer.render(scene, camera)
         this._forgeTablePrev.raf = requestAnimationFrame(tick)
       }
+      this._forgeTablePrev.tick = tick
       this._forgeTablePrev.raf = requestAnimationFrame(tick)
+    } else {
+      if (this._forgeTablePrev && !this._forgeTablePrev.running) {
+        this._forgeTablePrev.running = true
+        const tfn = this._forgeTablePrev.tick
+        if (tfn) this._forgeTablePrev.raf = requestAnimationFrame(tfn)
+      }
     }
 
     const prev = this._forgeTablePrev.obj
