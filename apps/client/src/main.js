@@ -69,6 +69,7 @@ const upgradeBoxEl = document.querySelector('#guestUpgradeBox')
 const linkUsernameEl = document.querySelector('#linkUsername')
 const linkPasswordEl = document.querySelector('#linkPassword')
 const upgradeStatusEl = document.querySelector('#upgradeStatus')
+let _authMode = 'unknown' // guest|user|unknown
 
 function showAuthGate() {
   document.body.classList.add('state-menu')
@@ -80,8 +81,8 @@ function showAuthGate() {
 }
 
 function updateGuestUpgradeVisibility() {
-  const hasGuest = !!(game?._persistCtx?.guestId)
-  if (upgradeBoxEl) upgradeBoxEl.classList.toggle('hidden', !hasGuest)
+  const canUpgrade = _authMode === 'guest' && !!(game?._persistCtx?.guestId)
+  if (upgradeBoxEl) upgradeBoxEl.classList.toggle('hidden', !canUpgrade)
 }
 
 function showMainMenuAfterAuth() {
@@ -116,6 +117,7 @@ document.querySelector('#btnAuthLogin')?.addEventListener('click', async () => {
         await savePlayerState({ guestId: out.guestId, worldId: out.worldId || 'world-1', state })
       },
     })
+    _authMode = 'user'
     setAuthStatus('')
     showMainMenuAfterAuth()
   } catch (err) {
@@ -129,7 +131,18 @@ document.querySelector('#btnAuthRegister')?.addEventListener('click', async () =
     const password = String(authPasswordEl?.value || '')
     setAuthStatus('Cadastrando...')
     await registerUserPassword({ username, password })
-    setAuthStatus('Conta criada. Agora faça login.', false)
+    const out = await loginUserPassword({ username, password })
+    game.setPersistenceContext({
+      guestId: out.guestId,
+      worldId: out.worldId || String(worldInput?.value || '').trim() || 'world-1',
+      token: out.token,
+      save: async (state) => {
+        await savePlayerState({ guestId: out.guestId, worldId: out.worldId || 'world-1', state })
+      },
+    })
+    _authMode = 'user'
+    setAuthStatus('')
+    showMainMenuAfterAuth()
   } catch (err) {
     setAuthStatus(`Erro: ${err?.message || err}`, true)
   }
@@ -147,6 +160,7 @@ document.querySelector('#btnContinueGuest')?.addEventListener('click', async () 
         await savePlayerState({ guestId: out.guestId, worldId: out.worldId, state })
       },
     })
+    _authMode = 'guest'
     setAuthStatus('')
     showMainMenuAfterAuth()
   } catch (err) {
@@ -162,6 +176,7 @@ document.querySelector('#btnUpgradeAccount')?.addEventListener('click', async ()
     const password = String(linkPasswordEl?.value || '')
     setUpgradeStatus('Vinculando conta...')
     await registerUserPassword({ username, password, guestId })
+    _authMode = 'user'
     setUpgradeStatus('Conta vinculada. Agora o acesso é por usuário/senha ✅')
     if (upgradeBoxEl) upgradeBoxEl.classList.add('hidden')
   } catch (err) {

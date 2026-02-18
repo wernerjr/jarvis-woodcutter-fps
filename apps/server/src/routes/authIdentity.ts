@@ -133,11 +133,16 @@ export async function registerAuthIdentityRoutes(app: FastifyInstance) {
 
     const usernameNorm = normalizeUsername(parsed.data.username)
     const passwordHash = hashPassword(parsed.data.password)
-    const guestId = parsed.data.guestId || null
+    let guestId = parsed.data.guestId || null
 
     if (guestId) {
       const g = await db.select({ id: guests.id }).from(guests).where(eq(guests.id, guestId)).limit(1)
       if (!g.length) return reply.status(404).send({ ok: false, error: 'guest_not_found' })
+    } else {
+      // Registro direto (sem guest prévio): cria guest base para progresso
+      guestId = crypto.randomUUID()
+      await db.insert(guests).values({ id: guestId, lastSeenAt: new Date() })
+      await ensurePlayerState(guestId, DEFAULT_WORLD_ID)
     }
 
     const existing = await db.select({ id: users.id }).from(users).where(eq(users.usernameNorm, usernameNorm)).limit(1)
@@ -153,11 +158,11 @@ export async function registerAuthIdentityRoutes(app: FastifyInstance) {
       lastSeenAt: new Date(),
     })
 
-    if (guestId) {
+    if (parsed.data.guestId) {
       await db
         .update(deviceGuestLinks)
         .set({ active: false, migratedAt: new Date(), updatedAt: new Date() })
-        .where(and(eq(deviceGuestLinks.guestId, guestId), isNull(deviceGuestLinks.migratedAt)))
+        .where(and(eq(deviceGuestLinks.guestId, parsed.data.guestId), isNull(deviceGuestLinks.migratedAt)))
     }
 
     return { ok: true, userId, guestId }
