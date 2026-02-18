@@ -52,7 +52,8 @@ Objetivo: facilitar onboarding, evolução de arquitetura e alinhamento entre en
   - bloqueio de interações durante loading,
   - bloqueio de seleção de texto e drag acidental na UI/canvas,
   - splash screen custom no menu principal (`/splash.png`).
-- **Epic P12 (Main Menu UI)** implementado como protótipo single-file:
-  - arquivo em `apps/client/public/main-menu-epic12.html`,
-  - paleta/efeitos e botões conforme roadmap,
-  - listeners JS minimalistas com `console.log` por ação.
+- **Epic P12/P13 (Main Menu UI e rollout global de layout)**:
+  - linguagem visual industrial aplicada ao menu e expandida para todos os menus/modais,
+  - cards padronizados com blur(12px), borda `#444` e sombra principal,
+  - botões padronizados com tipografia pesada uppercase + hover glow laranja,
+  - protótipo single-file do P12 removido após incorporação no client real.
