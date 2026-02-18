@@ -1,0 +1,957 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "project": "jarvis-woodcutter-fps",
+  "updatedAt": "2026-02-18T22:51:50.615Z",
+  "kind": "stories-unificado-historico",
+  "statusLegend": {
+    "epic": [
+      "todo",
+      "doing",
+      "done"
+    ],
+    "story": [
+      "todo",
+      "doing",
+      "done"
+    ]
+  },
+  "epics": [
+    {
+      "id": "P0",
+      "title": "MVP online jogável (conectar + movimento suave + mundo consistente)",
+      "status": "done",
+      "stories": [
+        {
+          "id": "P0-S1",
+          "title": "Autenticação mínima no WebSocket (join com token curto)",
+          "status": "done",
+          "objective": "Impedir spoof simples de guestId e preparar terreno para anti-grief básico sem complicar o MVP.",
+          "description": "Hoje o protocolo de WS aceita `guestId` no `join`. O objetivo é exigir um token curto emitido pelo backend HTTP (fluxo guest existente: `POST /api/auth/guest`) e validá-lo no handshake/join do WebSocket. Isso reduz o risco de alguém entrar como outro jogador e cria uma base para evoluir permissões e rate limits.\n\nEscopo MVP: autenticação apenas de identidade (quem é o player), sem autorização granular de ações ainda.",
+          "acceptanceCriteria": [
+            "O endpoint `POST /api/auth/guest` retorna um `token` (além do guestId) ou um objeto de sessão equivalente.",
+            "O client usa esse `token` ao conectar no WS (via querystring, header ou dentro do `join`) e o server rejeita conexões/joins sem token válido.",
+            "Ao token inválido/expirado, o server responde com erro claro (e o client volta ao menu/mostra toast).",
+            "Reconexão automática do client obtém/usa token válido (reusar token enquanto válido; reemitir se necessário).",
+            "Documentação atualizada em `docs/multiplayer-ws.md` com o formato final (ex.: campo `token`)."
+          ],
+          "technicalDecisions": [
+            "Formato sugerido: JWT assinado com secret do server OU HMAC simples (p.ex. payload JSON com exp + assinatura).",
+            "Duração: curta (ex.: 15–60 minutos) e renovável no reconnect.",
+            "Validação: server extrai `guestId` do token (não confiar no guestId enviado pelo client).",
+            "Compatibilidade: manter `v` do protocolo; se necessário, aceitar temporariamente ambos (com feature flag) durante migração local."
+          ]
+        },
+        {
+          "id": "P0-S2",
+          "title": "Suavização de players remotos (interpolação bufferizada no client)",
+          "status": "done",
+          "objective": "Fazer o multiplayer parecer jogável (sem teleporte/engasgos) com snapshots 10Hz, sem mudar o protocolo.",
+          "description": "O server publica `snapshot` (10Hz) com posição/yaw dos players. No client, a renderização de players remotos deve usar um buffer de snapshots (100–200ms) e interpolar para o tempo atual. Em caso de atraso, extrapolar levemente com clamps para evitar saltos grandes.\n\nIsso é puramente client-side: não altera simulação do server, só a apresentação.",
+          "acceptanceCriteria": [
+            "Com latency moderada (ex.: 80–150ms), players remotos se movem de forma contínua (sem jitter visível).",
+            "Ao perder 1–2 snapshots, o movimento continua com extrapolação curta (ex.: até 250ms) e depois faz snap suave.",
+            "Yaw remoto também interpola sem ‘quebras’ (ex.: tratar wrap de ângulos).",
+            "Existe um modo debug para visualizar buffer/latência (ex.: overlay opcional) sem poluir UI normal."
+          ],
+          "technicalDecisions": [
+            "Usar ‘render time’ = now - interpolationDelay (ex.: 150ms).",
+            "Armazenar snapshots em fila por player (max 20–40 itens).",
+            "Interpolar por lerp de posição e slerp/lerp de yaw (com ajuste de wrap para -pi..pi).",
+            "Clamps: velocidade máxima e distância máxima por frame para evitar teleporte por dados ruins."
+          ]
+        },
+        {
+          "id": "P0-S3",
+          "title": "Mundo server-authoritative para coletas/cortes (worldEvent estrito + worldChunk confirmação)",
+          "status": "done",
+          "objective": "Evitar desync e duplicação de loot garantindo que remoções/loot só aconteçam quando o server confirmar.",
+          "description": "O doc já define `worldEvent` (client→server) e `worldChunk` (server→client) com listas `removed*` e `placed`. A história é implementar o fluxo completo no client e server: client envia eventos (treeCut, rockCollect, stickCollect, oreBreak, place) e dá feedback local apenas ‘cosmético’/temporário; o server valida (mínimo) e emite `worldChunk` atualizado; o client aplica o estado authoritative ao mundo.\n\nIsso habilita multiplayer real para recursos compartilhados.",
+          "acceptanceCriteria": [
+            "Ao coletar um recurso, o client não adiciona loot definitivo nem remove definitivamente a entidade antes de `worldChunk` confirmar.",
+            "Quando `worldChunk` chega com `removedTrees/removedRocks/removedSticks/removedOres`, o mundo reflete exatamente esse estado.",
+            "Respawn: ao expirar o tempo do server (rocks 30s, sticks 30s, trees 45s, ore 120s), o server envia `worldChunk` removendo o id da lista e o client faz a entidade reaparecer.",
+            "Conflito: se dois players tentam coletar a mesma entidade, apenas um recebe confirmação (o outro vê falha/‘já coletado’ via atualização do chunk).",
+            "`place` cria/replica estruturas via `placed` no chunk (sem duplicar ao reconectar).",
+            "Documentação atualizada com o comportamento de confirmação e UX (feedback local vs authoritative)."
+          ],
+          "technicalDecisions": [
+            "Definir chunking (mesmo que simplificado) e chave estável `chunkX/chunkZ` para entidades.",
+            "No client, manter uma camada ‘pending events’ por id para mostrar feedback (ex.: fade) enquanto aguarda confirmação.",
+            "No server, persistir estado por chunk (versão incremental) e sempre enviar `version` para ordenação/diagnóstico.",
+            "Validação mínima no server: evento só aceito se player estiver dentro de um raio do alvo e em ‘estado jogável’."
+          ]
+        },
+        {
+          "id": "P0-S4",
+          "title": "Reconexão + re-sync de estado (players + chunks próximos)",
+          "status": "done",
+          "objective": "Garantir que quedas de conexão não corrompem o mundo local nem deixem ‘fantasmas’ de players/entidades.",
+          "description": "O client já tenta reconectar (documentado). A história é garantir um re-sync completo: ao reconectar, o client faz `join` novamente, limpa players remotos antigos, re-solicita/aceita `worldChunk` dos chunks relevantes e re-aplica estado authoritative do mundo.\n\nTambém incluir UX mínima: indicador ‘reconectando’ e fallback para menu se falhar.",
+          "acceptanceCriteria": [
+            "Ao desconectar e reconectar, o client não mantém players remotos antigos (limpa corretamente).",
+            "Após reconexão, o client recebe `welcome` e volta a receber `snapshot` e `worldChunk` sem duplicação.",
+            "O estado do mundo ao redor (remoções/placed) fica consistente com o server após no máximo alguns segundos.",
+            "Se o reconnect falhar após N tentativas (ex.: 5), o client retorna ao menu e informa o usuário."
+          ],
+          "technicalDecisions": [
+            "Implementar um ‘session generation id’ local: qualquer mensagem recebida de uma conexão antiga é descartada.",
+            "No join, incluir spawn/posição inicial; se houver persistência de player-state, preferir spawn do server.",
+            "No client, organizar uma API `multiplayer.reset()` para limpar caches (snapshots, pending events, entities)."
+          ]
+        }
+      ],
+      "sourceFiles": [
+        "finalizados/stories-2026-02-13-P0-P3.json"
+      ]
+    },
+    {
+      "id": "P1",
+      "title": "Publicável (deploy robusto + observabilidade + validações básicas)",
+      "status": "done",
+      "stories": [
+        {
+          "id": "P1-S1",
+          "title": "Observabilidade mínima do multiplayer (logs + contagem de players por worldId)",
+          "status": "done",
+          "objective": "Permitir diagnosticar problemas de conexão/jitter e validar adoção (quantos players online) sem ferramentas externas.",
+          "description": "Adicionar logs estruturados no server para eventos importantes (connect/disconnect, join, erro de parse, rejeições). Expor um endpoint simples (ex.: `/api/mp/stats`) protegido/oculto (ou só em dev) com contagem de conexões e players por `worldId`.\n\nMeta: ajudar a debugar no VPS rapidamente.",
+          "acceptanceCriteria": [
+            "Logs indicam: connection open/close, playerId, worldId, motivo de close (quando disponível).",
+            "Erros de mensagem inválida não derrubam o processo e são logados com throttle.",
+            "Endpoint de stats retorna contagem de players ativos por worldId e total de conexões.",
+            "Docs (README ou docs multiplayer) mencionam como usar o endpoint em dev."
+          ],
+          "technicalDecisions": [
+            "Usar logger do Fastify (pino) com campos: event, worldId, playerId, remoteAddress.",
+            "Throttle de logs para erros repetitivos (ex.: 1 log/seg por conexão).",
+            "Se stats endpoint em prod: proteger com token de admin ou desabilitar via env."
+          ]
+        },
+        {
+          "id": "P1-S2",
+          "title": "Validação + rate limit de worldEvent no server (anti-spam MVP)",
+          "status": "done",
+          "objective": "Evitar grief e overload por spam de eventos sem implementar anti-cheat completo.",
+          "description": "Implementar validações baratas para `worldEvent`: limitar frequência por player (bucket simples), validar alcance máximo (distância do player ao alvo), e validar que o alvo existe no chunk esperado. Rejeitar eventos inválidos sem modificar world state.\n\nManter UX: client recebe update via `worldChunk` (ou mensagem de erro opcional) e ‘pending’ some.",
+          "acceptanceCriteria": [
+            "Um player não consegue enviar >X worldEvents/seg (configurável) sem ser throttled.",
+            "Eventos fora do raio permitido são rejeitados e não alteram `worldChunk`.",
+            "Servidor permanece estável sob spam (não cresce memória por fila infinita).",
+            "Parâmetros de rate limit/raio ficam em constantes/ENV para tuning."
+          ],
+          "technicalDecisions": [
+            "Token bucket por conexão com reset por segundo (simples).",
+            "Raio por tipo (coleta menor, place maior) com constantes.",
+            "Rejeição: opção A) log + ignorar; opção B) enviar mensagem `error` (com `t:'error'`) — decidir e documentar."
+          ]
+        },
+        {
+          "id": "P1-S3",
+          "title": "Checklist de deploy (Caddy + WS upgrade) e smoke test reproduzível",
+          "status": "done",
+          "objective": "Reduzir ‘funciona local mas não no servidor’ garantindo proxy correto de /ws e um smoke test de saúde.",
+          "description": "Consolidar no repo um checklist de deploy: rotas do Caddy (`/`, `/api/*`, `/ws` com upgrade), portas, envs necessárias (DATABASE_URL/WOODCUTTER_DATABASE_URL etc). Criar um smoke test manual: abrir client, gerar guest, conectar WS, ver outro player.\n\nNão é automação pesada; é doc+passo-a-passo.",
+          "acceptanceCriteria": [
+            "Existe doc no repo com configuração mínima de Caddy e observações de WebSocket upgrade.",
+            "Smoke test lista comandos e endpoints esperados (health, auth/guest, connect ws).",
+            "README principal referencia esse doc."
+          ],
+          "technicalDecisions": [
+            "Manter texto alinhado com README atual (porta 3023, /ws).",
+            "Reforçar uso de `infup` quando depender de secrets do Infisical."
+          ]
+        }
+      ],
+      "sourceFiles": [
+        "finalizados/stories-2026-02-13-P0-P3.json"
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Base para escala (otimizações de rede e organização)",
+      "status": "done",
+      "stories": [
+        {
+          "id": "P2-S1",
+          "title": "Otimizar snapshots: deltas e/ou compactação (sem quebrar compatibilidade)",
+          "status": "done",
+          "objective": "Reduzir bandwidth e melhorar responsividade para mais players.",
+          "description": "Atualmente `snapshot` envia todos players. Evoluir para: (a) deltas por seq/version, (b) reduzir frequência adaptativa, (c) payload mais compacto (campos curtos, arredondamento), ou (d) compressão no transporte (quando aplicável).\n\nEscopo: manter uma estratégia compatível com `v` do protocolo.",
+          "acceptanceCriteria": [
+            "Existe uma opção de payload ‘compact’ (feature flag) que reduz tamanho médio de mensagem.",
+            "Client e server conseguem negociar versão (campo `v` ou `capabilities`).",
+            "Sem regressão perceptível de movimento remoto quando compact ativo."
+          ],
+          "technicalDecisions": [
+            "Preferir primeiro: reduzir precisão (ex.: 2 casas decimais) e nomes de campos.",
+            "Depois: deltas por player com seq/ack.",
+            "Manter fallback para snapshot completo em intervalos (ex.: a cada 2s)."
+          ]
+        },
+        {
+          "id": "P2-S2",
+          "title": "Lobbies/world selection (worldId) e separação por sala mais explícita",
+          "status": "done",
+          "objective": "Permitir múltiplas salas e facilitar testes (dev/prod) sem misturar players.",
+          "description": "Hoje existe `worldId` no join. Criar uma UX mínima no menu para escolher `worldId` (ou ‘public’/‘dev’). Garantir no server que rooms e chunks são isolados por worldId.",
+          "acceptanceCriteria": [
+            "Player consegue escolher worldId no menu (persistir no localStorage).",
+            "Players em worldIds diferentes não se veem nem compartilham worldChunk.",
+            "Docs atualizadas com convenção de worldId."
+          ],
+          "technicalDecisions": [
+            "Validar worldId no server (regex/allowlist) para evitar abuso.",
+            "Definir limite de worldIds simultâneos (anti OOM) ou TTL de rooms vazias."
+          ]
+        }
+      ],
+      "sourceFiles": [
+        "finalizados/stories-2026-02-13-P0-P3.json"
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Melhorias fáceis de gameplay (client-only, não quebrar multiplayer)",
+      "status": "done",
+      "stories": [
+        {
+          "id": "P3-S1",
+          "title": "Feedback de hit/impacto (hitmarker + som por material + micro recoil visual)",
+          "status": "done",
+          "objective": "Melhorar a sensação de ‘peso’ e clareza de acerto sem alterar regras de dano/loot.",
+          "description": "Adicionar feedback visual e sonoro ao acertar: hitmarker discreto no centro, som diferente por alvo (madeira/pedra/minério) e micro-animação da mão/arma. Tudo local e acionado no momento em que o client detecta o impacto (janela de swing existente).\n\nNão altera `worldEvent` nem o timing server-authoritative.",
+          "acceptanceCriteria": [
+            "Ao acertar madeira/pedra/minério, o feedback é consistente e distinto.",
+            "Configuração simples para intensidade (ou toggle) no menu de performance/pausa.",
+            "Não muda o balanceamento (dano, durabilidade, alcance)."
+          ],
+          "technicalDecisions": [
+            "Som: usar arquivos leves (ogg) e limitar sobreposição (cooldown curto).",
+            "Visual: hitmarker via DOM/CSS (mais barato que material shader).",
+            "Acionamento: usar o callback `Player.onImpact(fn)` (contrato citado no AGENTS.md)."
+          ]
+        },
+        {
+          "id": "P3-S2",
+          "title": "Realce de alvo interagível (outline/emissive) + prompt contextual mais legível",
+          "status": "done",
+          "objective": "Aumentar a legibilidade do que pode ser interagido sob a mira, reduzindo frustração.",
+          "description": "Quando o raycast encontra um alvo válido em alcance (mesma regra do prompt `F:`), aplicar um realce visual sutil no alvo (ex.: material emissive/scale pequeno ou outline simples). Atualizar o prompt para incluir nome do alvo e ação principal (ex.: `F: Abrir Forja`).\n\nTudo client-only.",
+          "acceptanceCriteria": [
+            "Realce aparece apenas com alvo válido e some instantaneamente ao perder alvo.",
+            "O prompt não aparece quando não há alvo (regra já documentada).",
+            "Performance: não adicionar pós-process pesado; manter barato."
+          ],
+          "technicalDecisions": [
+            "Evitar EffectComposer/OutlinePass no MVP; preferir emissive/hover material swap.",
+            "Manter uma referência ao ‘lastHighlighted’ para restaurar material sem leaks.",
+            "Sincronizar com a lógica existente de `UI.setInteractHint` (documentada em docs/interaction.md)."
+          ]
+        },
+        {
+          "id": "P3-S3",
+          "title": "Sway/bobbing e animação da ferramenta na mão (com opção de desligar)",
+          "status": "done",
+          "objective": "Dar sensação de FPS mais ‘vivo’ sem tocar em física/posicionamento authoritative.",
+          "description": "Adicionar sway (resposta ao mouse) e bobbing (passos) no modelo da ferramenta/mão e/ou na câmera, com amplitude pequena e opção de desligar no menu.\n\nGarantir que raycasts e lógica de impacto continuem baseados na câmera real e no timing do swing, para não impactar o multiplayer.",
+          "acceptanceCriteria": [
+            "Sway/bob não afeta a direção real do raycast/interação.",
+            "Existe toggle no menu/pausa para desativar (acessibilidade).",
+            "Sem náusea: amplitude e frequência conservadoras (valores default)."
+          ],
+          "technicalDecisions": [
+            "Aplicar sway no objeto do modelo da ferramenta (não na câmera), ou aplicar em um ‘cameraRig’ separado com offset apenas visual.",
+            "Bobbing ligado à velocidade do player (input/magnitude) e não ao dt cru.",
+            "Persistir preferências no localStorage."
+          ]
+        }
+      ],
+      "sourceFiles": [
+        "finalizados/stories-2026-02-13-P0-P3.json"
+      ]
+    },
+    {
+      "id": "P4",
+      "title": "Fixes de UX + persistência (highlight, autosave em menus, forja persistente)",
+      "status": "done",
+      "stories": [
+        {
+          "id": "P4-S1",
+          "title": "Highlight de alvo: limpar ao perder alvo + verde mais leve/translúcido",
+          "status": "done",
+          "objective": "Corrigir bug visual onde o realce verde permanece após perder o alvo e ajustar o highlight para ficar mais sutil.",
+          "description": "Hoje, ao mirar/‘passar o mouse’ sobre forja/mesa/fogueira, o highlight fica verde. Ao tirar o alvo (mover a mira), o highlight às vezes não volta ao normal. Precisamos garantir que: (1) o highlight sempre é limpo ao perder alvo, (2) o verde é mais leve e menos chamativo, e (3) tenha aparência um pouco translúcida, sem pós-process pesado.",
+          "acceptanceCriteria": [
+            "Quando não há alvo válido sob a mira, nenhum objeto permanece com emissive/highlight alterado.",
+            "Alternar rapidamente entre alvos não ‘acumula’ highlight nem deixa meshes presos verdes.",
+            "O highlight fica mais sutil (menor emissiveIntensity) e com aparência levemente translúcida (sem aumentar custo com transparência em massa).",
+            "Não introduz vazamento de memória (listas de meshes antigas limpas).",
+            "Docs atualizada: `apps/client/docs/interaction.md` descreve o comportamento final."
+          ],
+          "technicalDecisions": [
+            "Manter highlight barato: emissive + intensity clamp (sem EffectComposer).",
+            "Não alterar materiais para transparent globalmente (risco de overdraw); preferir apenas emissive e, se necessário, ajustar `color` levemente.",
+            "Garantir ‘cleanup’ também quando state muda (menu/paused/inventory/forge), não só no loop playing."
+          ]
+        },
+        {
+          "id": "P4-S2",
+          "title": "Persistência: enviar state também com menu/pausa abertos",
+          "status": "done",
+          "objective": "Evitar perda de progresso quando o player abre menu/pausa e fica tempo sem salvar.",
+          "description": "Atualmente o autosave (PUT /api/player/state) roda apenas quando `state==='playing'`. Se o player estiver em menu/pausa/inventário/forja e der F5 ou cair energia, pode perder progresso recente. Ajustar o autosave para enviar o estado periodicamente mesmo fora de playing, com guardrails para não spammar e para não salvar estado intermediário inválido.",
+          "acceptanceCriteria": [
+            "Autosave roda periodicamente mesmo em `paused`, `inventory`, `crafting`, `forge`, `forgeTable` e `menu` (quando houver contexto de persistência).",
+            "Não salva com alta frequência (manter intervalo atual ou ligeiramente maior).",
+            "Não quebra performance nem spamma toasts.",
+            "Se backend estiver offline, falha é silenciosa (comportamento atual).",
+            "Docs atualizada (client): mencionar política de autosave em `apps/client/docs/architecture.md` ou doc apropriado."
+          ],
+          "technicalDecisions": [
+            "Manter `saveNow()` como best-effort e idempotente.",
+            "Evitar salvar durante transições críticas se existirem (ex.: no meio de reset/restart) com um flag simples."
+          ]
+        },
+        {
+          "id": "P4-S3",
+          "title": "Forja server-side: estado persistente + progresso offline (sem player online)",
+          "status": "done",
+          "objective": "Garantir que o estado da forja seja persistido no backend e que a fundição continue ‘offline’ (server-authoritative), consumindo combustível e parando quando input/combustível acabar.",
+          "description": "Hoje, ao dar F5 com itens dentro da forja UI, os itens são perdidos porque o estado da forja é client-only. Além disso, você quer que a forja continue processando mesmo sem o player online.\n\nSolução MVP recomendada: persistir o estado da forja no server (DB) por `worldId+forgeId` e aplicar um ‘catch-up’ por tempo decorrido (`now - updatedAt`) quando a forja for consultada/aberta. Esse catch-up consome combustível, consome input, produz output (se houver espaço) e para automaticamente se combustível ou input acabar.",
+          "acceptanceCriteria": [
+            "Colocar combustível + minério na forja, sair (offline) por alguns minutos, voltar e ver progresso/saída avançados de acordo com o tempo decorrido.",
+            "Combustível é gasto corretamente; processamento para quando `burn` chega a 0.",
+            "Processamento para quando não houver input (minério) ou quando output estiver cheio.",
+            "Não há duplicação de itens (server-authoritative do inventário interno da forja).",
+            "Múltiplas forjas no mesmo `worldId` são isoladas por `forgeId`.",
+            "Docs atualizada: `apps/client/docs/systems-forge.md` e doc do multiplayer/world state (se aplicável) descrevem o que é server-side e o modelo de catch-up."
+          ],
+          "technicalDecisions": [
+            "Persistir estado no DB com chave (worldId, forgeId): `enabled`, `burnSec`, `progSec`, `fuelSlots`, `inputSlots`, `outputSlots`, `updatedAt`.",
+            "Catch-up é ‘sob demanda’ (quando abrir/consultar): aplicar dt acumulado e salvar novo `updatedAt`.",
+            "Consumir combustível e input em passos discretos (ex.: secondsPerIngot) respeitando espaço no output.",
+            "Se `enabled=false`, não processar; ainda atualizar `updatedAt` ao salvar alterações de inventário.",
+            "Sem cron/job por enquanto (MVP)."
+          ]
+        }
+      ],
+      "sourceFiles": [
+        "finalizados/stories-fixes-2026-02-13.json"
+      ]
+    },
+    {
+      "id": "P5",
+      "title": "Storage pessoal + arbustos + agricultura (algodão/fibra/corda)",
+      "status": "doing",
+      "stories": [
+        {
+          "id": "P5-S1",
+          "title": "Baú pessoal: craft + colocar + abrir só o dono + recolher/destruir só vazio",
+          "status": "done",
+          "objective": "Adicionar um baú colocável para o jogador guardar itens, com acesso exclusivo do dono.",
+          "description": "Criar um novo item/estrutura 'Baú'. O jogador crafta e coloca no mundo. Cada baú nasce com um ownerId (player/guestId) e só esse owner pode abrir e mover itens. Outros jogadores ao interagir devem ver um feedback simples ('Trancado'). Recolher (pickup) e destruir só é permitido se o baú estiver vazio.",
+          "acceptanceCriteria": [
+            "Existe receita de craft do baú e ele pode ser colocado no mundo como estrutura.",
+            "Ao mirar/interagir, o dono consegue abrir o inventário do baú e mover itens entre inventário <-> baú.",
+            "Jogadores não-donos não conseguem abrir nem visualizar o conteúdo (apenas mensagem 'Trancado').",
+            "Baú só pode ser recolhido/destruído quando estiver vazio.",
+            "Estado do baú persiste no servidor por worldId+chestId (inclui ownerId e slots).",
+            "Não há duplicação/perda de itens (operações idempotentes e consistentes)."
+          ],
+          "technicalDecisions": [
+            "Persistência server-side semelhante à forja: tabela/registro por (worldId, chestId) com state { ownerId, slots } + updatedAt.",
+            "Autoridade: servidor valida ownerId em GET/PUT do chest state.",
+            "O cliente só renderiza UI se GET retornar ok + owner=true; caso contrário exibe toast 'Trancado'.",
+            "Pickup/destroy: checar vazio no cliente e no servidor (double-check)."
+          ]
+        },
+        {
+          "id": "P5-S2",
+          "title": "Arbustos (mato): spawn no mundo + coleta + respawn 2 min + drop de sementes (20%)",
+          "status": "done",
+          "objective": "Adicionar arbustos no mapa para servir como fonte de sementes de algodão.",
+          "description": "Hoje não existe 'mato/arbusto' no mundo. Criar um novo nó de recurso (arbusto) semelhante às árvores: nasce no mundo, o jogador coleta e o arbusto some, depois respawna. O respawn deve ser maior que o da árvore: 2 minutos. Ao coletar, além de leaf, existe 20% de chance de dropar cotton_seed.",
+          "acceptanceCriteria": [
+            "Arbustos aparecem no mundo em quantidade razoável e com collider/interação consistentes.",
+            "Coletar um arbusto remove o arbusto e gera drops; após ~2 min ele respawna.",
+            "Ao coletar, sempre dropa leaf (ou drop atual equivalente) e tem 20% de chance de dropar cotton_seed.",
+            "Arbustos não geram drops infinitos sem desaparecer (sem exploit).",
+            "Persistência/respawn segue o mesmo padrão das árvores (com tempo diferente)."
+          ],
+          "technicalDecisions": [
+            "Reusar padrão de 'resource nodes' (árvores) para placement, raycast e respawn timers.",
+            "Manter drop table simples e configurável (chance seed=0.20).",
+            "Arbustos não devem spawnar na mina (somente no mundo exterior)."
+          ]
+        },
+        {
+          "id": "P5-S3",
+          "title": "Agricultura (algodão): enxada de metal + solo arado + plantar + crescer 5–8 min + colher fibra/corda",
+          "status": "done",
+          "objective": "Criar o loop de agricultura para produzir fibra e corda (base para roupas futuras).",
+          "description": "Adicionar a enxada de metal (forjada na mesa) para preparar o solo. Ao usar a enxada no chão, o terreno fica com visual 'arado' e passa a aceitar plantio. Sementes (cotton_seed) podem ser plantadas apenas em solo arado. O crescimento leva 5–8 minutos reais. Ao colher, o jogador recebe fiber (e opcionalmente chance de devolver seed). Adicionar craft de rope a partir de fiber.",
+          "acceptanceCriteria": [
+            "Existe receita para Enxada de Metal na mesa de craft: 2 iron_ingots + 1 stick.",
+            "Usar a enxada no chão cria/ativa um tile/patch de solo arado com visual diferente.",
+            "Só é possível plantar cotton_seed em solo arado.",
+            "Plantas crescem em 5–8 minutos reais (configurável) e podem ser colhidas ao final.",
+            "Colheita gera fiber; existe craft rope = fiber xN (definir N inicial: 3).",
+            "Na mina: não é possível arar/plantar (ou é bloqueado explicitamente).",
+            "Estado das plantações (solo arado + crescimento) persiste no servidor e suporta catch-up offline (similar à forja)."
+          ],
+          "technicalDecisions": [
+            "Persistir por (worldId, plotId) ou por grid (chunk) dependendo do sistema atual; começar simples (plotId por plant).",
+            "Catch-up offline por updatedAt: ao carregar, avançar growth com dt acumulado.",
+            "Visual de solo arado pode ser decal simples/mesh plano com textura diferente (sem shader pesado).",
+            "Restringir agricultura ao exterior (fora da mina) usando flag de região (inMine) já existente."
+          ]
+        }
+      ],
+      "sourceFiles": [
+        "finalizados/stories-2026-02-15-storage-farming.json"
+      ]
+    },
+    {
+      "id": "P7",
+      "title": "Sistema de Equipamentos (roupas por peça) + durabilidade por tempo equipado + buffs",
+      "status": "done",
+      "objective": "Adicionar slots de vestimenta (chapéu/calça/camisa/bota/luva) e mochila no modal de inventário, com durabilidade de 1 dia contando apenas enquanto equipado; base para buffs (maçã/sorte).",
+      "stories": [
+        {
+          "id": "P7-S1",
+          "title": "Modelo de dados: equipment slots + durabilidade por tempo equipado + buffs no save",
+          "status": "done",
+          "objective": "Persistir equipamentos (6 slots) e estado de durabilidade (tempo restante) + buffs (luckUntilMs) no save do player.",
+          "acceptanceCriteria": [
+            "Game possui structure: equipment.{hat,shirt,pants,boots,gloves,backpack} (ids/meta).",
+            "Cada peça equipada mantém tempo restante (ex.: equipRemainingMs) e só reduz enquanto equipada.",
+            "Buffs suportam ao menos luckUntilMs.",
+            "exportGameSave inclui equipment + durability + buffs; applyGameSave restaura corretamente.",
+            "Save antigo (v2 atual) não quebra: defaults aplicados."
+          ],
+          "probableFiles": [
+            "apps/client/src/net/gameSave.js",
+            "apps/client/src/game/Game.js"
+          ],
+          "testPlan": [
+            "Equipar uma peça, salvar, recarregar: permanece equipada com o mesmo tempo restante (best-effort).",
+            "Desequipar e aguardar tempo: durabilidade NÃO diminui fora do corpo.",
+            "Carregar save antigo: jogo funciona com equipment vazio e sem buffs."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T01:06:22Z"
+        },
+        {
+          "id": "P7-S2",
+          "title": "Inventário com slotCount dinâmico (resize seguro) para +10 da mochila",
+          "status": "done",
+          "objective": "Permitir aumentar/diminuir a capacidade do inventário sem corromper slots; tratar overflow ao reduzir capacidade.",
+          "acceptanceCriteria": [
+            "Inventory suporta resize para N slots mantendo itens existentes até N.",
+            "Se reduzir e houver itens além de N: excedentes são tratados (ex.: descartar com toast) de forma determinística.",
+            "UI de inventário renderiza corretamente com 20 e 30 slots."
+          ],
+          "probableFiles": [
+            "apps/client/src/game/Inventory.js",
+            "apps/client/src/game/UI.js",
+            "apps/client/src/game/Game.js"
+          ],
+          "testPlan": [
+            "Resize 20->30: slots extras aparecem.",
+            "Preencher slots 21-30, resize 30->20: excedentes tratados conforme regra.",
+            "Abrir/fechar inventário durante resize não quebra UI."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T01:07:10Z"
+        },
+        {
+          "id": "P7-S3",
+          "title": "UI/UX: modal de inventário com painel lateral de vestimenta + duplo clique equipar/desequipar",
+          "status": "done",
+          "objective": "Ao abrir o inventário, mostrar painel lateral com slots: chapéu, camisa, calça, bota, luva, mochila. Duplo clique no item no inventário equipa (se slot compatível). Duplo clique no slot equipado devolve ao inventário.",
+          "acceptanceCriteria": [
+            "Inventário exibe painel lateral com 6 slots nomeados.",
+            "Duplo clique em item equipável no inventário move para o slot correto (se vazio ou troca controlada).",
+            "Duplo clique no item equipado move de volta para inventário.",
+            "UI mostra (opcional) durabilidade como tempo restante (ex.: '23h12m')."
+          ],
+          "probableFiles": [
+            "apps/client/src/game/UI.js",
+            "apps/client/src/game/Game.js"
+          ],
+          "testPlan": [
+            "Duplo clique equipar/desequipar para cada slot.",
+            "Inventário cheio ao desequipar: comportamento consistente (bloqueia ou descarta com aviso — definir).",
+            "Timer de durabilidade atualiza e pausa ao desequipar."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T01:08:28Z"
+        }
+      ],
+      "updatedAt": "2026-02-18T01:08:28Z",
+      "sourceFiles": [
+        "finalizados/stories.2026-02-18-finalizado.json"
+      ]
+    },
+    {
+      "id": "P8",
+      "title": "Mochila (+10 slots)",
+      "status": "done",
+      "objective": "Adicionar item Mochila que, ao equipar, aumenta o inventário em +10 slots.",
+      "stories": [
+        {
+          "id": "P8-S1",
+          "title": "Item Mochila + equipar aplica +10 slots",
+          "status": "done",
+          "objective": "Criar item mochila (não stackable) e ao equipar no slot backpack aumentar capacidade do inventário em +10.",
+          "acceptanceCriteria": [
+            "Novo ItemId para mochila e definição em ITEMS.",
+            "Mochila é equipável no slot backpack.",
+            "Ao equipar: inventário aumenta de 20 -> 30. Ao desequipar volta para 20.",
+            "Persistência no save funciona."
+          ],
+          "probableFiles": [
+            "apps/client/src/game/items.js",
+            "apps/client/src/game/Game.js",
+            "apps/client/src/game/Inventory.js",
+            "apps/client/src/net/gameSave.js",
+            "apps/client/src/game/UI.js"
+          ],
+          "testPlan": [
+            "Adicionar mochila (dev/spawn temporário) e equipar: slots aumentam.",
+            "Salvar/recarregar: mantém slotCount aumentado.",
+            "Desequipar: volta para 20 e trata overflow conforme regra."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T01:14:47Z"
+        }
+      ],
+      "updatedAt": "2026-02-18T01:14:47Z",
+      "sourceFiles": [
+        "finalizados/stories.2026-02-18-finalizado.json"
+      ]
+    },
+    {
+      "id": "P9",
+      "title": "Vestimenta inicial: Conjunto do Lenhador (por peça) + bônus no corte de árvores",
+      "status": "done",
+      "objective": "Adicionar peças craftáveis (chapéu/camisa/calça/bota/luva) feitas de linho+corda. Enquanto o conjunto completo estiver equipado, aplicar bônus de chance de drops extras em árvores.",
+      "stories": [
+        {
+          "id": "P9-S1",
+          "title": "Itens de vestimenta (5 peças) + receitas por peça (linho+corda)",
+          "status": "done",
+          "objective": "Criar 5 itens equipáveis com receitas: camisa 150 linho + 1 corda; calça 120 linho + 3 cordas; chapéu 55 linho; bota 100 linho + 4 cordas; luva 80 linho + 2 cordas.",
+          "acceptanceCriteria": [
+            "Novos ItemId para: chapéu, camisa, calça, bota, luva (não stackable) e defs em ITEMS.",
+            "Cada item é equipável no slot correto.",
+            "Receitas adicionadas com os custos definidos.",
+            "Cada peça começa com durabilidade de 1 dia (tempo restante cheio ao ser criada/obtida)."
+          ],
+          "probableFiles": [
+            "apps/client/src/game/items.js",
+            "apps/client/src/game/recipes.js",
+            "apps/client/src/game/Game.js",
+            "apps/client/src/net/gameSave.js",
+            "apps/client/src/game/UI.js"
+          ],
+          "testPlan": [
+            "Craft de cada peça com recursos suficientes: consome linho/corda e adiciona peça.",
+            "Equipar peça: durabilidade começa a contar (reduz com o tempo equipado).",
+            "Desequipar: durabilidade pausa.",
+            "Salvar/recarregar no meio do timer: estado permanece consistente."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T02:18:56Z"
+        },
+        {
+          "id": "P9-S2",
+          "title": "Bônus do Lenhador: chance de drops extras ao cortar árvore (modelo A)",
+          "status": "done",
+          "objective": "Quando o conjunto completo (5 peças) estiver equipado, aplicar chance de drop extra ao confirmar treeCut: +1 tronco, +2 galhos, +5 folhas (rolagens independentes) além do loot base.",
+          "acceptanceCriteria": [
+            "Sem conjunto completo: loot permanece 1 log + (2-5) sticks + (10-20) leaves.",
+            "Com conjunto completo: aplica chance extra conforme regra (25%).",
+            "Toast reflete quando ocorrer (ex.: 'Bônus Lenhador! +1 Tronco +2 Galhos +5 Folhas').",
+            "Multiplayer: bônus aplicado apenas ao jogador que realizou o corte confirmado (pending world action)."
+          ],
+          "probableFiles": [
+            "apps/client/src/game/Game.js"
+          ],
+          "testPlan": [
+            "Cortar ~30 árvores sem set: baseline.",
+            "Cortar ~30 árvores com set completo: observar ocorrências (probabilístico).",
+            "2 jogadores simultâneos: cada um recebe seu loot; sem duplicação indevida."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T02:18:56Z"
+        }
+      ],
+      "updatedAt": "2026-02-18T02:18:56Z",
+      "sourceFiles": [
+        "finalizados/stories.2026-02-18-finalizado.json"
+      ]
+    },
+    {
+      "id": "P10",
+      "title": "Item raro: Maçã + Buff de Sorte (5 min dobra drops)",
+      "status": "done",
+      "objective": "Introduzir item raro Maçã (drop 0,5% em árvore) que ao consumir ativa buff temporário de sorte por 5 minutos, dobrando apenas drops/coletas.",
+      "stories": [
+        {
+          "id": "P10-S1",
+          "title": "Adicionar item Maçã + drop raro 0,5% em árvore",
+          "status": "done",
+          "objective": "Criar Maçã como item stackable e inserir chance de drop (0,5%) ao confirmar treeCut.",
+          "acceptanceCriteria": [
+            "Novo ItemId para maçã e definição em ITEMS.",
+            "Ao confirmar treeCut, rolar 0,5% e adicionar 1 maçã ao inventário (overflow tratado).",
+            "Toast quando dropar: 'Item raro! +1 Maçã'."
+          ],
+          "probableFiles": [
+            "apps/client/src/game/items.js",
+            "apps/client/src/game/Game.js"
+          ],
+          "testPlan": [
+            "Forçar chance 100% via flag temporária (dev) e validar que entra no inventário.",
+            "Restaurar chance real (0,5%)."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T02:30:15Z"
+        },
+        {
+          "id": "P10-S2",
+          "title": "Consumir Maçã ativa Sorte por 5 min (persistido) + UI timer",
+          "status": "done",
+          "objective": "Consumir a maçã no inventário para ativar buff de sorte por 5 min; persistir no save; mostrar contagem regressiva.",
+          "acceptanceCriteria": [
+            "Duplo clique (ou ação explícita) em maçã consome 1 e ativa luckUntilMs = now + 5min.",
+            "Enquanto ativo: UI mostra 'Sorte: mm:ss'.",
+            "Ao expirar: efeito para e UI some.",
+            "Recarregar página durante buff: continua contando corretamente."
+          ],
+          "probableFiles": [
+            "apps/client/src/game/UI.js",
+            "apps/client/src/game/Game.js",
+            "apps/client/src/net/gameSave.js"
+          ],
+          "testPlan": [
+            "Ativar buff, recarregar a página: timer continua.",
+            "Consumir outra maçã durante buff: comportamento definido (renovar para 5min a partir de agora)."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T02:31:05Z"
+        },
+        {
+          "id": "P10-S3",
+          "title": "Aplicar Sorte: dobrar apenas drops/coletas (i)",
+          "status": "done",
+          "objective": "Com buff ativo, dobrar quantidades de loot/drops: árvore, arbusto, pedra, minério, colheita. Não dobrar crafting/forja/baús.",
+          "acceptanceCriteria": [
+            "Tree loot dobra (inclui extras do Lenhador se ocorrerem).",
+            "Harvest loot dobra.",
+            "Outras coletas aplicáveis dobram onde existirem no Game.",
+            "Crafting/forja/baú não são afetados."
+          ],
+          "probableFiles": [
+            "apps/client/src/game/Game.js"
+          ],
+          "testPlan": [
+            "Ativar buff e cortar árvore: verificar quantidades dobradas.",
+            "Ativar buff e colher algodão: verificar quantidades dobradas.",
+            "Desativar buff: volta ao normal."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T02:32:18Z"
+        }
+      ],
+      "updatedAt": "2026-02-18T02:32:18Z",
+      "sourceFiles": [
+        "finalizados/stories.2026-02-18-finalizado.json"
+      ]
+    },
+    {
+      "id": "P11",
+      "title": "Conta Vinculada (upgrade do guest)",
+      "status": "todo",
+      "objective": "Permitir que jogador guest vincule sua conta a um identificador persistente (e-mail + código mágico), mantendo progresso e habilitando login seguro em múltiplos dispositivos.",
+      "successMetrics": [
+        "Taxa de conversão guest -> conta vinculada",
+        "Queda em relatos de perda de progresso",
+        "Aumento de retenção D7 de jogadores vinculados"
+      ],
+      "stories": [
+        {
+          "id": "P11-S1",
+          "title": "Modelo de dados para account vinculada e vínculo com guest existente",
+          "status": "todo",
+          "objective": "Adicionar entidades/tabelas para conta persistente e relação de migração de progresso do guest para accountId.",
+          "acceptanceCriteria": [
+            "Schema possui entidade de account com identificador único (e-mail normalizado).",
+            "Guest pode ser associado a accountId sem perder progresso já salvo.",
+            "Migração é idempotente (repetir operação não duplica nem corrompe dados).",
+            "Logs mínimos de auditoria para vínculo concluído."
+          ],
+          "probableFiles": [
+            "apps/server/src/db/schema.ts",
+            "apps/server/drizzle/*",
+            "apps/server/src/services/*"
+          ],
+          "testPlan": [
+            "Criar guest com progresso, vincular conta e validar manutenção do estado.",
+            "Executar vínculo duas vezes e confirmar idempotência.",
+            "Validar conflitos com e-mail já existente."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T16:14:00Z"
+        },
+        {
+          "id": "P11-S2",
+          "title": "Fluxo backend: solicitar código mágico e confirmar vínculo",
+          "status": "todo",
+          "objective": "Expor endpoints para iniciar vínculo por e-mail (geração/envio de código) e confirmar código para converter guest em conta vinculada.",
+          "acceptanceCriteria": [
+            "Endpoint para solicitar código mágico com rate limit por IP/e-mail.",
+            "Código tem TTL curto e uso único.",
+            "Endpoint de confirmação valida código e conclui vínculo guest -> accountId.",
+            "Retorno inclui token/sessão válida para uso subsequente no jogo."
+          ],
+          "probableFiles": [
+            "apps/server/src/routes/auth*",
+            "apps/server/src/services/auth*",
+            "apps/server/src/ws/*"
+          ],
+          "testPlan": [
+            "Solicitar e confirmar código válido dentro do TTL.",
+            "Tentar código expirado e reutilização do mesmo código.",
+            "Validar proteção básica contra brute-force."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T16:14:00Z"
+        },
+        {
+          "id": "P11-S3",
+          "title": "UI do client: 'Salvar meu progresso' e login por código",
+          "status": "todo",
+          "objective": "Adicionar fluxo simples no client para solicitar vínculo por e-mail, inserir código e concluir login persistente.",
+          "acceptanceCriteria": [
+            "Ação visível no inventário/menu: 'Salvar meu progresso'.",
+            "Tela/modal com campo de e-mail e campo de código.",
+            "Feedback claro de sucesso/erro/expiração.",
+            "Após concluir, sessão segue autenticada e progresso permanece intacto."
+          ],
+          "probableFiles": [
+            "apps/client/src/game/UI.js",
+            "apps/client/src/net/*",
+            "apps/client/src/game/Game.js"
+          ],
+          "testPlan": [
+            "Fluxo feliz completo no client.",
+            "Erro de código inválido/expirado com retry.",
+            "Reabrir jogo após vínculo e confirmar persistência/login."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T16:14:00Z"
+        }
+      ],
+      "updatedAt": "2026-02-18T16:14:00Z",
+      "sourceFiles": [
+        "finalizados/stories.2026-02-18-P11-finalizado.json"
+      ]
+    },
+    {
+      "id": "P12",
+      "title": "Main Menu UI (Industrial/Lumberjack) — versão single-file",
+      "status": "done",
+      "objective": "Criar um menu principal de jogo com identidade visual industrial lenhador (Jarvis), em HTML/CSS/JS limpo, com layout centrado, blur, botões estilizados e interações mínimas em JavaScript.",
+      "role": "Senior Frontend Game Developer",
+      "constraints": {
+        "deliveryFormat": "single_file_html_with_internal_css_js",
+        "tech": [
+          "HTML",
+          "CSS",
+          "JavaScript"
+        ]
+      },
+      "stories": [
+        {
+          "id": "P12-S1",
+          "title": "Layout base, tipografia e container central",
+          "status": "done",
+          "objective": "Construir a estrutura semântica do menu e aplicar tipografia pesada (Titan One/Bebas Neue), com container centralizado e estética industrial.",
+          "acceptanceCriteria": [
+            "HTML semântico com áreas claras (branding, ações principais).",
+            "Fonte pesada aplicada em uppercase nos botões e títulos.",
+            "Container centralizado com backdrop-filter: blur(12px).",
+            "Container com border 2px solid #444 e sombra 0 10px 30px rgba(0,0,0,0.5)."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T21:41:00Z"
+        },
+        {
+          "id": "P12-S2",
+          "title": "Tema visual e botões conforme especificação",
+          "status": "done",
+          "objective": "Aplicar paleta e estados visuais dos botões conforme guia do roadmap.",
+          "acceptanceCriteria": [
+            "Paleta aplicada: Primary #B45F06, Background #333333 (0.7), Glow #FF8C00, Text #EAD8B1.",
+            "Botões presentes: START ENGINE, UPGRADES, FOREST LOGS, OPTIONS, SHUT DOWN.",
+            "Hover: inner glow #FF8C00, scale 1.05, transition 0.2s ease-in-out.",
+            "Boa legibilidade em desktop e responsivo básico."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T21:41:00Z"
+        },
+        {
+          "id": "P12-S3",
+          "title": "JS minimalista de interação",
+          "status": "done",
+          "objective": "Adicionar event listeners nos botões para logging de ação no console, mantendo código limpo.",
+          "acceptanceCriteria": [
+            "Cada botão possui listener próprio ou delegado com console.log semântico.",
+            "JS interno no mesmo arquivo HTML (single-file).",
+            "Código claro, curto e fácil de expandir para integração real posterior."
+          ],
+          "mvp": true,
+          "updatedAt": "2026-02-18T21:41:00Z"
+        }
+      ],
+      "updatedAt": "2026-02-18T21:41:00Z",
+      "sourceFiles": [
+        "finalizados/stories.2026-02-18-P12-finalizado.json"
+      ]
+    },
+    {
+      "id": "P13",
+      "title": "Aplicar layout industrial do menu em todos os menus/modals",
+      "status": "done",
+      "objective": "Unificar identidade visual industrial/lumberjack em todos os overlays e modais do client, reaproveitando a linguagem do menu principal (paleta, blur, botões, tipografia e glow).",
+      "stories": [
+        {
+          "id": "P13-S1",
+          "title": "Padronizar base visual global (tokens/tema)",
+          "status": "done",
+          "objective": "Atualizar variáveis CSS globais com paleta industrial e ajustar camadas de overlay.",
+          "acceptanceCriteria": [
+            "Tokens globais usam Primary #B45F06, Glow #FF8C00, Text #EAD8B1 e card rgba(51,51,51,.70).",
+            "Overlays/modais compartilham fundo escuro com acentos industriais.",
+            "Legibilidade mantida para HUD e conteúdo de UI."
+          ],
+          "updatedAt": "2026-02-18T21:48:00Z"
+        },
+        {
+          "id": "P13-S2",
+          "title": "Padronizar cards e botões em todos os modais",
+          "status": "done",
+          "objective": "Aplicar estilo único para container e CTAs conforme direção de arte do menu.",
+          "acceptanceCriteria": [
+            "Cards com blur(12px), border 2px #444 e sombra 0 10px 30px rgba(0,0,0,0.5).",
+            "Botões com fonte pesada uppercase e hover glow + scale 1.05.",
+            "Estilo aplicado em menu, pausa, opções, inventário, forja, baú, crafting e controles."
+          ],
+          "updatedAt": "2026-02-18T21:48:00Z"
+        },
+        {
+          "id": "P13-S3",
+          "title": "Limpeza da entrega temporária do P12",
+          "status": "done",
+          "objective": "Remover artefato single-file de protótipo após incorporar o layout ao jogo real.",
+          "acceptanceCriteria": [
+            "Arquivo `apps/client/public/main-menu-epic12.html` removido.",
+            "Projeto permanece buildável após remoção."
+          ],
+          "updatedAt": "2026-02-18T21:48:00Z"
+        }
+      ],
+      "updatedAt": "2026-02-18T21:48:00Z",
+      "sourceFiles": [
+        "finalizados/stories.2026-02-18-P13-finalizado.json"
+      ]
+    },
+    {
+      "id": "P14",
+      "title": "Auth v2: guest por dispositivo + login usuário/senha + migração irreversível",
+      "status": "done",
+      "objective": "Substituir login por código mágico por autenticação com guest único por dispositivo e conta usuário/senha, permitindo upgrade irreversível de guest para conta.",
+      "stories": [
+        {
+          "id": "P14-S1",
+          "title": "Modelo de dados Auth v2",
+          "status": "done",
+          "objective": "Criar tabelas users/devices/device_guest_links e preparar compatibilidade com estado atual baseado em guestId.",
+          "acceptanceCriteria": [
+            "Username único case-insensitive.",
+            "Device key única por equipamento.",
+            "Vínculo device->guest único com marcação de migração.",
+            "Sem quebra de compatibilidade do gameplay atual."
+          ],
+          "updatedAt": "2026-02-18T22:49:00Z"
+        },
+        {
+          "id": "P14-S2",
+          "title": "Endpoint guest por dispositivo",
+          "status": "done",
+          "objective": "Criar endpoint para garantir guest único por device e bloquear guest quando já migrado para conta.",
+          "acceptanceCriteria": [
+            "Mesmo device retorna mesmo guest ativo.",
+            "Device com guest migrado retorna erro orientando login por usuário/senha.",
+            "Fluxo preserva worldId e token de sessão."
+          ],
+          "updatedAt": "2026-02-18T22:49:00Z"
+        },
+        {
+          "id": "P14-S3",
+          "title": "Cadastro e login por usuário/senha",
+          "status": "done",
+          "objective": "Implementar register/login com hash de senha seguro e retorno de sessão compatível.",
+          "acceptanceCriteria": [
+            "Cadastro com username único e senha mínima.",
+            "Login com verificação de hash e erro genérico em credenciais inválidas.",
+            "Resposta inclui guestId/token para compatibilidade atual."
+          ],
+          "updatedAt": "2026-02-18T22:49:00Z"
+        },
+        {
+          "id": "P14-S4",
+          "title": "Upgrade guest -> conta (irreversível)",
+          "status": "done",
+          "objective": "Permitir que sessão guest vire conta usuário/senha, desativando acesso guest do device.",
+          "acceptanceCriteria": [
+            "Upgrade associa guest existente a usuário.",
+            "Após upgrade, acesso por guest do mesmo device é bloqueado.",
+            "Progresso permanece no guest vinculado (compatibilidade)."
+          ],
+          "updatedAt": "2026-02-18T22:49:00Z"
+        },
+        {
+          "id": "P14-S5",
+          "title": "Client UI/fluxo novo",
+          "status": "done",
+          "objective": "Atualizar telas para login usuário/senha + entrar como guest + vincular conta quando guest.",
+          "acceptanceCriteria": [
+            "Tela inicial separa Entrar, Cadastrar e Guest.",
+            "Guest logado consegue vincular usuário/senha.",
+            "Remover dependência do fluxo de código mágico."
+          ],
+          "updatedAt": "2026-02-18T22:49:00Z"
+        },
+        {
+          "id": "P14-S6",
+          "title": "Hardening e migração",
+          "status": "done",
+          "objective": "Adicionar rate-limit e plano de migração/descontinuação do auth antigo.",
+          "acceptanceCriteria": [
+            "Rate limit mínimo em register/login/guest ensure.",
+            "Plano de desligamento de rotas antigas documentado.",
+            "Testes de regressão dos fluxos críticos."
+          ],
+          "updatedAt": "2026-02-18T22:49:00Z"
+        }
+      ],
+      "updatedAt": "2026-02-18T22:49:00Z",
+      "sourceFiles": [
+        "stories.json"
+      ]
+    }
+  ]
+}
