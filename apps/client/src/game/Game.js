@@ -995,10 +995,32 @@ export class Game {
     e.preventDefault?.()
   }
 
+  _consumeAppleFromActiveHotbar() {
+    const slot = this.hotbar?.[this.hotbarActive]
+    if (!slot || slot.id !== ItemId.APPLE) return false
+
+    this.player.handAction?.()
+    slot.qty = Math.max(0, Number(slot.qty || 0) - 1)
+    if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+
+    this._activateAppleLuck()
+    this.ui.toast('Você comeu uma maçã 🍎 (+Sorte)', 1000)
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+    if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+    this._queuePlayerSave()
+    return true
+  }
+
   _onMouseDownAny(e) {
     if (this.state !== 'playing') return
     if (performance.now() < (this._suppressMouseDownUntil || 0)) return
     if (document.pointerLockElement !== this.canvas) return
+
+    // Left click: if active slot is apple, consume immediately.
+    if (e.button === 0 && this._consumeAppleFromActiveHotbar()) {
+      e.preventDefault?.()
+      return
+    }
 
     // Left mouse: placement hold
     if (e.button === 0) {
@@ -2121,8 +2143,11 @@ export class Game {
 
     if (s.id === ItemId.APPLE) {
       const removed = this.inventory.remove(ItemId.APPLE, 1)
-      if (removed) return
+      if (!removed) return
       this._activateAppleLuck()
+      this.player.handAction?.()
+      this.sfx.click?.()
+      this.ui.toast('Você comeu uma maçã 🍎 (+Sorte)', 1000)
       this._postMoveUpdate()
       return
     }
