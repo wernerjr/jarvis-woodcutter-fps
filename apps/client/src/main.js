@@ -262,6 +262,15 @@ invGrid.addEventListener('click', (e) => {
   game.setInventorySelectedIndex(idx)
 })
 
+invGrid.addEventListener('dblclick', (e) => {
+  if (!document.body.classList.contains('inventory-open')) return
+  const slot = e.target?.closest?.('.invSlot')
+  if (!slot) return
+  const idx = Number(slot.dataset.index)
+  if (Number.isNaN(idx)) return
+  game.invQuickAction(idx)
+})
+
 // Double-click on equipment slot: move back to inventory
 const invEquipGrid = document.querySelector('#invEquipGrid')
 invEquipGrid?.addEventListener('dblclick', (e) => {

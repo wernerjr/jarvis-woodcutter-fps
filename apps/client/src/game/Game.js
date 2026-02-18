@@ -999,14 +999,25 @@ export class Game {
     const slot = this.hotbar?.[this.hotbarActive]
     if (!slot || slot.id !== ItemId.APPLE) return false
 
-    this.player.handAction?.()
-    slot.qty = Math.max(0, Number(slot.qty || 0) - 1)
-    if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+    // Hotbar é atalho: consumo real acontece no inventário.
+    const left = this.inventory.remove(ItemId.APPLE, 1)
+    if (left > 0) {
+      this.ui.toast('Sem maçã no inventário.', 900)
+      return false
+    }
 
+    this.player.handAction?.()
     this._activateAppleLuck()
+
+    // Se acabou maçã no inventário, limpar qualquer atalho de maçã.
+    if ((this.inventory.count?.(ItemId.APPLE) || 0) <= 0) {
+      for (let i = 1; i < this.hotbar.length; i++) {
+        if (this.hotbar[i]?.id === ItemId.APPLE) this.hotbar[i] = null
+      }
+    }
+
     this.ui.toast('Você comeu uma maçã 🍎 (+Sorte)', 1000)
-    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
-    if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+    this._postMoveUpdate()
     this._queuePlayerSave()
     return true
   }
