@@ -1,319 +1,97 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T02:32:18Z",
+  "updatedAt": "2026-02-18T16:14:00Z",
   "statusLegend": {
-    "epic": [
-      "todo",
-      "doing",
-      "done"
-    ],
-    "story": [
-      "todo",
-      "doing",
-      "done"
-    ]
-  },
-  "assumptions": {
-    "inventoryBaseSlots": 20,
-    "backpackBonusSlots": 10,
-    "materials": {
-      "linhoItemId": "fiber",
-      "cordaItemId": "rope",
-      "note": "No código atual o item 'fiber' representa o linho/fibra usado nas receitas."
-    },
-    "equipmentSlots": [
-      "hat",
-      "shirt",
-      "pants",
-      "boots",
-      "gloves",
-      "backpack"
-    ],
-    "equipmentDurability": {
-      "type": "equipped_time",
-      "duration": "1d",
-      "pauseWhenUnequipped": true
-    },
-    "woodcutterSet": {
-      "bonusRequiresFullSet": true,
-      "treeExtraDropChance": 0.25,
-      "extra": {
-        "log": 1,
-        "stick": 2,
-        "leaf": 5
-      },
-      "rollsIndependent": true
-    },
-    "apple": {
-      "dropFrom": "treeCut",
-      "dropChance": 0.005,
-      "luckDurationSec": 300,
-      "luckDoubles": [
-        "treeLoot",
-        "bushLoot",
-        "rockLoot",
-        "oreLoot",
-        "harvestLoot"
-      ],
-      "doesNotDouble": [
-        "crafting",
-        "forge",
-        "chestTransfers"
-      ]
-    },
-    "ux": {
-      "equipInteraction": "double_click_inventory_item_toggles_equip",
-      "inventoryModalHasSidePanelForEquipment": true
-    }
+    "epic": ["todo", "doing", "done"],
+    "story": ["todo", "doing", "done"]
   },
   "epics": [
     {
-      "id": "P7",
-      "title": "Sistema de Equipamentos (roupas por peça) + durabilidade por tempo equipado + buffs",
-      "status": "done",
-      "objective": "Adicionar slots de vestimenta (chapéu/calça/camisa/bota/luva) e mochila no modal de inventário, com durabilidade de 1 dia contando apenas enquanto equipado; base para buffs (maçã/sorte).",
-      "stories": [
-        {
-          "id": "P7-S1",
-          "title": "Modelo de dados: equipment slots + durabilidade por tempo equipado + buffs no save",
-          "status": "done",
-          "objective": "Persistir equipamentos (6 slots) e estado de durabilidade (tempo restante) + buffs (luckUntilMs) no save do player.",
-          "acceptanceCriteria": [
-            "Game possui structure: equipment.{hat,shirt,pants,boots,gloves,backpack} (ids/meta).",
-            "Cada peça equipada mantém tempo restante (ex.: equipRemainingMs) e só reduz enquanto equipada.",
-            "Buffs suportam ao menos luckUntilMs.",
-            "exportGameSave inclui equipment + durability + buffs; applyGameSave restaura corretamente.",
-            "Save antigo (v2 atual) não quebra: defaults aplicados."
-          ],
-          "probableFiles": [
-            "apps/client/src/net/gameSave.js",
-            "apps/client/src/game/Game.js"
-          ],
-          "testPlan": [
-            "Equipar uma peça, salvar, recarregar: permanece equipada com o mesmo tempo restante (best-effort).",
-            "Desequipar e aguardar tempo: durabilidade NÃO diminui fora do corpo.",
-            "Carregar save antigo: jogo funciona com equipment vazio e sem buffs."
-          ],
-          "mvp": true,
-          "updatedAt": "2026-02-18T01:06:22Z"
-        },
-        {
-          "id": "P7-S2",
-          "title": "Inventário com slotCount dinâmico (resize seguro) para +10 da mochila",
-          "status": "done",
-          "objective": "Permitir aumentar/diminuir a capacidade do inventário sem corromper slots; tratar overflow ao reduzir capacidade.",
-          "acceptanceCriteria": [
-            "Inventory suporta resize para N slots mantendo itens existentes até N.",
-            "Se reduzir e houver itens além de N: excedentes são tratados (ex.: descartar com toast) de forma determinística.",
-            "UI de inventário renderiza corretamente com 20 e 30 slots."
-          ],
-          "probableFiles": [
-            "apps/client/src/game/Inventory.js",
-            "apps/client/src/game/UI.js",
-            "apps/client/src/game/Game.js"
-          ],
-          "testPlan": [
-            "Resize 20->30: slots extras aparecem.",
-            "Preencher slots 21-30, resize 30->20: excedentes tratados conforme regra.",
-            "Abrir/fechar inventário durante resize não quebra UI."
-          ],
-          "mvp": true,
-          "updatedAt": "2026-02-18T01:07:10Z"
-        },
-        {
-          "id": "P7-S3",
-          "title": "UI/UX: modal de inventário com painel lateral de vestimenta + duplo clique equipar/desequipar",
-          "status": "done",
-          "objective": "Ao abrir o inventário, mostrar painel lateral com slots: chapéu, camisa, calça, bota, luva, mochila. Duplo clique no item no inventário equipa (se slot compatível). Duplo clique no slot equipado devolve ao inventário.",
-          "acceptanceCriteria": [
-            "Inventário exibe painel lateral com 6 slots nomeados.",
-            "Duplo clique em item equipável no inventário move para o slot correto (se vazio ou troca controlada).",
-            "Duplo clique no item equipado move de volta para inventário.",
-            "UI mostra (opcional) durabilidade como tempo restante (ex.: '23h12m')."
-          ],
-          "probableFiles": [
-            "apps/client/src/game/UI.js",
-            "apps/client/src/game/Game.js"
-          ],
-          "testPlan": [
-            "Duplo clique equipar/desequipar para cada slot.",
-            "Inventário cheio ao desequipar: comportamento consistente (bloqueia ou descarta com aviso — definir).",
-            "Timer de durabilidade atualiza e pausa ao desequipar."
-          ],
-          "mvp": true,
-          "updatedAt": "2026-02-18T01:08:28Z"
-        }
+      "id": "P11",
+      "title": "Conta Vinculada (upgrade do guest)",
+      "status": "todo",
+      "objective": "Permitir que jogador guest vincule sua conta a um identificador persistente (e-mail + código mágico), mantendo progresso e habilitando login seguro em múltiplos dispositivos.",
+      "successMetrics": [
+        "Taxa de conversão guest -> conta vinculada",
+        "Queda em relatos de perda de progresso",
+        "Aumento de retenção D7 de jogadores vinculados"
       ],
-      "updatedAt": "2026-02-18T01:08:28Z"
-    },
-    {
-      "id": "P8",
-      "title": "Mochila (+10 slots)",
-      "status": "done",
-      "objective": "Adicionar item Mochila que, ao equipar, aumenta o inventário em +10 slots.",
       "stories": [
         {
-          "id": "P8-S1",
-          "title": "Item Mochila + equipar aplica +10 slots",
-          "status": "done",
-          "objective": "Criar item mochila (não stackable) e ao equipar no slot backpack aumentar capacidade do inventário em +10.",
+          "id": "P11-S1",
+          "title": "Modelo de dados para account vinculada e vínculo com guest existente",
+          "status": "todo",
+          "objective": "Adicionar entidades/tabelas para conta persistente e relação de migração de progresso do guest para accountId.",
           "acceptanceCriteria": [
-            "Novo ItemId para mochila e definição em ITEMS.",
-            "Mochila é equipável no slot backpack.",
-            "Ao equipar: inventário aumenta de 20 -> 30. Ao desequipar volta para 20.",
-            "Persistência no save funciona."
+            "Schema possui entidade de account com identificador único (e-mail normalizado).",
+            "Guest pode ser associado a accountId sem perder progresso já salvo.",
+            "Migração é idempotente (repetir operação não duplica nem corrompe dados).",
+            "Logs mínimos de auditoria para vínculo concluído."
           ],
           "probableFiles": [
-            "apps/client/src/game/items.js",
-            "apps/client/src/game/Game.js",
-            "apps/client/src/game/Inventory.js",
-            "apps/client/src/net/gameSave.js",
-            "apps/client/src/game/UI.js"
+            "apps/server/src/db/schema.ts",
+            "apps/server/drizzle/*",
+            "apps/server/src/services/*"
           ],
           "testPlan": [
-            "Adicionar mochila (dev/spawn temporário) e equipar: slots aumentam.",
-            "Salvar/recarregar: mantém slotCount aumentado.",
-            "Desequipar: volta para 20 e trata overflow conforme regra."
+            "Criar guest com progresso, vincular conta e validar manutenção do estado.",
+            "Executar vínculo duas vezes e confirmar idempotência.",
+            "Validar conflitos com e-mail já existente."
           ],
           "mvp": true,
-          "updatedAt": "2026-02-18T01:14:47Z"
-        }
-      ],
-      "updatedAt": "2026-02-18T01:14:47Z"
-    },
-    {
-      "id": "P9",
-      "title": "Vestimenta inicial: Conjunto do Lenhador (por peça) + bônus no corte de árvores",
-      "status": "done",
-      "objective": "Adicionar peças craftáveis (chapéu/camisa/calça/bota/luva) feitas de linho+corda. Enquanto o conjunto completo estiver equipado, aplicar bônus de chance de drops extras em árvores.",
-      "stories": [
-        {
-          "id": "P9-S1",
-          "title": "Itens de vestimenta (5 peças) + receitas por peça (linho+corda)",
-          "status": "done",
-          "objective": "Criar 5 itens equipáveis com receitas: camisa 150 linho + 1 corda; calça 120 linho + 3 cordas; chapéu 55 linho; bota 100 linho + 4 cordas; luva 80 linho + 2 cordas.",
-          "acceptanceCriteria": [
-            "Novos ItemId para: chapéu, camisa, calça, bota, luva (não stackable) e defs em ITEMS.",
-            "Cada item é equipável no slot correto.",
-            "Receitas adicionadas com os custos definidos.",
-            "Cada peça começa com durabilidade de 1 dia (tempo restante cheio ao ser criada/obtida)."
-          ],
-          "probableFiles": [
-            "apps/client/src/game/items.js",
-            "apps/client/src/game/recipes.js",
-            "apps/client/src/game/Game.js",
-            "apps/client/src/net/gameSave.js",
-            "apps/client/src/game/UI.js"
-          ],
-          "testPlan": [
-            "Craft de cada peça com recursos suficientes: consome linho/corda e adiciona peça.",
-            "Equipar peça: durabilidade começa a contar (reduz com o tempo equipado).",
-            "Desequipar: durabilidade pausa.",
-            "Salvar/recarregar no meio do timer: estado permanece consistente."
-          ],
-          "mvp": true,
-          "updatedAt": "2026-02-18T02:18:56Z"
+          "updatedAt": "2026-02-18T16:14:00Z"
         },
         {
-          "id": "P9-S2",
-          "title": "Bônus do Lenhador: chance de drops extras ao cortar árvore (modelo A)",
-          "status": "done",
-          "objective": "Quando o conjunto completo (5 peças) estiver equipado, aplicar chance de drop extra ao confirmar treeCut: +1 tronco, +2 galhos, +5 folhas (rolagens independentes) além do loot base.",
+          "id": "P11-S2",
+          "title": "Fluxo backend: solicitar código mágico e confirmar vínculo",
+          "status": "todo",
+          "objective": "Expor endpoints para iniciar vínculo por e-mail (geração/envio de código) e confirmar código para converter guest em conta vinculada.",
           "acceptanceCriteria": [
-            "Sem conjunto completo: loot permanece 1 log + (2-5) sticks + (10-20) leaves.",
-            "Com conjunto completo: aplica chance extra conforme regra (25%).",
-            "Toast reflete quando ocorrer (ex.: 'Bônus Lenhador! +1 Tronco +2 Galhos +5 Folhas').",
-            "Multiplayer: bônus aplicado apenas ao jogador que realizou o corte confirmado (pending world action)."
+            "Endpoint para solicitar código mágico com rate limit por IP/e-mail.",
+            "Código tem TTL curto e uso único.",
+            "Endpoint de confirmação valida código e conclui vínculo guest -> accountId.",
+            "Retorno inclui token/sessão válida para uso subsequente no jogo."
           ],
           "probableFiles": [
-            "apps/client/src/game/Game.js"
+            "apps/server/src/routes/auth*",
+            "apps/server/src/services/auth*",
+            "apps/server/src/ws/*"
           ],
           "testPlan": [
-            "Cortar ~30 árvores sem set: baseline.",
-            "Cortar ~30 árvores com set completo: observar ocorrências (probabilístico).",
-            "2 jogadores simultâneos: cada um recebe seu loot; sem duplicação indevida."
+            "Solicitar e confirmar código válido dentro do TTL.",
+            "Tentar código expirado e reutilização do mesmo código.",
+            "Validar proteção básica contra brute-force."
           ],
           "mvp": true,
-          "updatedAt": "2026-02-18T02:18:56Z"
-        }
-      ],
-      "updatedAt": "2026-02-18T02:18:56Z"
-    },
-    {
-      "id": "P10",
-      "title": "Item raro: Maçã + Buff de Sorte (5 min dobra drops)",
-      "status": "done",
-      "objective": "Introduzir item raro Maçã (drop 0,5% em árvore) que ao consumir ativa buff temporário de sorte por 5 minutos, dobrando apenas drops/coletas.",
-      "stories": [
-        {
-          "id": "P10-S1",
-          "title": "Adicionar item Maçã + drop raro 0,5% em árvore",
-          "status": "done",
-          "objective": "Criar Maçã como item stackable e inserir chance de drop (0,5%) ao confirmar treeCut.",
-          "acceptanceCriteria": [
-            "Novo ItemId para maçã e definição em ITEMS.",
-            "Ao confirmar treeCut, rolar 0,5% e adicionar 1 maçã ao inventário (overflow tratado).",
-            "Toast quando dropar: 'Item raro! +1 Maçã'."
-          ],
-          "probableFiles": [
-            "apps/client/src/game/items.js",
-            "apps/client/src/game/Game.js"
-          ],
-          "testPlan": [
-            "Forçar chance 100% via flag temporária (dev) e validar que entra no inventário.",
-            "Restaurar chance real (0,5%)."
-          ],
-          "mvp": true,
-          "updatedAt": "2026-02-18T02:30:15Z"
+          "updatedAt": "2026-02-18T16:14:00Z"
         },
         {
-          "id": "P10-S2",
-          "title": "Consumir Maçã ativa Sorte por 5 min (persistido) + UI timer",
-          "status": "done",
-          "objective": "Consumir a maçã no inventário para ativar buff de sorte por 5 min; persistir no save; mostrar contagem regressiva.",
+          "id": "P11-S3",
+          "title": "UI do client: 'Salvar meu progresso' e login por código",
+          "status": "todo",
+          "objective": "Adicionar fluxo simples no client para solicitar vínculo por e-mail, inserir código e concluir login persistente.",
           "acceptanceCriteria": [
-            "Duplo clique (ou ação explícita) em maçã consome 1 e ativa luckUntilMs = now + 5min.",
-            "Enquanto ativo: UI mostra 'Sorte: mm:ss'.",
-            "Ao expirar: efeito para e UI some.",
-            "Recarregar página durante buff: continua contando corretamente."
+            "Ação visível no inventário/menu: 'Salvar meu progresso'.",
+            "Tela/modal com campo de e-mail e campo de código.",
+            "Feedback claro de sucesso/erro/expiração.",
+            "Após concluir, sessão segue autenticada e progresso permanece intacto."
           ],
           "probableFiles": [
             "apps/client/src/game/UI.js",
-            "apps/client/src/game/Game.js",
-            "apps/client/src/net/gameSave.js"
-          ],
-          "testPlan": [
-            "Ativar buff, recarregar a página: timer continua.",
-            "Consumir outra maçã durante buff: comportamento definido (renovar para 5min a partir de agora)."
-          ],
-          "mvp": true,
-          "updatedAt": "2026-02-18T02:31:05Z"
-        },
-        {
-          "id": "P10-S3",
-          "title": "Aplicar Sorte: dobrar apenas drops/coletas (i)",
-          "status": "done",
-          "objective": "Com buff ativo, dobrar quantidades de loot/drops: árvore, arbusto, pedra, minério, colheita. Não dobrar crafting/forja/baús.",
-          "acceptanceCriteria": [
-            "Tree loot dobra (inclui extras do Lenhador se ocorrerem).",
-            "Harvest loot dobra.",
-            "Outras coletas aplicáveis dobram onde existirem no Game.",
-            "Crafting/forja/baú não são afetados."
-          ],
-          "probableFiles": [
+            "apps/client/src/net/*",
             "apps/client/src/game/Game.js"
           ],
           "testPlan": [
-            "Ativar buff e cortar árvore: verificar quantidades dobradas.",
-            "Ativar buff e colher algodão: verificar quantidades dobradas.",
-            "Desativar buff: volta ao normal."
+            "Fluxo feliz completo no client.",
+            "Erro de código inválido/expirado com retry.",
+            "Reabrir jogo após vínculo e confirmar persistência/login."
           ],
           "mvp": true,
-          "updatedAt": "2026-02-18T02:32:18Z"
+          "updatedAt": "2026-02-18T16:14:00Z"
         }
       ],
-      "updatedAt": "2026-02-18T02:32:18Z"
+      "updatedAt": "2026-02-18T16:14:00Z"
     }
   ]
 }
