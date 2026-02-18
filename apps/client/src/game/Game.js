@@ -3435,31 +3435,6 @@ export class Game {
 
   _applyServerCorrection(me) {
     const now = Date.now()
-
-    // When the player is actively moving, positional reconciliation can feel like "rubber banding".
-    // Prefer local feel while moving; keep yaw gently aligned.
-    const k = this._lastNetInput?.keys
-    const moving = !!(k && (k.w || k.a || k.s || k.d))
-    if (moving) {
-      const yawT = me.yaw || 0
-      const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
-      this.player.yaw.rotation.y += dy * 0.10
-      return
-    }
-
-    // PERF/feel: avoid constant tiny corrections that "fight" the local movement.
-    // Apply reconciliation at a limited rate.
-    if (now < (this._reconNextAt || 0)) return
-    this._reconNextAt = now + 80
-
-    if (now < (this._reconCooldownUntil || 0)) {
-      // When pressed against geometry, reconciliation tends to jitter.
-      // Keep yaw gently aligned but avoid positional corrections for a short cooldown.
-      const yawT = me.yaw || 0
-      const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
-      this.player.yaw.rotation.y += dy * 0.10
-      return
-    }
     const tx = me.x || 0
     const ty = me.y || this.player.eyeHeight
     const tz = me.z || 0
@@ -3468,53 +3443,64 @@ export class Game {
     const dz = tz - this.player.position.z
     const dist = Math.hypot(dx, dz)
 
-    // Deadzone avoids micro-jitter when close enough.
-    // Slightly larger to prevent constant small pulls that feel like movement stutter.
-    const deadzone = 0.45
-    if (dist < deadzone) {
-      // still align yaw a bit
-      const yawT = me.yaw || 0
-      const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
-      this.player.yaw.rotation.y += dy * 0.15
+    // Target hard cap for visible drift.
+    const driftCap = 0.2
+
+    const yawT = me.yaw || 0
+    const dyaw = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+
+    // When moving, keep local feel, but if drift exceeds cap, reconcile enough to stay under cap.
+    const k = this._lastNetInput?.keys
+    const moving = !!(k && (k.w || k.a || k.s || k.d))
+    if (moving && dist <= driftCap) {
+      this.player.yaw.rotation.y += dyaw * 0.10
       return
     }
 
-    // Clamp correction step to avoid pulling through walls.
-    const maxStep = 0.25
-    const step = Math.min(maxStep, dist)
-    const nx = dx / (dist || 1)
-    const nz = dz / (dist || 1)
+    // PERF/feel: avoid constant tiny corrections that fight local movement.
+    if (now < (this._reconNextAt || 0)) {
+      this.player.yaw.rotation.y += dyaw * 0.10
+      return
+    }
+    this._reconNextAt = now + 60
 
-    const beforeX = this.player.position.x
-    const beforeZ = this.player.position.z
-
-    const next = this.player.position.clone()
-    next.x += nx * step
-    next.z += nz * step
-
-    // Y correction (clamped to ground constraints)
-    const groundY = this._lastGroundY || 0
-    const minY = groundY + this.player.eyeHeight
-    next.y = Math.max(minY, ty)
-
-    // Apply collision-aware correction
-    this.player.resolveCollisions(next, this._lastColliders || [])
-
-    const moved = Math.hypot(next.x - beforeX, next.z - beforeZ)
-    // If collision resolution prevented most of our intended correction step,
-    // we are likely pressed against geometry: back off reconciliation briefly.
-    if (moved < step * 0.65) {
-      this._reconCooldownUntil = now + 220
+    if (now < (this._reconCooldownUntil || 0) && dist <= driftCap) {
+      this.player.yaw.rotation.y += dyaw * 0.10
+      return
     }
 
-    this.player.position.copy(next)
+    // If we are above cap, pull at least (dist - cap), limited by step.
+    const desiredPull = Math.max(0, dist - driftCap)
+    const maxStep = moving ? 0.35 : 0.28
+    const step = Math.min(maxStep, Math.max(desiredPull, moving ? 0.06 : 0.0), dist)
 
-    // Only hard-reset velocity on big corrections; otherwise it feels like "sticky" movement.
-    if (dist > 1.2) this.player.velocity.set(0, 0, 0)
+    if (step > 0) {
+      const nx = dx / (dist || 1)
+      const nz = dz / (dist || 1)
 
-    const yawT = me.yaw || 0
-    const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
-    this.player.yaw.rotation.y += dy * 0.25
+      const beforeX = this.player.position.x
+      const beforeZ = this.player.position.z
+
+      const next = this.player.position.clone()
+      next.x += nx * step
+      next.z += nz * step
+
+      const groundY = this._lastGroundY || 0
+      const minY = groundY + this.player.eyeHeight
+      next.y = Math.max(minY, ty)
+
+      this.player.resolveCollisions(next, this._lastColliders || [])
+
+      const moved = Math.hypot(next.x - beforeX, next.z - beforeZ)
+      if (moved < step * 0.60) this._reconCooldownUntil = now + 180
+
+      this.player.position.copy(next)
+
+      // Big drift correction: kill velocity to stop random walk feel.
+      if (dist > 0.9) this.player.velocity.set(0, 0, 0)
+    }
+
+    this.player.yaw.rotation.y += dyaw * (moving ? 0.18 : 0.25)
   }
 
   _disconnectWs() {
