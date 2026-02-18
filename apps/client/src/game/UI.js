@@ -904,6 +904,21 @@ export class UI {
     else if (outId === 'backpack') {
       meta.cat = 'Equipamentos'
       meta.desc = 'Mochila: ao equipar, adiciona +10 slots no inventário.'
+    } else if (outId === 'woodcutter_hat') {
+      meta.cat = 'Equipamentos'
+      meta.desc = 'Peça do conjunto Lenhador (cabeça).'
+    } else if (outId === 'woodcutter_shirt') {
+      meta.cat = 'Equipamentos'
+      meta.desc = 'Peça do conjunto Lenhador (camisa).'
+    } else if (outId === 'woodcutter_pants') {
+      meta.cat = 'Equipamentos'
+      meta.desc = 'Peça do conjunto Lenhador (calça).'
+    } else if (outId === 'woodcutter_boots') {
+      meta.cat = 'Equipamentos'
+      meta.desc = 'Peça do conjunto Lenhador (bota).'
+    } else if (outId === 'woodcutter_gloves') {
+      meta.cat = 'Equipamentos'
+      meta.desc = 'Peça do conjunto Lenhador (luva).'
     }
 
     return meta

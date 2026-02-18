@@ -11,6 +11,11 @@ export const ItemId = {
   IRON_INGOT: 'iron_ingot',
 
   BACKPACK: 'backpack',
+  WOODCUTTER_HAT: 'woodcutter_hat',
+  WOODCUTTER_SHIRT: 'woodcutter_shirt',
+  WOODCUTTER_PANTS: 'woodcutter_pants',
+  WOODCUTTER_BOOTS: 'woodcutter_boots',
+  WOODCUTTER_GLOVES: 'woodcutter_gloves',
 
   AXE_STONE: 'axe_stone',
   AXE_METAL: 'axe_metal',
@@ -38,6 +43,11 @@ export const ITEMS = {
   [ItemId.IRON_INGOT]: { id: ItemId.IRON_INGOT, name: 'Barra de Ferro', icon: '🧱', stackable: true },
 
   [ItemId.BACKPACK]: { id: ItemId.BACKPACK, name: 'Mochila', icon: '🎒', stackable: false, equipSlot: 'backpack' },
+  [ItemId.WOODCUTTER_HAT]: { id: ItemId.WOODCUTTER_HAT, name: 'Chapéu do Lenhador', icon: '🎩', stackable: false, equipSlot: 'hat' },
+  [ItemId.WOODCUTTER_SHIRT]: { id: ItemId.WOODCUTTER_SHIRT, name: 'Camisa do Lenhador', icon: '👕', stackable: false, equipSlot: 'shirt' },
+  [ItemId.WOODCUTTER_PANTS]: { id: ItemId.WOODCUTTER_PANTS, name: 'Calça do Lenhador', icon: '👖', stackable: false, equipSlot: 'pants' },
+  [ItemId.WOODCUTTER_BOOTS]: { id: ItemId.WOODCUTTER_BOOTS, name: 'Bota do Lenhador', icon: '🥾', stackable: false, equipSlot: 'boots' },
+  [ItemId.WOODCUTTER_GLOVES]: { id: ItemId.WOODCUTTER_GLOVES, name: 'Luva do Lenhador', icon: '🧤', stackable: false, equipSlot: 'gloves' },
 
   [ItemId.AXE_STONE]: { id: ItemId.AXE_STONE, name: 'Machado de Pedra', icon: '🪓🪨', stackable: false },
   [ItemId.AXE_METAL]: { id: ItemId.AXE_METAL, name: 'Machado de Metal', icon: '🪓⚙️', stackable: false },

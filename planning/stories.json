@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T01:14:47Z",
+  "updatedAt": "2026-02-18T02:17:54Z",
   "statusLegend": {
     "epic": [
       "todo",
@@ -185,13 +185,13 @@
     {
       "id": "P9",
       "title": "Vestimenta inicial: Conjunto do Lenhador (por peça) + bônus no corte de árvores",
-      "status": "todo",
+      "status": "doing",
       "objective": "Adicionar peças craftáveis (chapéu/camisa/calça/bota/luva) feitas de linho+corda. Enquanto o conjunto completo estiver equipado, aplicar bônus de chance de drops extras em árvores.",
       "stories": [
         {
           "id": "P9-S1",
           "title": "Itens de vestimenta (5 peças) + receitas por peça (linho+corda)",
-          "status": "todo",
+          "status": "done",
           "objective": "Criar 5 itens equipáveis com receitas: camisa 150 linho + 1 corda; calça 120 linho + 3 cordas; chapéu 55 linho; bota 100 linho + 4 cordas; luva 80 linho + 2 cordas.",
           "acceptanceCriteria": [
             "Novos ItemId para: chapéu, camisa, calça, bota, luva (não stackable) e defs em ITEMS.",
@@ -212,7 +212,8 @@
             "Desequipar: durabilidade pausa.",
             "Salvar/recarregar no meio do timer: estado permanece consistente."
           ],
-          "mvp": true
+          "mvp": true,
+          "updatedAt": "2026-02-18T02:17:54Z"
         },
         {
           "id": "P9-S2",
@@ -235,7 +236,8 @@
           ],
           "mvp": true
         }
-      ]
+      ],
+      "updatedAt": "2026-02-18T02:17:54Z"
     },
     {
       "id": "P10",

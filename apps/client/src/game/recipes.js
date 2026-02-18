@@ -10,6 +10,11 @@ export const RecipeId = {
   CHEST: 'chest',
   ROPE: 'rope',
   BACKPACK: 'backpack',
+  WOODCUTTER_HAT: 'woodcutter_hat',
+  WOODCUTTER_SHIRT: 'woodcutter_shirt',
+  WOODCUTTER_PANTS: 'woodcutter_pants',
+  WOODCUTTER_BOOTS: 'woodcutter_boots',
+  WOODCUTTER_GLOVES: 'woodcutter_gloves',
 }
 
 export const DURABILITY = {
@@ -178,6 +183,50 @@ export const FORGE_TABLE_RECIPES = [
     cost: [
       { id: ItemId.FIBER, qty: 200 },
       { id: ItemId.ROPE, qty: 8 },
+    ],
+  },
+  {
+    id: RecipeId.WOODCUTTER_HAT,
+    name: 'Chapéu do Lenhador',
+    output: { id: ItemId.WOODCUTTER_HAT, qty: 1, meta: { equipRemainingMs: 24 * 60 * 60 * 1000 } },
+    cost: [
+      { id: ItemId.FIBER, qty: 55 },
+    ],
+  },
+  {
+    id: RecipeId.WOODCUTTER_SHIRT,
+    name: 'Camisa do Lenhador',
+    output: { id: ItemId.WOODCUTTER_SHIRT, qty: 1, meta: { equipRemainingMs: 24 * 60 * 60 * 1000 } },
+    cost: [
+      { id: ItemId.FIBER, qty: 150 },
+      { id: ItemId.ROPE, qty: 1 },
+    ],
+  },
+  {
+    id: RecipeId.WOODCUTTER_PANTS,
+    name: 'Calça do Lenhador',
+    output: { id: ItemId.WOODCUTTER_PANTS, qty: 1, meta: { equipRemainingMs: 24 * 60 * 60 * 1000 } },
+    cost: [
+      { id: ItemId.FIBER, qty: 120 },
+      { id: ItemId.ROPE, qty: 3 },
+    ],
+  },
+  {
+    id: RecipeId.WOODCUTTER_BOOTS,
+    name: 'Bota do Lenhador',
+    output: { id: ItemId.WOODCUTTER_BOOTS, qty: 1, meta: { equipRemainingMs: 24 * 60 * 60 * 1000 } },
+    cost: [
+      { id: ItemId.FIBER, qty: 100 },
+      { id: ItemId.ROPE, qty: 4 },
+    ],
+  },
+  {
+    id: RecipeId.WOODCUTTER_GLOVES,
+    name: 'Luva do Lenhador',
+    output: { id: ItemId.WOODCUTTER_GLOVES, qty: 1, meta: { equipRemainingMs: 24 * 60 * 60 * 1000 } },
+    cost: [
+      { id: ItemId.FIBER, qty: 80 },
+      { id: ItemId.ROPE, qty: 2 },
     ],
   },
 ]
