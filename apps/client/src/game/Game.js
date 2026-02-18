@@ -2977,9 +2977,29 @@ export class Game {
     }, 600)
   }
 
+  _syncHotbarShortcutsFromInventory() {
+    for (let i = 1; i < this.hotbar.length; i++) {
+      const s = this.hotbar[i]
+      if (!s?.id) continue
+      const total = this.inventory.count?.(s.id) || 0
+      if (total <= 0) {
+        this.hotbar[i] = null
+        continue
+      }
+      if (ITEMS[s.id]?.stackable) {
+        s.qty = total
+      } else {
+        s.qty = 1
+        const meta = this.inventory.getFirstMeta?.(s.id)
+        if (meta) s.meta = { ...meta }
+      }
+    }
+  }
+
   _postMoveUpdate() {
     // Keep hand fixed.
     this.hotbar[0] = { id: 'hand', qty: 1 }
+    this._syncHotbarShortcutsFromInventory()
 
     // Re-render if inventory/forge/chest open.
     if (this.state === 'inventory' || this.state === 'forge' || this.state === 'chest') {
@@ -3605,17 +3625,18 @@ export class Game {
       this.forgeTables.place({ x: this._ghostX, z: this._ghostZ }, placeId)
       this._registerPlacedLocal('forgeTable', placeId, this._ghostX, this._ghostZ)
 
-      // Consume current hotbar stack
-      slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
-      if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+      // Consume from inventory (hotbar é atalho)
+      const left = this.inventory.remove(ItemId.FORGE_TABLE, 1)
+      if (left > 0) {
+        this.ui.toast('Sem mesa de forja no inventário.', 900)
+        return
+      }
 
       // Unlock metal recipes in UI sense (station gating).
       this._hasForgeTableBuilt = true
 
       this.ui.toast('Mesa de forja colocada.', 900)
-      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
-
-      if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+      this._postMoveUpdate()
     })
 
     const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'forgeTable', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
@@ -3696,13 +3717,14 @@ export class Game {
       this.chests.place({ x: this._ghostX, z: this._ghostZ }, placeId)
       this._registerPlacedLocal('chest', placeId, this._ghostX, this._ghostZ)
 
-      slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
-      if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+      const left = this.inventory.remove(ItemId.CHEST, 1)
+      if (left > 0) {
+        this.ui.toast('Sem baú no inventário.', 900)
+        return
+      }
 
       this.ui.toast('Baú colocado.', 900)
-      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
-
-      if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+      this._postMoveUpdate()
     })
 
     const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'chest', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
@@ -3725,14 +3747,14 @@ export class Game {
       this.forges.place({ x: this._ghostX, z: this._ghostZ }, placeId)
       this._registerPlacedLocal('forge', placeId, this._ghostX, this._ghostZ)
 
-      // Consume current hotbar stack
-      slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
-      if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+      const left = this.inventory.remove(ItemId.FORGE, 1)
+      if (left > 0) {
+        this.ui.toast('Sem forja no inventário.', 900)
+        return
+      }
 
       this.ui.toast('Forja colocada.', 900)
-      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
-
-      if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+      this._postMoveUpdate()
     })
 
     const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'forge', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
@@ -3755,15 +3777,14 @@ export class Game {
       this.fires.place({ x: this._ghostX, y: 0, z: this._ghostZ }, placeId)
       this._registerPlacedLocal('campfire', placeId, this._ghostX, this._ghostZ)
 
-      // Consume only the currently selected hotbar stack.
-      slot.qty = Math.max(0, (slot.qty ?? 1) - 1)
-      if (slot.qty <= 0) this.hotbar[this.hotbarActive] = null
+      const left = this.inventory.remove(ItemId.CAMPFIRE, 1)
+      if (left > 0) {
+        this.ui.toast('Sem fogueira no inventário.', 900)
+        return
+      }
 
       this.ui.toast('Fogueira colocada.', 900)
-      this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
-
-      // Do not clear other campfires bound to other slots.
-      if (!this.hotbar[this.hotbarActive]) this.selectHotbar(0)
+      this._postMoveUpdate()
     })
 
     const sent = this._sendWorldEvent({ kind: 'place', placeKind: 'campfire', id: placeId, x: this._ghostX, z: this._ghostZ, at: Date.now() })
