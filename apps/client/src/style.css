@@ -109,11 +109,25 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 
 /* Splash background */
 #menu.overlay{
+  justify-content:flex-end;
+  align-items:flex-start;
+  padding-top: clamp(220px, 55vh, 520px);
+  padding-right: 10%;
   background:
     linear-gradient(180deg, rgba(0,0,0,.40), rgba(0,0,0,.70)),
     radial-gradient(1200px 700px at 20% 15%, rgba(255,140,0,.22), transparent 60%),
     radial-gradient(900px 600px at 85% 25%, rgba(180,95,6,.20), transparent 55%),
     url('/splash.png') center/cover no-repeat;
+}
+#menu .card{width:300px; max-width:min(88vw, 300px)}
+#menu .buttons{justify-items:end}
+#menu .buttons button{width:100%; text-align:right}
+
+@media (max-width: 900px){
+  #menu.overlay{justify-content:center; align-items:center; padding:24px;}
+  #menu .card{max-width:min(92vw, 520px)}
+  #menu .buttons{justify-items:stretch}
+  #menu .buttons button{text-align:center}
 }
 #pause.overlay, #options.overlay, #forge.overlay, #chest.overlay, #forgeTable.overlay, #crafting.overlay, #inventory.overlay, #controls.overlay{
   background:
