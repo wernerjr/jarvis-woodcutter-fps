@@ -414,6 +414,18 @@ export class Game {
       return
     }
 
+    // Dev helper (temporary): B gives 1 backpack for testing equip/slots.
+    if (e.code === 'KeyB') {
+      if (this.state === 'playing') {
+        const left = this.inventory.add(ItemId.BACKPACK, 1, { equipRemainingMs: 24 * 60 * 60 * 1000 })
+        if (left) this.ui.toast('Inventário cheio (mochila descartada).', 1200)
+        else this.ui.toast('Dev: +1 Mochila (use duplo clique para equipar).', 1400)
+        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], { slotCountHint: this.inventory.slotCount })
+        this._queuePlayerSave?.()
+      }
+      return
+    }
+
     // Crafting toggle
     if (e.code === 'KeyC') {
       if (this.state === 'playing') {
@@ -1578,8 +1590,8 @@ export class Game {
   }
 
   _recomputeInventoryCapacity() {
-    // For now: any equipped backpack grants +10 slots (actual item id comes in P8).
-    const hasBackpack = !!this.equipment?.backpack
+    // P8: only actual backpack item grants +10.
+    const hasBackpack = this.equipment?.backpack?.id === ItemId.BACKPACK
     const desired = (this.inventoryBaseSlots || 20) + (hasBackpack ? 10 : 0)
     this._setInventorySlotCount(desired)
   }

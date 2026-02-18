@@ -10,6 +10,8 @@ export const ItemId = {
   IRON_ORE: 'iron_ore',
   IRON_INGOT: 'iron_ingot',
 
+  BACKPACK: 'backpack',
+
   AXE_STONE: 'axe_stone',
   AXE_METAL: 'axe_metal',
   PICKAXE_STONE: 'pickaxe_stone',
@@ -34,6 +36,8 @@ export const ITEMS = {
   [ItemId.STONE]: { id: ItemId.STONE, name: 'Pedra', icon: '🪨', stackable: true },
   [ItemId.IRON_ORE]: { id: ItemId.IRON_ORE, name: 'Minério de Ferro', icon: '🔩', stackable: true },
   [ItemId.IRON_INGOT]: { id: ItemId.IRON_INGOT, name: 'Barra de Ferro', icon: '🧱', stackable: true },
+
+  [ItemId.BACKPACK]: { id: ItemId.BACKPACK, name: 'Mochila', icon: '🎒', stackable: false, equipSlot: 'backpack' },
 
   [ItemId.AXE_STONE]: { id: ItemId.AXE_STONE, name: 'Machado de Pedra', icon: '🪓🪨', stackable: false },
   [ItemId.AXE_METAL]: { id: ItemId.AXE_METAL, name: 'Machado de Metal', icon: '🪓⚙️', stackable: false },

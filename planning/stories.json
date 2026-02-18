@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T01:08:28Z",
+  "updatedAt": "2026-02-18T01:14:47Z",
   "statusLegend": {
     "epic": [
       "todo",
@@ -150,13 +150,13 @@
     {
       "id": "P8",
       "title": "Mochila (+10 slots)",
-      "status": "todo",
+      "status": "done",
       "objective": "Adicionar item Mochila que, ao equipar, aumenta o inventário em +10 slots.",
       "stories": [
         {
           "id": "P8-S1",
           "title": "Item Mochila + equipar aplica +10 slots",
-          "status": "todo",
+          "status": "done",
           "objective": "Criar item mochila (não stackable) e ao equipar no slot backpack aumentar capacidade do inventário em +10.",
           "acceptanceCriteria": [
             "Novo ItemId para mochila e definição em ITEMS.",
@@ -176,9 +176,11 @@
             "Salvar/recarregar: mantém slotCount aumentado.",
             "Desequipar: volta para 20 e trata overflow conforme regra."
           ],
-          "mvp": true
+          "mvp": true,
+          "updatedAt": "2026-02-18T01:14:47Z"
         }
-      ]
+      ],
+      "updatedAt": "2026-02-18T01:14:47Z"
     },
     {
       "id": "P9",
