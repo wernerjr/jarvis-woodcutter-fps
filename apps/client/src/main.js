@@ -119,7 +119,12 @@ document.querySelector('#btnLoginStart')?.addEventListener('click', async () => 
     setAccountStatus('Enviando código de login...')
     const email = String(accountEmailEl?.value || '').trim()
     const out = await startAccountLogin({ email })
-    setAccountStatus(`Código de login enviado. ${out?.devCode ? `DevCode: ${out.devCode}` : ''}`)
+    if (out?.devCode && accountCodeEl) {
+      accountCodeEl.value = String(out.devCode)
+      accountCodeEl.focus()
+      accountCodeEl.select?.()
+    }
+    setAccountStatus('Código de login enviado.')
   } catch (err) {
     setAccountStatus(`Erro: ${err?.message || err}`, true)
   }
@@ -631,7 +636,7 @@ $('#btnPlay').addEventListener('click', async () => {
     setLoadingLock(false)
   }
 })
-$('#btnControls').addEventListener('click', () => game.openControls('menu'))
+$('#btnControls')?.addEventListener('click', () => game.openControls('menu'))
 $('#btnMenuOptions')?.addEventListener('click', () => {
   // Open options overlay
   const opt = document.querySelector('#options')
