@@ -59,24 +59,24 @@
       <div id="auth" class="overlay block" role="dialog" aria-modal="true" aria-label="Login">
         <div class="card">
           <h1>Entrar</h1>
-          <p class="muted">Faça login para recuperar progresso ou entre como guest.</p>
+          <p class="muted">Use usuário/senha ou entre como guest neste dispositivo.</p>
 
           <div class="row">
-            <label class="muted small" for="accountEmail">E-mail</label>
-            <input id="accountEmail" class="text" type="email" placeholder="seu@email.com" />
+            <label class="muted small" for="authUsername">Usuário</label>
+            <input id="authUsername" class="text" type="text" maxlength="24" placeholder="seu_usuario" />
           </div>
 
           <div class="row">
-            <label class="muted small" for="accountCode">Código</label>
-            <input id="accountCode" class="text" type="text" inputmode="numeric" maxlength="6" placeholder="Código (6 dígitos)" />
+            <label class="muted small" for="authPassword">Senha</label>
+            <input id="authPassword" class="text" type="password" maxlength="120" placeholder="••••••" />
           </div>
 
           <div class="buttons">
-            <button id="btnLoginStart">Enviar código</button>
-            <button id="btnLoginVerify" class="primary">Entrar com código</button>
+            <button id="btnAuthLogin" class="primary">Entrar</button>
+            <button id="btnAuthRegister">Cadastrar</button>
             <button id="btnContinueGuest">Entrar como guest</button>
           </div>
-          <div id="accountStatus" class="muted small" style="margin-top:8px"></div>
+          <div id="authStatus" class="muted small" style="margin-top:8px"></div>
         </div>
       </div>
 
@@ -89,6 +89,14 @@
           <div class="row">
             <label class="muted small" for="worldId">Sala (worldId)</label>
             <input id="worldId" class="text" type="text" value="world-1" placeholder="world-1" />
+          </div>
+
+          <div id="guestUpgradeBox" class="row" style="margin-top:10px; padding:10px; border:1px solid rgba(255,255,255,.14); border-radius:10px;">
+            <div class="muted small" style="margin-bottom:6px"><b>Vincular guest</b> (usuário/senha)</div>
+            <input id="linkUsername" class="text" type="text" maxlength="24" placeholder="novo_usuario" />
+            <input id="linkPassword" class="text" type="password" maxlength="120" placeholder="nova senha" style="margin-top:8px" />
+            <button id="btnUpgradeAccount" style="margin-top:8px">Vincular conta</button>
+            <div id="upgradeStatus" class="muted small" style="margin-top:6px"></div>
           </div>
 
           <div class="buttons">

@@ -1,10 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T22:28:00Z",
+  "updatedAt": "2026-02-18T22:32:00Z",
   "statusLegend": {
-    "epic": ["todo", "doing", "done"],
-    "story": ["todo", "doing", "done"]
+    "epic": [
+      "todo",
+      "doing",
+      "done"
+    ],
+    "story": [
+      "todo",
+      "doing",
+      "done"
+    ]
   },
   "epics": [
     {
@@ -29,7 +37,7 @@
         {
           "id": "P14-S2",
           "title": "Endpoint guest por dispositivo",
-          "status": "todo",
+          "status": "doing",
           "objective": "Criar endpoint para garantir guest único por device e bloquear guest quando já migrado para conta.",
           "acceptanceCriteria": [
             "Mesmo device retorna mesmo guest ativo.",
@@ -41,7 +49,7 @@
         {
           "id": "P14-S3",
           "title": "Cadastro e login por usuário/senha",
-          "status": "todo",
+          "status": "doing",
           "objective": "Implementar register/login com hash de senha seguro e retorno de sessão compatível.",
           "acceptanceCriteria": [
             "Cadastro com username único e senha mínima.",
@@ -65,7 +73,7 @@
         {
           "id": "P14-S5",
           "title": "Client UI/fluxo novo",
-          "status": "todo",
+          "status": "doing",
           "objective": "Atualizar telas para login usuário/senha + entrar como guest + vincular conta quando guest.",
           "acceptanceCriteria": [
             "Tela inicial separa Entrar, Cadastrar e Guest.",
@@ -87,7 +95,7 @@
           "updatedAt": "2026-02-18T22:28:00Z"
         }
       ],
-      "updatedAt": "2026-02-18T22:28:00Z"
+      "updatedAt": "2026-02-18T22:32:00Z"
     }
   ]
 }

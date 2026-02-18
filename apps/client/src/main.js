@@ -1,7 +1,7 @@
 import './style.css'
 import { Game } from './game/Game.js'
 import { UI } from './game/UI.js'
-import { ensureGuest, loadPlayerState, savePlayerState, loadPlayerSettings, savePlayerSettings, getStoredWorldId, setStoredWorldId, getStoredAccountEmail, startAccountLink, verifyAccountLink, startAccountLogin, verifyAccountLogin } from './net/persistence.js'
+import { ensureGuest, ensureGuestByDevice, loadPlayerState, savePlayerState, loadPlayerSettings, savePlayerSettings, getStoredWorldId, setStoredWorldId, loginUserPassword, registerUserPassword } from './net/persistence.js'
 
 const canvas = document.querySelector('#game')
 
@@ -59,14 +59,16 @@ if (worldInput) {
   })
 }
 
-// Account link/login (menu)
+// Auth v2 gate (username/senha + guest por dispositivo)
 const authEl = document.querySelector('#auth')
 const menuEl = document.querySelector('#menu')
-const accountEmailEl = document.querySelector('#accountEmail')
-const accountCodeEl = document.querySelector('#accountCode')
-const accountStatusEl = document.querySelector('#accountStatus')
-const storedEmail = getStoredAccountEmail()
-if (accountEmailEl && storedEmail) accountEmailEl.value = storedEmail
+const authUsernameEl = document.querySelector('#authUsername')
+const authPasswordEl = document.querySelector('#authPassword')
+const authStatusEl = document.querySelector('#authStatus')
+const upgradeBoxEl = document.querySelector('#guestUpgradeBox')
+const linkUsernameEl = document.querySelector('#linkUsername')
+const linkPasswordEl = document.querySelector('#linkPassword')
+const upgradeStatusEl = document.querySelector('#upgradeStatus')
 
 function showAuthGate() {
   document.body.classList.add('state-menu')
@@ -77,94 +79,93 @@ function showAuthGate() {
   document.querySelector('#hud')?.classList.add('hidden')
 }
 
+function updateGuestUpgradeVisibility() {
+  const hasGuest = !!(game?._persistCtx?.guestId)
+  if (upgradeBoxEl) upgradeBoxEl.classList.toggle('hidden', !hasGuest)
+}
+
 function showMainMenuAfterAuth() {
   authEl?.classList.add('hidden')
   ui.showMenu()
+  updateGuestUpgradeVisibility()
 }
 
-function setAccountStatus(msg, isError = false) {
-  if (!accountStatusEl) return
-  accountStatusEl.textContent = msg || ''
-  accountStatusEl.style.color = isError ? '#ffb0b0' : ''
+function setAuthStatus(msg, isError = false) {
+  if (!authStatusEl) return
+  authStatusEl.textContent = msg || ''
+  authStatusEl.style.color = isError ? '#ffb0b0' : ''
 }
 
-document.querySelector('#btnLinkStart')?.addEventListener('click', async () => {
+function setUpgradeStatus(msg, isError = false) {
+  if (!upgradeStatusEl) return
+  upgradeStatusEl.textContent = msg || ''
+  upgradeStatusEl.style.color = isError ? '#ffb0b0' : ''
+}
+
+document.querySelector('#btnAuthLogin')?.addEventListener('click', async () => {
   try {
-    setAccountStatus('Gerando código...')
-    const guest = await ensureGuest({ worldId: String(worldInput?.value || '').trim() || undefined })
-    const email = String(accountEmailEl?.value || '').trim()
-    const out = await startAccountLink({ guestId: guest.guestId, email })
-    setAccountStatus(`Código enviado. ${out?.devCode ? `DevCode: ${out.devCode}` : ''}`)
-  } catch (err) {
-    setAccountStatus(`Erro: ${err?.message || err}`, true)
-  }
-})
-
-document.querySelector('#btnLinkVerify')?.addEventListener('click', async () => {
-  try {
-    setAccountStatus('Confirmando vínculo...')
-    const guestId = game?._persistCtx?.guestId || (await ensureGuest({ worldId: String(worldInput?.value || '').trim() || undefined })).guestId
-    const email = String(accountEmailEl?.value || '').trim()
-    const code = String(accountCodeEl?.value || '').trim()
-    await verifyAccountLink({ guestId, email, code })
-    setAccountStatus('Conta vinculada com sucesso ✅')
-    ui.toast('Progresso vinculado ao e-mail com sucesso!', 1500)
-  } catch (err) {
-    setAccountStatus(`Erro: ${err?.message || err}`, true)
-  }
-})
-
-document.querySelector('#btnLoginStart')?.addEventListener('click', async () => {
-  try {
-    setAccountStatus('Enviando código de login...')
-    const email = String(accountEmailEl?.value || '').trim()
-    const out = await startAccountLogin({ email })
-    if (out?.devCode && accountCodeEl) {
-      accountCodeEl.value = String(out.devCode)
-      accountCodeEl.focus()
-      accountCodeEl.select?.()
-    }
-    setAccountStatus('')
-  } catch (err) {
-    setAccountStatus(`Erro: ${err?.message || err}`, true)
-  }
-})
-
-document.querySelector('#btnLoginVerify')?.addEventListener('click', async () => {
-  try {
-    setAccountStatus('Confirmando login...')
-    const email = String(accountEmailEl?.value || '').trim()
-    const code = String(accountCodeEl?.value || '').trim()
-    const out = await verifyAccountLogin({ email, code })
-    setAccountStatus('Login concluído. Seu progresso foi recuperado ✅')
-    ui.toast('Login por e-mail concluído!', 1500)
-
-    // If game context already exists, update it for subsequent saves.
-    if (game?._persistCtx && out?.guestId && out?.token) {
-      game.setPersistenceContext({
-        ...game._persistCtx,
-        guestId: out.guestId,
-        token: out.token,
-        save: async (state) => {
-          await savePlayerState({ guestId: out.guestId, worldId: game._persistCtx.worldId, state })
-        },
-      })
-    }
-
+    const username = String(authUsernameEl?.value || '').trim()
+    const password = String(authPasswordEl?.value || '')
+    setAuthStatus('Entrando...')
+    const out = await loginUserPassword({ username, password })
+    game.setPersistenceContext({
+      guestId: out.guestId,
+      worldId: out.worldId || String(worldInput?.value || '').trim() || 'world-1',
+      token: out.token,
+      save: async (state) => {
+        await savePlayerState({ guestId: out.guestId, worldId: out.worldId || 'world-1', state })
+      },
+    })
+    setAuthStatus('')
     showMainMenuAfterAuth()
   } catch (err) {
-    setAccountStatus(`Erro: ${err?.message || err}`, true)
+    setAuthStatus(`Erro: ${err?.message || err}`, true)
+  }
+})
+
+document.querySelector('#btnAuthRegister')?.addEventListener('click', async () => {
+  try {
+    const username = String(authUsernameEl?.value || '').trim()
+    const password = String(authPasswordEl?.value || '')
+    setAuthStatus('Cadastrando...')
+    await registerUserPassword({ username, password })
+    setAuthStatus('Conta criada. Agora faça login.', false)
+  } catch (err) {
+    setAuthStatus(`Erro: ${err?.message || err}`, true)
   }
 })
 
 document.querySelector('#btnContinueGuest')?.addEventListener('click', async () => {
   try {
-    setAccountStatus('Entrando como guest...')
-    await ensureGuest({ worldId: String(worldInput?.value || '').trim() || undefined })
-    setAccountStatus('Entrou como guest ✅')
+    setAuthStatus('Entrando como guest...')
+    const out = await ensureGuestByDevice({ worldId: String(worldInput?.value || '').trim() || undefined })
+    game.setPersistenceContext({
+      guestId: out.guestId,
+      worldId: out.worldId,
+      token: out.token,
+      save: async (state) => {
+        await savePlayerState({ guestId: out.guestId, worldId: out.worldId, state })
+      },
+    })
+    setAuthStatus('')
     showMainMenuAfterAuth()
   } catch (err) {
-    setAccountStatus(`Erro: ${err?.message || err}`, true)
+    setAuthStatus(`Erro: ${err?.message || err}`, true)
+  }
+})
+
+document.querySelector('#btnUpgradeAccount')?.addEventListener('click', async () => {
+  try {
+    const guestId = game?._persistCtx?.guestId
+    if (!guestId) throw new Error('guest_not_found')
+    const username = String(linkUsernameEl?.value || '').trim()
+    const password = String(linkPasswordEl?.value || '')
+    setUpgradeStatus('Vinculando conta...')
+    await registerUserPassword({ username, password, guestId })
+    setUpgradeStatus('Conta vinculada. Agora o acesso é por usuário/senha ✅')
+    if (upgradeBoxEl) upgradeBoxEl.classList.add('hidden')
+  } catch (err) {
+    setUpgradeStatus(`Erro: ${err?.message || err}`, true)
   }
 })
 
@@ -176,7 +177,10 @@ async function bootAndLoadAll() {
     const desiredWorldId = String(worldInput?.value || '').trim() || undefined
 
     ui.showLoading('Conectando ao servidor…', 0.15)
-    const { guestId, worldId, token } = await ensureGuest({ worldId: desiredWorldId })
+    const pre = game?._persistCtx
+    const { guestId, worldId, token } = pre?.guestId && pre?.token
+      ? { guestId: pre.guestId, worldId: pre.worldId || desiredWorldId || 'world-1', token: pre.token }
+      : await ensureGuest({ worldId: desiredWorldId })
 
     game.setPersistenceContext({
       guestId,
