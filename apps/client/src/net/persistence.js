@@ -4,6 +4,7 @@ const LS_GUEST_ID = 'woodcutter_guest_id';
 const LS_GUEST_TOKEN = 'woodcutter_guest_token';
 const LS_WORLD_ID = 'woodcutter_world_id';
 const LS_ACCOUNT_EMAIL = 'woodcutter_account_email';
+const LS_DEVICE_KEY = 'woodcutter_device_key';
 
 export function getStoredGuestId() {
   try {
@@ -60,6 +61,19 @@ export function getStoredAccountEmail() {
     return localStorage.getItem(LS_ACCOUNT_EMAIL);
   } catch {
     return null;
+  }
+}
+
+export function getOrCreateDeviceKey() {
+  try {
+    let v = localStorage.getItem(LS_DEVICE_KEY)
+    if (v && v.length >= 16) return v
+    const rand = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).replace(/[^a-zA-Z0-9_-]/g, '')
+    v = `dev_${rand}`
+    localStorage.setItem(LS_DEVICE_KEY, v)
+    return v
+  } catch {
+    return `dev_fallback_${Date.now()}_${Math.random().toString(36).slice(2)}`
   }
 }
 
@@ -196,6 +210,56 @@ export async function verifyAccountLogin({ email, code }) {
     setStoredGuestToken(data.token);
   }
   setStoredAccountEmail(email);
+
+  return data;
+}
+
+// Auth v2 (WIP)
+export async function ensureGuestByDevice({ worldId } = {}) {
+  const desiredWorldId = worldId || getStoredWorldId();
+  const deviceKey = getOrCreateDeviceKey();
+
+  const res = await apiFetch('/api/auth/device/guest', {
+    method: 'POST',
+    body: JSON.stringify({
+      deviceKey,
+      ...(desiredWorldId ? { worldId: desiredWorldId } : {}),
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `auth/device/guest failed: ${res.status}`);
+
+  if (!data?.guestId || !data?.worldId || !data?.token) throw new Error('auth/device/guest invalid response');
+  setStoredGuestId(data.guestId);
+  setStoredGuestToken(data.token);
+  setStoredWorldId(data.worldId);
+  return data;
+}
+
+export async function registerUserPassword({ username, password, guestId }) {
+  const res = await apiFetch('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ username, password, ...(guestId ? { guestId } : {}) }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `auth/register failed: ${res.status}`);
+  return data;
+}
+
+export async function loginUserPassword({ username, password }) {
+  const res = await apiFetch('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `auth/login failed: ${res.status}`);
+
+  if (data?.guestId && data?.token) {
+    setStoredGuestId(data.guestId);
+    setStoredGuestToken(data.token);
+  }
+  if (data?.worldId) setStoredWorldId(data.worldId);
 
   return data;
 }

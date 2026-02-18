@@ -86,6 +86,49 @@ export async function runMigrations(logger?: { info: (o: any, msg?: string) => v
       ON "magic_codes" ("email", "purpose", "created_at" DESC);
     `);
 
+    // Auth v2
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "users" (
+        "id" text PRIMARY KEY,
+        "username" text NOT NULL,
+        "username_norm" text NOT NULL UNIQUE,
+        "password_hash" text NOT NULL,
+        "guest_id" text UNIQUE REFERENCES "guests"("id"),
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "last_seen_at" timestamptz
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "devices" (
+        "id" text PRIMARY KEY,
+        "device_key" text NOT NULL UNIQUE,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "last_seen_at" timestamptz
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "device_guest_links" (
+        "device_id" text NOT NULL UNIQUE REFERENCES "devices"("id"),
+        "guest_id" text NOT NULL UNIQUE REFERENCES "guests"("id"),
+        "active" boolean NOT NULL DEFAULT true,
+        "migrated_at" timestamptz,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS "users_username_norm_idx"
+      ON "users" ("username_norm");
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS "devices_device_key_idx"
+      ON "devices" ("device_key");
+    `);
+
     logger?.info?.({ ms: Date.now() - startedAt }, 'db migrations ok (idempotent)');
   } catch (err) {
     logger?.error?.({ err }, 'db migrations failed');

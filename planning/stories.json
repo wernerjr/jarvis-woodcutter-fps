@@ -1,55 +1,93 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T21:48:00Z",
+  "updatedAt": "2026-02-18T22:28:00Z",
   "statusLegend": {
     "epic": ["todo", "doing", "done"],
     "story": ["todo", "doing", "done"]
   },
   "epics": [
     {
-      "id": "P13",
-      "title": "Aplicar layout industrial do menu em todos os menus/modals",
-      "status": "done",
-      "objective": "Unificar identidade visual industrial/lumberjack em todos os overlays e modais do client, reaproveitando a linguagem do menu principal (paleta, blur, botões, tipografia e glow).",
+      "id": "P14",
+      "title": "Auth v2: guest por dispositivo + login usuário/senha + migração irreversível",
+      "status": "doing",
+      "objective": "Substituir login por código mágico por autenticação com guest único por dispositivo e conta usuário/senha, permitindo upgrade irreversível de guest para conta.",
       "stories": [
         {
-          "id": "P13-S1",
-          "title": "Padronizar base visual global (tokens/tema)",
-          "status": "done",
-          "objective": "Atualizar variáveis CSS globais com paleta industrial e ajustar camadas de overlay.",
+          "id": "P14-S1",
+          "title": "Modelo de dados Auth v2",
+          "status": "doing",
+          "objective": "Criar tabelas users/devices/device_guest_links e preparar compatibilidade com estado atual baseado em guestId.",
           "acceptanceCriteria": [
-            "Tokens globais usam Primary #B45F06, Glow #FF8C00, Text #EAD8B1 e card rgba(51,51,51,.70).",
-            "Overlays/modais compartilham fundo escuro com acentos industriais.",
-            "Legibilidade mantida para HUD e conteúdo de UI."
+            "Username único case-insensitive.",
+            "Device key única por equipamento.",
+            "Vínculo device->guest único com marcação de migração.",
+            "Sem quebra de compatibilidade do gameplay atual."
           ],
-          "updatedAt": "2026-02-18T21:48:00Z"
+          "updatedAt": "2026-02-18T22:28:00Z"
         },
         {
-          "id": "P13-S2",
-          "title": "Padronizar cards e botões em todos os modais",
-          "status": "done",
-          "objective": "Aplicar estilo único para container e CTAs conforme direção de arte do menu.",
+          "id": "P14-S2",
+          "title": "Endpoint guest por dispositivo",
+          "status": "todo",
+          "objective": "Criar endpoint para garantir guest único por device e bloquear guest quando já migrado para conta.",
           "acceptanceCriteria": [
-            "Cards com blur(12px), border 2px #444 e sombra 0 10px 30px rgba(0,0,0,0.5).",
-            "Botões com fonte pesada uppercase e hover glow + scale 1.05.",
-            "Estilo aplicado em menu, pausa, opções, inventário, forja, baú, crafting e controles."
+            "Mesmo device retorna mesmo guest ativo.",
+            "Device com guest migrado retorna erro orientando login por usuário/senha.",
+            "Fluxo preserva worldId e token de sessão."
           ],
-          "updatedAt": "2026-02-18T21:48:00Z"
+          "updatedAt": "2026-02-18T22:28:00Z"
         },
         {
-          "id": "P13-S3",
-          "title": "Limpeza da entrega temporária do P12",
-          "status": "done",
-          "objective": "Remover artefato single-file de protótipo após incorporar o layout ao jogo real.",
+          "id": "P14-S3",
+          "title": "Cadastro e login por usuário/senha",
+          "status": "todo",
+          "objective": "Implementar register/login com hash de senha seguro e retorno de sessão compatível.",
           "acceptanceCriteria": [
-            "Arquivo `apps/client/public/main-menu-epic12.html` removido.",
-            "Projeto permanece buildável após remoção."
+            "Cadastro com username único e senha mínima.",
+            "Login com verificação de hash e erro genérico em credenciais inválidas.",
+            "Resposta inclui guestId/token para compatibilidade atual."
           ],
-          "updatedAt": "2026-02-18T21:48:00Z"
+          "updatedAt": "2026-02-18T22:28:00Z"
+        },
+        {
+          "id": "P14-S4",
+          "title": "Upgrade guest -> conta (irreversível)",
+          "status": "todo",
+          "objective": "Permitir que sessão guest vire conta usuário/senha, desativando acesso guest do device.",
+          "acceptanceCriteria": [
+            "Upgrade associa guest existente a usuário.",
+            "Após upgrade, acesso por guest do mesmo device é bloqueado.",
+            "Progresso permanece no guest vinculado (compatibilidade)."
+          ],
+          "updatedAt": "2026-02-18T22:28:00Z"
+        },
+        {
+          "id": "P14-S5",
+          "title": "Client UI/fluxo novo",
+          "status": "todo",
+          "objective": "Atualizar telas para login usuário/senha + entrar como guest + vincular conta quando guest.",
+          "acceptanceCriteria": [
+            "Tela inicial separa Entrar, Cadastrar e Guest.",
+            "Guest logado consegue vincular usuário/senha.",
+            "Remover dependência do fluxo de código mágico."
+          ],
+          "updatedAt": "2026-02-18T22:28:00Z"
+        },
+        {
+          "id": "P14-S6",
+          "title": "Hardening e migração",
+          "status": "todo",
+          "objective": "Adicionar rate-limit e plano de migração/descontinuação do auth antigo.",
+          "acceptanceCriteria": [
+            "Rate limit mínimo em register/login/guest ensure.",
+            "Plano de desligamento de rotas antigas documentado.",
+            "Testes de regressão dos fluxos críticos."
+          ],
+          "updatedAt": "2026-02-18T22:28:00Z"
         }
       ],
-      "updatedAt": "2026-02-18T21:48:00Z"
+      "updatedAt": "2026-02-18T22:28:00Z"
     }
   ]
 }

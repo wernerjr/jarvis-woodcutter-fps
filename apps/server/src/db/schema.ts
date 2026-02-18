@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, primaryKey, integer } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, jsonb, primaryKey, integer, boolean } from 'drizzle-orm/pg-core';
 
 export const guests = pgTable('guests', {
   id: text('id').primaryKey(),
@@ -123,4 +123,39 @@ export const magicCodes = pgTable('magic_codes', {
   usedAt: timestamp('used_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   requestIp: text('request_ip'),
+});
+
+// Auth v2
+export const users = pgTable('users', {
+  id: text('id').primaryKey(),
+  username: text('username').notNull(),
+  usernameNorm: text('username_norm').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  guestId: text('guest_id')
+    .unique()
+    .references(() => guests.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+});
+
+export const devices = pgTable('devices', {
+  id: text('id').primaryKey(),
+  deviceKey: text('device_key').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+});
+
+export const deviceGuestLinks = pgTable('device_guest_links', {
+  deviceId: text('device_id')
+    .notNull()
+    .unique()
+    .references(() => devices.id),
+  guestId: text('guest_id')
+    .notNull()
+    .unique()
+    .references(() => guests.id),
+  active: boolean('active').notNull().default(true),
+  migratedAt: timestamp('migrated_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
