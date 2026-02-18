@@ -168,6 +168,7 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 .card h2{font-size:24px;}
 .muted{margin:6px 0 12px; color:var(--muted); line-height:1.4}
 .small{font-size:12px;}
+.versionTag{margin-top:8px; margin-bottom:0; text-align:right; opacity:.7}
 
 .row{display:flex; flex-direction:column; gap:6px; margin:10px 0 14px; text-align:left}
 input.text{padding:10px 12px; border-radius:12px; border:1px solid var(--stroke); background: rgba(0,0,0,0.22); color:var(--fg); outline:none; pointer-events:auto}

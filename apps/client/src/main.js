@@ -1,7 +1,7 @@
 import './style.css'
 import { Game } from './game/Game.js'
 import { UI } from './game/UI.js'
-import { ensureGuest, ensureGuestByDevice, loadPlayerState, savePlayerState, loadPlayerSettings, savePlayerSettings, getStoredWorldId, setStoredWorldId, loginUserPassword, registerUserPassword } from './net/persistence.js'
+import { ensureGuest, ensureGuestByDevice, loadPlayerState, savePlayerState, loadPlayerSettings, savePlayerSettings, getStoredWorldId, setStoredWorldId, loginUserPassword, registerUserPassword, setStoredGuestId, setStoredGuestToken } from './net/persistence.js'
 
 const canvas = document.querySelector('#game')
 
@@ -97,6 +97,16 @@ function setAuthStatus(msg, isError = false) {
   authStatusEl.style.color = isError ? '#ffb0b0' : ''
 }
 
+function humanAuthError(err, mode = 'login') {
+  const raw = String(err?.message || err || '').toLowerCase()
+  if (raw.includes('invalid_body')) return mode === 'register' ? 'Preencha usuário e senha válidos para cadastrar.' : 'Preencha usuário e senha válidos para entrar.'
+  if (raw.includes('username_taken')) return 'Esse usuário já está em uso.'
+  if (raw.includes('invalid_credentials')) return 'Usuário ou senha inválidos.'
+  if (raw.includes('rate_limited')) return 'Muitas tentativas. Aguarde e tente novamente.'
+  if (raw.includes('user_not_linked_to_progress')) return 'Conta sem progresso vinculado.'
+  return mode === 'register' ? 'Não foi possível cadastrar agora.' : 'Não foi possível entrar agora.'
+}
+
 function setUpgradeStatus(msg, isError = false) {
   if (!upgradeStatusEl) return
   upgradeStatusEl.textContent = msg || ''
@@ -121,7 +131,7 @@ document.querySelector('#btnAuthLogin')?.addEventListener('click', async () => {
     setAuthStatus('')
     showMainMenuAfterAuth()
   } catch (err) {
-    setAuthStatus(`Erro: ${err?.message || err}`, true)
+    setAuthStatus(humanAuthError(err, 'login'), true)
   }
 })
 
@@ -144,7 +154,7 @@ document.querySelector('#btnAuthRegister')?.addEventListener('click', async () =
     setAuthStatus('')
     showMainMenuAfterAuth()
   } catch (err) {
-    setAuthStatus(`Erro: ${err?.message || err}`, true)
+    setAuthStatus(humanAuthError(err, 'register'), true)
   }
 })
 
@@ -671,7 +681,20 @@ $('#btnMenuOptions')?.addEventListener('click', () => {
   if (b2) b2.textContent = `View bob: ${game._viewBobEnabled ? 'ON' : 'OFF'}`
   if (b3) b3.textContent = `Preview 3D: ${game.preview3dEnabled ? 'ON' : 'OFF'}`
 })
-$('#btnClose').addEventListener('click', () => game.tryClose())
+function logoutToAuth() {
+  try {
+    localStorage.removeItem('woodcutter_guest_id')
+    localStorage.removeItem('woodcutter_guest_token')
+  } catch {}
+  setStoredGuestId('')
+  setStoredGuestToken(null)
+  _authMode = 'unknown'
+  bootPromise = null
+  game.quitToMenu?.()
+  showAuthGate()
+}
+
+$('#btnClose').addEventListener('click', () => logoutToAuth())
 
 // Options menu
 $('#btnOptBack')?.addEventListener('click', () => {
@@ -722,7 +745,6 @@ $('#btnOptPreview3D')?.addEventListener('click', () => {
 })
 
 $('#btnResume').addEventListener('click', () => game.resume())
-$('#btnRestart').addEventListener('click', () => game.restart())
 $('#btnPauseControls').addEventListener('click', () => game.openControls('pause'))
 $('#btnPauseOptions')?.addEventListener('click', () => {
   // Open options overlay from pause
