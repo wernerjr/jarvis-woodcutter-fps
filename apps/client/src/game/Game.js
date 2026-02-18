@@ -130,7 +130,15 @@ export class Game {
 
     this.pickaxeDamage = 10
 
-    this.inventory = new Inventory({ slots: 20, maxStack: 100 })
+    this.inventoryBaseSlots = 20
+    this.inventory = new Inventory({ slots: this.inventoryBaseSlots, maxStack: 100 })
+
+    // Equipment + buffs (saved in gameSave v3)
+    /** @type {{hat:any|null, shirt:any|null, pants:any|null, boots:any|null, gloves:any|null, backpack:any|null}} */
+    this.equipment = { hat: null, shirt: null, pants: null, boots: null, gloves: null, backpack: null }
+    /** @type {{luckUntilMs:number}} */
+    this.buffs = { luckUntilMs: 0 }
+
     this.time = new TimeSystem({ startHours: 9.0 })
     this.perf = new Perf()
     this.perfEnabled = false
@@ -1549,8 +1557,52 @@ export class Game {
     this.player.setLocked(false)
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
 
-    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], { slotCountHint: this.inventory.slotCount })
+    this.ui.renderEquipment?.(this.equipment, (id) => ITEMS[id])
+    this.ui.setBuffLine?.(this._getBuffLine())
     this.ui.showInventory()
+  }
+
+  _getBuffLine() {
+    const now = Date.now()
+    const rem = Math.max(0, Number(this.buffs?.luckUntilMs || 0) - now)
+    if (rem <= 0) return ''
+    const s = Math.ceil(rem / 1000)
+    const mm = Math.floor(s / 60)
+    const ss = s % 60
+    return `Sorte ativa: ${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+  }
+
+  _isEquipSlotName(name) {
+    return name === 'hat' || name === 'shirt' || name === 'pants' || name === 'boots' || name === 'gloves' || name === 'backpack'
+  }
+
+  _updateEquippedDurability(dt) {
+    const ms = Math.max(0, Number(dt || 0)) * 1000
+    if (!ms) return
+
+    const DAY_MS = 24 * 60 * 60 * 1000
+
+    for (const name of ['hat', 'shirt', 'pants', 'boots', 'gloves', 'backpack']) {
+      const s = this.equipment?.[name]
+      if (!s || !s.id) continue
+      if (!s.meta) s.meta = {}
+
+      if (typeof s.meta.equipRemainingMs !== 'number') s.meta.equipRemainingMs = DAY_MS
+      s.meta.equipRemainingMs = Math.max(0, s.meta.equipRemainingMs - ms)
+
+      if (s.meta.equipRemainingMs <= 0) {
+        // Break: remove item entirely.
+        this.equipment[name] = null
+        this.ui.toast('Uma peça equipada se desgastou e quebrou.', 1400)
+      }
+    }
+
+    // Keep inventory UI fresh while open.
+    if (this.state === 'inventory') {
+      this.ui.renderEquipment?.(this.equipment, (id) => ITEMS[id])
+      this.ui.setBuffLine?.(this._getBuffLine())
+    }
   }
 
   async openForge(forgeId) {
@@ -3523,6 +3575,9 @@ export class Game {
 
     // Hard-guard: never leave wheel visuals around unless the wheel is actually open.
     if (this.state === 'playing' && !this._wheelOpen) this.ui.hideWheel?.()
+
+    // Equipment durability counts while equipped (real-time), even in menus.
+    this._updateEquippedDurability?.(dt)
 
     // Freeze most simulation when not playing (pause/inventory/menus).
     // Forge continues processing while its UI is open.

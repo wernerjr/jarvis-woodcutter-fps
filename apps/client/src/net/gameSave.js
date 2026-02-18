@@ -6,7 +6,7 @@ import { ITEMS } from '../game/items.js'
  */
 export function exportGameSave(game) {
   return {
-    v: 2,
+    v: 3,
     score: game.score ?? 0,
     player: {
       inMine: !!game._inMine,
@@ -20,11 +20,23 @@ export function exportGameSave(game) {
       slots: (game.inventory?.slots || []).map((s) => (s ? { id: s.id, qty: s.qty, meta: s.meta ?? null } : null)),
     },
     hotbar: (game.hotbar || []).map((s) => (s ? { id: s.id, qty: s.qty, meta: s.meta ?? null } : null)),
+    equipment: {
+      hat: game.equipment?.hat ? { id: game.equipment.hat.id, qty: game.equipment.hat.qty ?? 1, meta: game.equipment.hat.meta ?? null } : null,
+      shirt: game.equipment?.shirt ? { id: game.equipment.shirt.id, qty: game.equipment.shirt.qty ?? 1, meta: game.equipment.shirt.meta ?? null } : null,
+      pants: game.equipment?.pants ? { id: game.equipment.pants.id, qty: game.equipment.pants.qty ?? 1, meta: game.equipment.pants.meta ?? null } : null,
+      boots: game.equipment?.boots ? { id: game.equipment.boots.id, qty: game.equipment.boots.qty ?? 1, meta: game.equipment.boots.meta ?? null } : null,
+      gloves: game.equipment?.gloves ? { id: game.equipment.gloves.id, qty: game.equipment.gloves.qty ?? 1, meta: game.equipment.gloves.meta ?? null } : null,
+      backpack: game.equipment?.backpack ? { id: game.equipment.backpack.id, qty: game.equipment.backpack.qty ?? 1, meta: game.equipment.backpack.meta ?? null } : null,
+    },
+    buffs: {
+      luckUntilMs: Number(game.buffs?.luckUntilMs ?? 0) || 0,
+    },
   };
+
 }
 
 export function isValidSave(save) {
-  return save && typeof save === 'object' && (save.v === 1 || save.v === 2)
+  return save && typeof save === 'object' && (save.v === 1 || save.v === 2 || save.v === 3)
 }
 
 export function applyGameSave(game, save) {
@@ -53,6 +65,28 @@ export function applyGameSave(game, save) {
     if (!ITEMS[s.id] && s.id !== 'hand') continue;
     game.hotbar[i] = { id: s.id, qty: Number(s.qty ?? 0), meta: s.meta ?? undefined };
   }
+
+  // equipment + buffs (v3)
+  const eq = save.v >= 3 && save.equipment && typeof save.equipment === 'object' ? save.equipment : null;
+  if (!game.equipment) {
+    game.equipment = { hat: null, shirt: null, pants: null, boots: null, gloves: null, backpack: null };
+  }
+  const setEq = (k) => {
+    const s = eq?.[k];
+    if (!s) return (game.equipment[k] = null);
+    if (!ITEMS[s.id]) return (game.equipment[k] = null);
+    game.equipment[k] = { id: s.id, qty: Number(s.qty ?? 1) || 1, meta: s.meta ?? undefined };
+  };
+  setEq('hat');
+  setEq('shirt');
+  setEq('pants');
+  setEq('boots');
+  setEq('gloves');
+  setEq('backpack');
+
+  if (!game.buffs) game.buffs = { luckUntilMs: 0 };
+  const buffs = save.v >= 3 && save.buffs && typeof save.buffs === 'object' ? save.buffs : null;
+  game.buffs.luckUntilMs = Number(buffs?.luckUntilMs ?? 0) || 0;
 
   // player position (best effort)
   const p = save.player?.position;

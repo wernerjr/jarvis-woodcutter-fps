@@ -1,10 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T00:56:00Z",
+  "updatedAt": "2026-02-18T01:06:22Z",
   "statusLegend": {
-    "epic": ["todo", "doing", "done"],
-    "story": ["todo", "doing", "done"]
+    "epic": [
+      "todo",
+      "doing",
+      "done"
+    ],
+    "story": [
+      "todo",
+      "doing",
+      "done"
+    ]
   },
   "assumptions": {
     "inventoryBaseSlots": 20,
@@ -14,7 +22,14 @@
       "cordaItemId": "rope",
       "note": "No código atual o item 'fiber' representa o linho/fibra usado nas receitas."
     },
-    "equipmentSlots": ["hat", "shirt", "pants", "boots", "gloves", "backpack"],
+    "equipmentSlots": [
+      "hat",
+      "shirt",
+      "pants",
+      "boots",
+      "gloves",
+      "backpack"
+    ],
     "equipmentDurability": {
       "type": "equipped_time",
       "duration": "1d",
@@ -23,15 +38,29 @@
     "woodcutterSet": {
       "bonusRequiresFullSet": true,
       "treeExtraDropChance": 0.25,
-      "extra": { "log": 1, "stick": 2, "leaf": 5 },
+      "extra": {
+        "log": 1,
+        "stick": 2,
+        "leaf": 5
+      },
       "rollsIndependent": true
     },
     "apple": {
       "dropFrom": "treeCut",
       "dropChance": 0.005,
       "luckDurationSec": 300,
-      "luckDoubles": ["treeLoot", "bushLoot", "rockLoot", "oreLoot", "harvestLoot"],
-      "doesNotDouble": ["crafting", "forge", "chestTransfers"]
+      "luckDoubles": [
+        "treeLoot",
+        "bushLoot",
+        "rockLoot",
+        "oreLoot",
+        "harvestLoot"
+      ],
+      "doesNotDouble": [
+        "crafting",
+        "forge",
+        "chestTransfers"
+      ]
     },
     "ux": {
       "equipInteraction": "double_click_inventory_item_toggles_equip",
@@ -42,13 +71,13 @@
     {
       "id": "P7",
       "title": "Sistema de Equipamentos (roupas por peça) + durabilidade por tempo equipado + buffs",
-      "status": "todo",
+      "status": "doing",
       "objective": "Adicionar slots de vestimenta (chapéu/calça/camisa/bota/luva) e mochila no modal de inventário, com durabilidade de 1 dia contando apenas enquanto equipado; base para buffs (maçã/sorte).",
       "stories": [
         {
           "id": "P7-S1",
           "title": "Modelo de dados: equipment slots + durabilidade por tempo equipado + buffs no save",
-          "status": "todo",
+          "status": "done",
           "objective": "Persistir equipamentos (6 slots) e estado de durabilidade (tempo restante) + buffs (luckUntilMs) no save do player.",
           "acceptanceCriteria": [
             "Game possui structure: equipment.{hat,shirt,pants,boots,gloves,backpack} (ids/meta).",
@@ -66,7 +95,8 @@
             "Desequipar e aguardar tempo: durabilidade NÃO diminui fora do corpo.",
             "Carregar save antigo: jogo funciona com equipment vazio e sem buffs."
           ],
-          "mvp": true
+          "mvp": true,
+          "updatedAt": "2026-02-18T01:06:22Z"
         },
         {
           "id": "P7-S2",
