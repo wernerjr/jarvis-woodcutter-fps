@@ -1268,6 +1268,24 @@ export class Game {
     }
   }
 
+  _isLuckActive() {
+    return Number(this.buffs?.luckUntilMs || 0) > Date.now()
+  }
+
+  _activateAppleLuck() {
+    const durationMs = 5 * 60 * 1000
+    const now = Date.now()
+    if (!this.buffs) this.buffs = { luckUntilMs: 0 }
+    this.buffs.luckUntilMs = now + durationMs
+
+    const mm = 5
+    const ss = 0
+    this.ui.toast(`Sorte ativada: ${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`, 1200)
+
+    if (this.state === 'inventory') this.ui.setBuffLine?.(this._getBuffLine())
+    this._queuePlayerSave?.()
+  }
+
   _tryHoe() {
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
@@ -2063,6 +2081,14 @@ export class Game {
     if (Number.isNaN(idx)) return
     const s = this.inventory?.slots?.[idx]
     if (!s) return
+
+    if (s.id === ItemId.APPLE) {
+      const removed = this.inventory.remove(ItemId.APPLE, 1)
+      if (removed) return
+      this._activateAppleLuck()
+      this._postMoveUpdate()
+      return
+    }
 
     const slot = this._getEquipSlotForItem(s.id)
     if (slot) return void this.invEquipFromInventory(idx, slot)

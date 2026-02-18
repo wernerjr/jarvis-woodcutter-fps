@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T02:30:15Z",
+  "updatedAt": "2026-02-18T02:31:05Z",
   "statusLegend": {
     "epic": [
       "todo",
@@ -270,7 +270,7 @@
         {
           "id": "P10-S2",
           "title": "Consumir Maçã ativa Sorte por 5 min (persistido) + UI timer",
-          "status": "todo",
+          "status": "done",
           "objective": "Consumir a maçã no inventário para ativar buff de sorte por 5 min; persistir no save; mostrar contagem regressiva.",
           "acceptanceCriteria": [
             "Duplo clique (ou ação explícita) em maçã consome 1 e ativa luckUntilMs = now + 5min.",
@@ -287,7 +287,8 @@
             "Ativar buff, recarregar a página: timer continua.",
             "Consumir outra maçã durante buff: comportamento definido (renovar para 5min a partir de agora)."
           ],
-          "mvp": true
+          "mvp": true,
+          "updatedAt": "2026-02-18T02:31:05Z"
         },
         {
           "id": "P10-S3",
@@ -311,7 +312,7 @@
           "mvp": true
         }
       ],
-      "updatedAt": "2026-02-18T02:30:15Z"
+      "updatedAt": "2026-02-18T02:31:05Z"
     }
   ]
 }
