@@ -309,23 +309,32 @@
       <!-- Inventory -->
       <div id="inventory" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Inventário">
         <div class="card invCard">
-          <h2>Inventário</h2>
-          <p id="invHint" class="muted small">20 slots • stacks até 100 • <b>I</b> para abrir/fechar</p>
+          <div class="invTopbar">
+            <div>
+              <h2>Inventário</h2>
+              <p id="invHint" class="muted small">20 slots • stacks até 100 • <b>I</b> para abrir/fechar</p>
+            </div>
+            <div class="invLegend muted small">
+              <div><b>Hotbar fixa:</b> tecla <b>1</b> (mão)</div>
+              <div><b>Atalhos:</b> teclas <b>2-9 e 0</b> ou arrastar para hotbar</div>
+            </div>
+          </div>
 
           <div class="invBody">
-            <div class="invMain">
+            <section class="invMain" aria-label="Itens">
+              <div class="invSectionTitle">Itens</div>
               <div id="invGrid" class="invGrid"></div>
-            </div>
+            </section>
 
             <aside class="invEquip" aria-label="Equipamentos">
-              <div class="invEquipTitle">Equipamentos</div>
-              <div id="invEquipGrid" class="invEquipGrid">
-                <div class="equipSlot" data-eq="hat"><div class="equipLabel">Chapéu</div><div class="equipItem"></div></div>
-                <div class="equipSlot" data-eq="shirt"><div class="equipLabel">Camisa</div><div class="equipItem"></div></div>
-                <div class="equipSlot" data-eq="pants"><div class="equipLabel">Calça</div><div class="equipItem"></div></div>
-                <div class="equipSlot" data-eq="boots"><div class="equipLabel">Bota</div><div class="equipItem"></div></div>
-                <div class="equipSlot" data-eq="gloves"><div class="equipLabel">Luva</div><div class="equipItem"></div></div>
-                <div class="equipSlot" data-eq="backpack"><div class="equipLabel">Mochila</div><div class="equipItem"></div></div>
+              <div class="invSectionTitle">Equipamentos</div>
+              <div id="invEquipGrid" class="invEquipGrid invEquipBody">
+                <div class="equipSlot" data-eq="hat"><div class="equipLabel">Cabeça</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="shirt"><div class="equipLabel">Tronco</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="gloves"><div class="equipLabel">Braços</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="pants"><div class="equipLabel">Pernas</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="boots"><div class="equipLabel">Pés</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="backpack"><div class="equipLabel">Costas</div><div class="equipItem"></div></div>
               </div>
               <div id="invBuffLine" class="muted small invBuffLine hidden"></div>
             </aside>

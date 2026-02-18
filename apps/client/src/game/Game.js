@@ -372,18 +372,19 @@ export class Game {
   }
 
   _onKeyDownAny(e) {
-    // Hotbar slots: 1..9 => indices 1..9, 0 => índice 0 (mão)
+    // Hotbar slots (teclado): 1..9,0 -> índices 0..9
+    // idx 0 (tecla 1) = mão fixa.
     const digitMap = {
-      Digit1: 1,
-      Digit2: 2,
-      Digit3: 3,
-      Digit4: 4,
-      Digit5: 5,
-      Digit6: 6,
-      Digit7: 7,
-      Digit8: 8,
-      Digit9: 9,
-      Digit0: 0,
+      Digit1: 0,
+      Digit2: 1,
+      Digit3: 2,
+      Digit4: 3,
+      Digit5: 4,
+      Digit6: 5,
+      Digit7: 6,
+      Digit8: 7,
+      Digit9: 8,
+      Digit0: 9,
     }
     const mapped = digitMap[e.code]
     if (Number.isInteger(mapped)) {
@@ -2143,12 +2144,16 @@ export class Game {
     if (this.state === 'inventory') this._renderInventoryUI()
   }
 
+  _hotbarKeyLabelFromIdx(i) {
+    return i === 9 ? '0' : String(i + 1)
+  }
+
   _buildHotbarShortcutMap() {
     const map = {}
     for (let i = 1; i <= 9; i++) {
       const s = this.hotbar?.[i]
       if (!s?.id || s.id === 'hand') continue
-      map[s.id] = i
+      map[s.id] = this._hotbarKeyLabelFromIdx(i)
     }
     return map
   }
@@ -2167,7 +2172,7 @@ export class Game {
     if (!Number.isInteger(idx) || idx < 0) return false
     if (!Number.isInteger(hi) || hi < 0 || hi > 9) return false
     if (hi === 0) {
-      this.ui.toast('Slot 0 é reservado para mão.', 1000)
+      this.ui.toast('Slot 1 é reservado para mão (fixo).', 1000)
       return false
     }
 
@@ -2205,7 +2210,7 @@ export class Game {
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
     this._renderInventoryUI()
     const s = this.inventory?.slots?.[idx]
-    this.ui.toast(`Atalho ${hotIdx}: ${ITEMS[s?.id]?.name || s?.id || ''}`, 900)
+    this.ui.toast(`Atalho ${this._hotbarKeyLabelFromIdx(Number(hotIdx))}: ${ITEMS[s?.id]?.name || s?.id || ''}`, 900)
     this._queuePlayerSave()
   }
 

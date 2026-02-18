@@ -1103,7 +1103,7 @@ export class UI {
 
     if (this.els.invHintEl) {
       const base = typeof slotCountHint === 'number' ? `${slotCountHint} slots` : `${slots.length} slots`
-      this.els.invHintEl.innerHTML = `${base} • stacks até 100 • passe o mouse + <b>1-9</b> para atalho • <b>I</b> para abrir/fechar`
+      this.els.invHintEl.innerHTML = `${base} • stacks até 100 • passe o mouse + <b>2-9/0</b> para atalho (<b>1</b> = mão fixa) • <b>I</b> para abrir/fechar`
     }
 
     for (let i = 0; i < slots.length; i++) {
