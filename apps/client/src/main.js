@@ -715,5 +715,12 @@ ui.setScore(0)
 
 game.start()
 
+// Harden desktop UX: evitar seleção/drag acidental no canvas.
+canvas.addEventListener('dragstart', (e) => e.preventDefault())
+canvas.addEventListener('selectstart', (e) => e.preventDefault())
+canvas.addEventListener('contextmenu', (e) => {
+  if (document.pointerLockElement === canvas) e.preventDefault()
+})
+
 // Expose for quick debugging in dev
 window.__game = game
