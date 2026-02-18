@@ -958,6 +958,39 @@ export class Game {
     this.ui.toast('Destruído.', 900)
   }
 
+  _expireCampfires(expired) {
+    if (!Array.isArray(expired) || !expired.length) return
+
+    for (const e of expired) {
+      const id = String(e?.id || '')
+      if (!id) continue
+
+      // Prevent duplicate pending remove requests.
+      const key = `placeRemove:${id}`
+      if (this._pendingWorldActions.has(key)) continue
+
+      if (this._wsConnected && this.ws) {
+        this._setPendingWorldAction(key, () => {
+          this.fires.remove(id)
+          this._unregisterPlacedLocal('campfire', id)
+        })
+
+        const sent = this._sendWorldEvent({ kind: 'placeRemove', placeKind: 'campfire', id, pickup: false, x: Number(e.x) || 0, z: Number(e.z) || 0, at: Date.now() })
+        if (!sent) {
+          const rec = this._pendingWorldActions.get(key)
+          if (rec?.timeoutId) clearTimeout(rec.timeoutId)
+          this._pendingWorldActions.delete(key)
+          this.fires.remove(id)
+          this._unregisterPlacedLocal('campfire', id)
+        }
+      } else {
+        // Offline fallback.
+        this.fires.remove(id)
+        this._unregisterPlacedLocal('campfire', id)
+      }
+    }
+  }
+
   _campfireToggle(id) {
     // Light if holding torch, otherwise extinguish if lit.
     const lit = this.fires.isLit(id)
@@ -4144,7 +4177,8 @@ export class Game {
     this.sticks.update(simDt)
     this.bushes.update(simDt)
     this.farm.update(simDt)
-    this.fires.update(simDt)
+    const expiredFires = this.fires.update(simDt)
+    if (expiredFires?.length) this._expireCampfires(expiredFires)
     this.forges.update(forgeDt, this.camera)
     this.ores.update(simDt)
     this.grass.update(simDt, this.player.position)

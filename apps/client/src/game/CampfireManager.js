@@ -88,6 +88,7 @@ export class CampfireManager {
 
   update(dt) {
     const t = performance.now() * 0.001
+    const expired = []
     for (const [id, f] of this._fires.entries()) {
       const ember = f.mesh.userData.ember
       const flame = f.mesh.userData.flame
@@ -123,11 +124,13 @@ export class CampfireManager {
       }
 
       if (f.ttl <= 0) {
-        // Remove fire cleanly
+        // Remove fire cleanly (local visual) and report expiration.
+        expired.push({ id: String(id), x: Number(f.mesh.position.x), z: Number(f.mesh.position.z) })
         f.mesh.removeFromParent()
         this._fires.delete(id)
       }
     }
+    return expired
   }
 
   /** @param {number} torchMain */
