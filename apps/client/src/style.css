@@ -111,8 +111,8 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 #menu.overlay,
 #auth.overlay{
   justify-content:flex-end;
-  align-items:center;
-  padding:24px 10% 24px 24px;
+  align-items:flex-end;
+  padding:24px 40px 20px 24px;
   background:
     linear-gradient(180deg, rgba(0,0,0,.40), rgba(0,0,0,.70)),
     radial-gradient(1200px 700px at 20% 15%, rgba(255,140,0,.22), transparent 60%),
@@ -123,9 +123,8 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 #auth .card{
   width:340px;
   max-width:min(90vw, 340px);
-  max-height:calc(100vh - 48px);
+  max-height:calc(100vh - 44px);
   overflow:auto;
-  transform:translateY(72px);
 }
 #menu .buttons,
 #auth .buttons{justify-items:end}
