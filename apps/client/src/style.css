@@ -144,7 +144,27 @@ button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,16
 .craftReq{margin-top:6px; color:var(--muted); font-size:12px;}
 .craftRow button{pointer-events:auto;}
 
-.invGrid{display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-top:10px; align-content:start; grid-auto-rows:minmax(62px, auto);}
+.invGrid{display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-top:10px; align-content:start; grid-auto-rows:minmax(62px, auto);} 
+
+/* Inventory modal: main grid + equipment side panel */
+.invCard{width:min(96vw, 1200px); max-width:none;}
+.invBody{display:grid; grid-template-columns: 1.6fr 0.8fr; gap:16px; margin-top:10px; min-height:0}
+.invMain{min-height:0}
+.invEquip{padding:12px; border:1px solid rgba(255,255,255,.10); border-radius:14px; background:rgba(0,0,0,.16); min-height:0; overflow:auto}
+.invEquipTitle{font-weight:800; margin-bottom:10px}
+.invEquipGrid{display:grid; grid-template-columns: 1fr; gap:10px}
+.equipSlot{border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:10px; background:rgba(255,255,255,0.03); cursor:pointer}
+.equipSlot:hover{border-color:rgba(74,163,255,.35); background:rgba(74,163,255,.06)}
+.equipLabel{font-size:12px; color:var(--muted); font-weight:700}
+.equipItem{margin-top:6px; min-height:18px; font-weight:800; display:flex; align-items:center; justify-content:space-between; gap:10px}
+.equipItem .left{display:flex; align-items:center; gap:8px}
+.equipDur{font-variant-numeric: tabular-nums; font-size:12px; color:rgba(255,255,255,.72)}
+.invBuffLine{margin-top:10px}
+
+@media (max-width: 980px){
+  .invBody{grid-template-columns:1fr;}
+}
+
 .invSlot{border:1px solid var(--stroke); border-radius:12px; padding:10px; min-height:62px; background: rgba(255,255,255,0.04)}
 .invSlot.invEmpty{background: rgba(255,255,255,0.02);}
 .invSlot.draggable{cursor: grab;}

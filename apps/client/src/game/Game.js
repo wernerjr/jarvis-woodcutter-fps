@@ -2002,6 +2002,86 @@ export class Game {
     return arr.findIndex((s) => !s)
   }
 
+  _getEquipSlotForItem(itemId) {
+    const def = ITEMS?.[itemId]
+    const slot = def?.equipSlot
+    if (!slot) return null
+    return this._isEquipSlotName(slot) ? slot : null
+  }
+
+  invQuickAction(invIdx) {
+    if (this.state !== 'inventory') return
+    const idx = Number(invIdx)
+    if (Number.isNaN(idx)) return
+    const s = this.inventory?.slots?.[idx]
+    if (!s) return
+
+    const slot = this._getEquipSlotForItem(s.id)
+    if (slot) return void this.invEquipFromInventory(idx, slot)
+
+    // default behavior (legacy): quick move to hotbar
+    return void this.invQuickToHotbar(idx)
+  }
+
+  invEquipFromInventory(invIdx, equipSlot) {
+    if (this.state !== 'inventory') return
+    const idx = Number(invIdx)
+    if (Number.isNaN(idx)) return
+    const slot = String(equipSlot || '')
+    if (!this._isEquipSlotName(slot)) return
+
+    const src = this.inventory.slots[idx]
+    if (!src) return
+
+    const expected = this._getEquipSlotForItem(src.id)
+    if (expected !== slot) {
+      this.ui.toast('Não é compatível com esse slot.', 1000)
+      this.sfx.click()
+      return
+    }
+
+    // Ensure we have durability meta
+    if (!src.meta) src.meta = {}
+    if (typeof src.meta.equipRemainingMs !== 'number') src.meta.equipRemainingMs = 24 * 60 * 60 * 1000
+
+    const prev = this.equipment[slot]
+    this.equipment[slot] = { id: src.id, qty: 1, meta: src.meta ?? undefined }
+    this.inventory.slots[idx] = prev ? { id: prev.id, qty: 1, meta: prev.meta ?? undefined } : null
+
+    this._recomputeInventoryCapacity?.()
+    this._postMoveUpdate()
+
+    if (this.state === 'inventory') {
+      this.ui.renderEquipment?.(this.equipment, (id) => ITEMS[id])
+    }
+  }
+
+  equipQuickToInventory(equipSlot) {
+    if (this.state !== 'inventory') return
+    const slot = String(equipSlot || '')
+    if (!this._isEquipSlotName(slot)) return
+
+    const src = this.equipment?.[slot]
+    if (!src) return
+
+    const to = this._firstEmptyInvIdx()
+    if (to < 0) {
+      this.ui.toast('Inventário cheio.', 1000)
+      this.sfx.click()
+      return
+    }
+
+    this.inventory.slots[to] = { id: src.id, qty: 1, meta: src.meta ?? undefined }
+    this.equipment[slot] = null
+
+    this._recomputeInventoryCapacity?.()
+    this._postMoveUpdate()
+
+    if (this.state === 'inventory') {
+      this.ui.renderEquipment?.(this.equipment, (id) => ITEMS[id])
+    }
+  }
+
   invQuickToHotbar(invIdx) {
     if (this.state !== 'inventory') return
     const idx = Number(invIdx)
@@ -2630,7 +2710,11 @@ export class Game {
 
     // Re-render if inventory/forge/chest open.
     if (this.state === 'inventory' || this.state === 'forge' || this.state === 'chest') {
-      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      if (this.state === 'inventory') {
+        this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], { slotCountHint: this.inventory.slotCount })
+        this.ui.renderEquipment?.(this.equipment, (id) => ITEMS[id])
+        this.ui.setBuffLine?.(this._getBuffLine())
+      }
 
       if (this.state === 'forge') {
         this.ui.renderForgeInventory(this.inventory.slots, (id) => ITEMS[id])

@@ -128,7 +128,7 @@ export class UI {
     return `Dur: ${dur ?? '-'}`
   }
 
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, chestEl?: HTMLElement, chestInvGridEl?: HTMLElement, chestSlotsEl?: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement, hitmarkerEl?: HTMLElement, loadingEl?: HTMLElement, loadingHintEl?: HTMLElement, loadingBarFillEl?: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, invHintEl?: HTMLElement, invEquipGridEl?: HTMLElement, invBuffLineEl?: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, chestEl?: HTMLElement, chestInvGridEl?: HTMLElement, chestSlotsEl?: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement, hitmarkerEl?: HTMLElement, loadingEl?: HTMLElement, loadingHintEl?: HTMLElement, loadingBarFillEl?: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -1067,9 +1067,15 @@ export class UI {
     if (nextId) void setActiveRecipe(nextId)
   }
 
-  renderInventory(slots, getItem) {
+  renderInventory(slots, getItem, { slotCountHint = null } = {}) {
     const grid = this.els.invGridEl
     grid.innerHTML = ''
+
+    if (this.els.invHintEl) {
+      const base = typeof slotCountHint === 'number' ? `${slotCountHint} slots` : `${slots.length} slots`
+      this.els.invHintEl.innerHTML = `${base} • stacks até 100 • <b>I</b> para abrir/fechar`
+    }
+
     for (let i = 0; i < slots.length; i++) {
       const s = slots[i]
       const cell = document.createElement('div')
@@ -1087,6 +1093,59 @@ export class UI {
 
       grid.appendChild(cell)
     }
+  }
+
+  renderEquipment(equipment, getItem) {
+    const root = this.els.invEquipGridEl
+    if (!root) return
+
+    const slots = ['hat', 'shirt', 'pants', 'boots', 'gloves', 'backpack']
+    for (const name of slots) {
+      const el = root.querySelector(`.equipSlot[data-eq="${name}"]`)
+      if (!el) continue
+      const itemEl = el.querySelector('.equipItem')
+      if (!itemEl) continue
+
+      const s = equipment?.[name] || null
+      if (!s) {
+        itemEl.innerHTML = '<span class="left muted">(vazio)</span>'
+        continue
+      }
+
+      const def = getItem(s.id)
+      const ico = def?.icon ?? ''
+      const nm = def?.name ?? s.id
+
+      const rem = typeof s.meta?.equipRemainingMs === 'number' ? Math.max(0, s.meta.equipRemainingMs) : null
+      const durStr = rem == null ? '' : this._formatRemaining(rem)
+
+      itemEl.innerHTML = `
+        <span class="left"><span>${ico}</span><span>${nm}</span></span>
+        <span class="equipDur">${durStr}</span>
+      `.trim()
+    }
+  }
+
+  setBuffLine(text) {
+    const el = this.els.invBuffLineEl
+    if (!el) return
+    if (!text) {
+      el.textContent = ''
+      el.classList.add('hidden')
+      return
+    }
+    el.textContent = text
+    el.classList.remove('hidden')
+  }
+
+  _formatRemaining(ms) {
+    const s = Math.ceil(ms / 1000)
+    const days = Math.floor(s / 86400)
+    const hours = Math.floor((s % 86400) / 3600)
+    const mins = Math.floor((s % 3600) / 60)
+    if (days > 0) return `${days}d ${hours}h`
+    if (hours > 0) return `${hours}h ${String(mins).padStart(2, '0')}m`
+    return `${mins}m ${String(s % 60).padStart(2, '0')}s`
   }
 
   renderHotbar(slots, getItem, activeIdx) {

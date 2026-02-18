@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T01:07:10Z",
+  "updatedAt": "2026-02-18T01:08:28Z",
   "statusLegend": {
     "epic": [
       "todo",
@@ -71,7 +71,7 @@
     {
       "id": "P7",
       "title": "Sistema de Equipamentos (roupas por peça) + durabilidade por tempo equipado + buffs",
-      "status": "doing",
+      "status": "done",
       "objective": "Adicionar slots de vestimenta (chapéu/calça/camisa/bota/luva) e mochila no modal de inventário, com durabilidade de 1 dia contando apenas enquanto equipado; base para buffs (maçã/sorte).",
       "stories": [
         {
@@ -124,7 +124,7 @@
         {
           "id": "P7-S3",
           "title": "UI/UX: modal de inventário com painel lateral de vestimenta + duplo clique equipar/desequipar",
-          "status": "todo",
+          "status": "done",
           "objective": "Ao abrir o inventário, mostrar painel lateral com slots: chapéu, camisa, calça, bota, luva, mochila. Duplo clique no item no inventário equipa (se slot compatível). Duplo clique no slot equipado devolve ao inventário.",
           "acceptanceCriteria": [
             "Inventário exibe painel lateral com 6 slots nomeados.",
@@ -141,9 +141,11 @@
             "Inventário cheio ao desequipar: comportamento consistente (bloqueia ou descarta com aviso — definir).",
             "Timer de durabilidade atualiza e pausa ao desequipar."
           ],
-          "mvp": true
+          "mvp": true,
+          "updatedAt": "2026-02-18T01:08:28Z"
         }
-      ]
+      ],
+      "updatedAt": "2026-02-18T01:08:28Z"
     },
     {
       "id": "P8",

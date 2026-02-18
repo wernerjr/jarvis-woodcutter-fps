@@ -290,10 +290,29 @@
 
       <!-- Inventory -->
       <div id="inventory" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Inventário">
-        <div class="card">
+        <div class="card invCard">
           <h2>Inventário</h2>
-          <p class="muted small">20 slots • stacks até 100 • <b>I</b> para abrir/fechar</p>
-          <div id="invGrid" class="invGrid"></div>
+          <p id="invHint" class="muted small">20 slots • stacks até 100 • <b>I</b> para abrir/fechar</p>
+
+          <div class="invBody">
+            <div class="invMain">
+              <div id="invGrid" class="invGrid"></div>
+            </div>
+
+            <aside class="invEquip" aria-label="Equipamentos">
+              <div class="invEquipTitle">Equipamentos</div>
+              <div id="invEquipGrid" class="invEquipGrid">
+                <div class="equipSlot" data-eq="hat"><div class="equipLabel">Chapéu</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="shirt"><div class="equipLabel">Camisa</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="pants"><div class="equipLabel">Calça</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="boots"><div class="equipLabel">Bota</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="gloves"><div class="equipLabel">Luva</div><div class="equipItem"></div></div>
+                <div class="equipSlot" data-eq="backpack"><div class="equipLabel">Mochila</div><div class="equipItem"></div></div>
+              </div>
+              <div id="invBuffLine" class="muted small invBuffLine hidden"></div>
+            </aside>
+          </div>
+
           <div class="buttons">
             <button id="btnInvSort" class="secondary">Ordenar</button>
             <button id="btnInvClose" class="primary">Close</button>

@@ -14,6 +14,9 @@ const ui = new UI({
   controlsEl: document.querySelector('#controls'),
   inventoryEl: document.querySelector('#inventory'),
   invGridEl: document.querySelector('#invGrid'),
+  invHintEl: document.querySelector('#invHint'),
+  invEquipGridEl: document.querySelector('#invEquipGrid'),
+  invBuffLineEl: document.querySelector('#invBuffLine'),
   forgeEl: document.querySelector('#forge'),
   chestEl: document.querySelector('#chest'),
   chestInvGridEl: document.querySelector('#chestInvGrid'),
@@ -167,7 +170,18 @@ invGrid.addEventListener('dblclick', (e) => {
   if (!slot) return
   const idx = Number(slot.dataset.index)
   if (Number.isNaN(idx)) return
-  game.invQuickToHotbar(idx)
+  game.invQuickAction(idx)
+})
+
+// Double-click on equipment slot: move back to inventory
+const invEquipGrid = document.querySelector('#invEquipGrid')
+invEquipGrid?.addEventListener('dblclick', (e) => {
+  if (!document.body.classList.contains('inventory-open')) return
+  const slot = e.target?.closest?.('.equipSlot')
+  if (!slot) return
+  const eq = String(slot.getAttribute('data-eq') || '')
+  if (!eq) return
+  game.equipQuickToInventory(eq)
 })
 
 // Drag/drop + click: embedded forge inventory <-> forge slots
