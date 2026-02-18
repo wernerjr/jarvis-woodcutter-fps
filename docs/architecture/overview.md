@@ -5,8 +5,9 @@
 - [2. Contexto (C4 - nível Contexto)](#2-contexto-c4---nível-contexto)
 - [3. Containers (C4 - nível Containers)](#3-containers-c4---nível-containers)
 - [4. Tecnologias principais](#4-tecnologias-principais)
-- [5. Decisões arquiteturais relevantes](#5-decisões-arquiteturais-relevantes)
-- [6. Limites e trade-offs atuais](#6-limites-e-trade-offs-atuais)
+- [5. Tecnologias usadas no projeto (inventário completo)](#5-tecnologias-usadas-no-projeto-inventário-completo)
+- [6. Decisões arquiteturais relevantes](#6-decisões-arquiteturais-relevantes)
+- [7. Limites e trade-offs atuais](#7-limites-e-trade-offs-atuais)
 
 ## 1. Escopo
 Projeto de jogo FPS low-poly com:
@@ -66,7 +67,32 @@ Projeto de jogo FPS low-poly com:
 - **Transporte multiplayer**: WebSocket (`ws`).
 - **Containerização**: Docker + docker-compose.
 
-## 5. Decisões arquiteturais relevantes
+## 5. Tecnologias usadas no projeto (inventário completo)
+
+| Tecnologia | Onde é usada | Função no projeto |
+|---|---|---|
+| JavaScript (ESM) | Client (`apps/client`) | Linguagem base do front-end e módulos do jogo |
+| Vite | Client (`apps/client`) | Dev server e build de produção |
+| Three.js | Client (`apps/client`) | Renderização 3D via WebGL |
+| Node.js | Server (`apps/server`) | Runtime backend |
+| TypeScript | Server (`apps/server`) | Tipagem estática e manutenção do código servidor |
+| Fastify | Server (`apps/server`) | Framework HTTP para APIs (`/api/*`) |
+| WebSocket (`ws`) | Server (`apps/server`) | Comunicação multiplayer em tempo real (`/ws`) |
+| Zod | Server (`apps/server`) | Validação de payloads e contratos |
+| dotenv | Server (`apps/server`) | Carregamento de variáveis de ambiente |
+| PostgreSQL (`pg`) | Server (`apps/server`) | Driver de conexão/acesso ao banco relacional |
+| Redis (`redis`) | Server (`apps/server`) | Acesso a cache, estado volátil e coordenação distribuída |
+| PostgreSQL | Dados persistentes | Fonte de verdade para estado de jogador/mundo/configurações |
+| Redis | Dados voláteis/distribuídos | Presença, snapshots, locks e rate limiting distribuído |
+| Drizzle ORM | Camada de dados (server) | ORM para modelagem e acesso ao PostgreSQL |
+| drizzle-kit | Camada de dados (server) | Migrações e ferramentas de inspeção (studio) |
+| pnpm workspaces | Monorepo (raiz) | Gerenciamento de pacotes/scripts entre apps |
+| tsx | Server (`apps/server`) | Execução em modo watch no desenvolvimento |
+| Docker + docker-compose | Operação/deploy local | Containerização de serviços e orquestração local |
+| Nginx (container client) | Entrega do client | Servir build estático do jogo |
+
+
+## 6. Decisões arquiteturais relevantes
 1. **Server-authoritative para estado compartilhado do mundo**
    - World events (ex.: corte de árvore, coleta, placement) são validados e persistidos no servidor.
 2. **Guest auth com token assinado para WS**
@@ -79,7 +105,7 @@ Projeto de jogo FPS low-poly com:
 5. **Processamento offline de forja no backend**
    - Catch-up no acesso e worker periódico para manter progressão mesmo sem UI aberta.
 
-## 6. Limites e trade-offs atuais
+## 7. Limites e trade-offs atuais
 - **MVP multiplayer**: não há sistema robusto de matchmaking/lobbies avançados.
 - **Consistência eventual**: uso de cache Redis e múltiplos pods privilegia responsividade sobre serialização rígida global.
 - **Guest identity**: simples e prática para protótipo; não substitui conta persistente com recuperação.
