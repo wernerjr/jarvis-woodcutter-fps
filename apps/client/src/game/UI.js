@@ -1118,7 +1118,7 @@ export class UI {
         cell.draggable = true
         const extra = item.stackable ? `${s.qty} / 100` : this._toolLine(s)
         const hot = hotbarByItemId?.[s.id]
-        const hotBadge = Number.isInteger(hot) ? `<div class="invHotBadge">${hot}</div>` : ''
+        const hotBadge = hot != null && hot !== '' ? `<div class="invHotBadge">${hot}</div>` : ''
         cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div>${hotBadge}</div><div class="invQty">${extra}</div>`
       } else {
         cell.innerHTML = ''
@@ -1141,6 +1141,7 @@ export class UI {
 
       const s = equipment?.[name] || null
       if (!s) {
+        el.title = `${el.querySelector('.equipLabel')?.textContent || ''}: vazio`
         itemEl.innerHTML = '<span class="left muted">(vazio)</span>'
         continue
       }
@@ -1152,10 +1153,9 @@ export class UI {
       const rem = typeof s.meta?.equipRemainingMs === 'number' ? Math.max(0, s.meta.equipRemainingMs) : null
       const durStr = rem == null ? '' : this._formatRemaining(rem)
 
-      itemEl.innerHTML = `
-        <span class="left"><span>${ico}</span><span>${nm}</span></span>
-        <span class="equipDur">${durStr}</span>
-      `.trim()
+      // Slot compacto: só ícone. Nome/detalhes ficam no hint nativo (title).
+      el.title = `${el.querySelector('.equipLabel')?.textContent || ''}: ${nm}${durStr ? ` • ${durStr}` : ''}`.trim()
+      itemEl.innerHTML = `<span class="equipIconOnly">${ico}</span>`
     }
   }
 
@@ -1243,6 +1243,21 @@ export class UI {
         if (durRoot) durRoot.style.opacity = '0'
       }
     })
+
+    // Mirror compact hotbar inside inventory modal.
+    const mirror = document.querySelector('#invHotbarMirror')
+    if (mirror) {
+      mirror.innerHTML = ''
+      for (let i = 0; i <= 9; i++) {
+        const s = slots[i]
+        const cell = document.createElement('div')
+        cell.className = 'invHotCell' + (i === activeIdx ? ' active' : '') + (i === 0 ? ' fixed' : '')
+        const key = i === 9 ? '0' : String(i + 1)
+        const ico = i === 0 ? '✋' : (s ? (getItem(s.id)?.icon ?? '') : '')
+        cell.innerHTML = `<div class="k">${key}</div><div class="i">${ico}</div>`
+        mirror.appendChild(cell)
+      }
+    }
   }
 
   setHotbarActive(toolId) {
