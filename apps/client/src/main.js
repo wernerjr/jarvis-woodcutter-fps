@@ -253,22 +253,27 @@ invGrid.addEventListener('mousemove', (e) => {
   game.setInventoryHoverIndex(idx)
 })
 
+let _invLastClickIdx = -1
+let _invLastClickAt = 0
 invGrid.addEventListener('click', (e) => {
   if (!document.body.classList.contains('inventory-open')) return
   const slot = e.target?.closest?.('.invSlot')
   if (!slot) return
   const idx = Number(slot.dataset.index)
   if (Number.isNaN(idx)) return
-  game.setInventorySelectedIndex(idx)
-})
 
-invGrid.addEventListener('dblclick', (e) => {
-  if (!document.body.classList.contains('inventory-open')) return
-  const slot = e.target?.closest?.('.invSlot')
-  if (!slot) return
-  const idx = Number(slot.dataset.index)
-  if (Number.isNaN(idx)) return
-  game.invQuickAction(idx)
+  game.setInventorySelectedIndex(idx)
+
+  // Fallback robusto para duplo clique (drag pode impedir evento native dblclick)
+  const now = performance.now()
+  const isDouble = _invLastClickIdx === idx && (now - _invLastClickAt) <= 320
+  _invLastClickIdx = idx
+  _invLastClickAt = now
+  if (isDouble) {
+    game.invQuickAction(idx)
+    _invLastClickIdx = -1
+    _invLastClickAt = 0
+  }
 })
 
 // Double-click on equipment slot: move back to inventory
