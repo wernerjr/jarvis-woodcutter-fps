@@ -110,16 +110,20 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 /* Splash background */
 #menu.overlay{
   justify-content:flex-end;
-  align-items:flex-start;
-  padding-top: clamp(220px, 55vh, 520px);
-  padding-right: 10%;
+  align-items:center;
+  padding:24px 10% 24px 24px;
   background:
     linear-gradient(180deg, rgba(0,0,0,.40), rgba(0,0,0,.70)),
     radial-gradient(1200px 700px at 20% 15%, rgba(255,140,0,.22), transparent 60%),
     radial-gradient(900px 600px at 85% 25%, rgba(180,95,6,.20), transparent 55%),
     url('/splash.png') center/cover no-repeat;
 }
-#menu .card{width:300px; max-width:min(88vw, 300px)}
+#menu .card{
+  width:340px;
+  max-width:min(90vw, 340px);
+  max-height:calc(100vh - 48px);
+  overflow:auto;
+}
 #menu .buttons{justify-items:end}
 #menu .buttons button{width:100%; text-align:right}
 
