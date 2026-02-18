@@ -5,6 +5,7 @@ import { runMigrations } from './db/migrate.js';
 import { registerAuthGuestRoutes } from './routes/authGuest.js';
 import { registerPlayerStateRoutes } from './routes/playerState.js';
 import { registerForgeStateRoutes } from './routes/forgeState.js';
+import { registerAccountAuthRoutes } from './routes/accountAuth.js';
 import { registerChestStateRoutes } from './routes/chestState.js';
 import { registerPlayerSettingsRoutes } from './routes/playerSettings.js';
 import { registerWs } from './ws/wsServer.js';
@@ -45,6 +46,7 @@ app.get('/api/health', async () => {
 });
 
 await registerAuthGuestRoutes(app);
+await registerAccountAuthRoutes(app);
 await registerPlayerStateRoutes(app);
 await registerPlayerSettingsRoutes(app);
 await registerForgeStateRoutes(app);

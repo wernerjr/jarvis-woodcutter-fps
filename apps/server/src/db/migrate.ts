@@ -50,6 +50,42 @@ export async function runMigrations(logger?: { info: (o: any, msg?: string) => v
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "accounts" (
+        "id" text PRIMARY KEY,
+        "email" text NOT NULL UNIQUE,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "last_seen_at" timestamptz
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "account_links" (
+        "account_id" text NOT NULL UNIQUE REFERENCES "accounts"("id"),
+        "guest_id" text NOT NULL UNIQUE REFERENCES "guests"("id"),
+        "linked_at" timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "magic_codes" (
+        "id" text PRIMARY KEY,
+        "email" text NOT NULL,
+        "code_hash" text NOT NULL,
+        "purpose" text NOT NULL,
+        "guest_id" text,
+        "expires_at" timestamptz NOT NULL,
+        "used_at" timestamptz,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "request_ip" text
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS "magic_codes_email_purpose_created_idx"
+      ON "magic_codes" ("email", "purpose", "created_at" DESC);
+    `);
+
     logger?.info?.({ ms: Date.now() - startedAt }, 'db migrations ok (idempotent)');
   } catch (err) {
     logger?.error?.({ err }, 'db migrations failed');

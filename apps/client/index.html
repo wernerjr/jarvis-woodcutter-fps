@@ -63,6 +63,23 @@
             <input id="worldId" class="text" type="text" value="world-1" placeholder="world-1" />
           </div>
 
+          <div class="row" style="margin-top:10px; padding:10px; border:1px solid rgba(255,255,255,.14); border-radius:10px;">
+            <div style="width:100%">
+              <div class="muted small" style="margin-bottom:6px"><b>Conta vinculada</b> (salvar progresso)</div>
+              <input id="accountEmail" class="text" type="email" placeholder="seu@email.com" />
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button id="btnLinkStart">Enviar código</button>
+                <input id="accountCode" class="text" type="text" inputmode="numeric" maxlength="6" placeholder="Código (6 dígitos)" />
+              </div>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button id="btnLinkVerify">Salvar meu progresso</button>
+                <button id="btnLoginStart">Entrar por e-mail</button>
+                <button id="btnLoginVerify">Confirmar login</button>
+              </div>
+              <div id="accountStatus" class="muted small" style="margin-top:6px"></div>
+            </div>
+          </div>
+
           <div class="buttons">
             <button id="btnPlay" class="primary">Play</button>
             <button id="btnMenuOptions">Opções</button>

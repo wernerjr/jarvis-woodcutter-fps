@@ -1,7 +1,7 @@
 import './style.css'
 import { Game } from './game/Game.js'
 import { UI } from './game/UI.js'
-import { ensureGuest, loadPlayerState, savePlayerState, loadPlayerSettings, savePlayerSettings, getStoredWorldId, setStoredWorldId } from './net/persistence.js'
+import { ensureGuest, loadPlayerState, savePlayerState, loadPlayerSettings, savePlayerSettings, getStoredWorldId, setStoredWorldId, getStoredAccountEmail, startAccountLink, verifyAccountLink, startAccountLogin, verifyAccountLogin } from './net/persistence.js'
 
 const canvas = document.querySelector('#game')
 
@@ -58,6 +58,81 @@ if (worldInput) {
     if (v) setStoredWorldId(v)
   })
 }
+
+// Account link/login (menu)
+const accountEmailEl = document.querySelector('#accountEmail')
+const accountCodeEl = document.querySelector('#accountCode')
+const accountStatusEl = document.querySelector('#accountStatus')
+const storedEmail = getStoredAccountEmail()
+if (accountEmailEl && storedEmail) accountEmailEl.value = storedEmail
+
+function setAccountStatus(msg, isError = false) {
+  if (!accountStatusEl) return
+  accountStatusEl.textContent = msg || ''
+  accountStatusEl.style.color = isError ? '#ffb0b0' : ''
+}
+
+document.querySelector('#btnLinkStart')?.addEventListener('click', async () => {
+  try {
+    setAccountStatus('Gerando código...')
+    const guest = await ensureGuest({ worldId: String(worldInput?.value || '').trim() || undefined })
+    const email = String(accountEmailEl?.value || '').trim()
+    const out = await startAccountLink({ guestId: guest.guestId, email })
+    setAccountStatus(`Código enviado. ${out?.devCode ? `DevCode: ${out.devCode}` : ''}`)
+  } catch (err) {
+    setAccountStatus(`Erro: ${err?.message || err}`, true)
+  }
+})
+
+document.querySelector('#btnLinkVerify')?.addEventListener('click', async () => {
+  try {
+    setAccountStatus('Confirmando vínculo...')
+    const guestId = game?._persistCtx?.guestId || (await ensureGuest({ worldId: String(worldInput?.value || '').trim() || undefined })).guestId
+    const email = String(accountEmailEl?.value || '').trim()
+    const code = String(accountCodeEl?.value || '').trim()
+    await verifyAccountLink({ guestId, email, code })
+    setAccountStatus('Conta vinculada com sucesso ✅')
+    ui.toast('Progresso vinculado ao e-mail com sucesso!', 1500)
+  } catch (err) {
+    setAccountStatus(`Erro: ${err?.message || err}`, true)
+  }
+})
+
+document.querySelector('#btnLoginStart')?.addEventListener('click', async () => {
+  try {
+    setAccountStatus('Enviando código de login...')
+    const email = String(accountEmailEl?.value || '').trim()
+    const out = await startAccountLogin({ email })
+    setAccountStatus(`Código de login enviado. ${out?.devCode ? `DevCode: ${out.devCode}` : ''}`)
+  } catch (err) {
+    setAccountStatus(`Erro: ${err?.message || err}`, true)
+  }
+})
+
+document.querySelector('#btnLoginVerify')?.addEventListener('click', async () => {
+  try {
+    setAccountStatus('Confirmando login...')
+    const email = String(accountEmailEl?.value || '').trim()
+    const code = String(accountCodeEl?.value || '').trim()
+    const out = await verifyAccountLogin({ email, code })
+    setAccountStatus('Login concluído. Seu progresso foi recuperado ✅')
+    ui.toast('Login por e-mail concluído!', 1500)
+
+    // If game context already exists, update it for subsequent saves.
+    if (game?._persistCtx && out?.guestId && out?.token) {
+      game.setPersistenceContext({
+        ...game._persistCtx,
+        guestId: out.guestId,
+        token: out.token,
+        save: async (state) => {
+          await savePlayerState({ guestId: out.guestId, worldId: game._persistCtx.worldId, state })
+        },
+      })
+    }
+  } catch (err) {
+    setAccountStatus(`Erro: ${err?.message || err}`, true)
+  }
+})
 
 // Backend bootstrap happens on Play (shows loading screen)
 let bootPromise = null

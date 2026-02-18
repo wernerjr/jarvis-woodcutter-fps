@@ -93,3 +93,34 @@ export const playerSettings = pgTable(
     pk: primaryKey({ columns: [t.guestId, t.worldId] }),
   })
 );
+
+export const accounts = pgTable('accounts', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+});
+
+export const accountLinks = pgTable('account_links', {
+  accountId: text('account_id')
+    .notNull()
+    .references(() => accounts.id)
+    .unique(),
+  guestId: text('guest_id')
+    .notNull()
+    .references(() => guests.id)
+    .unique(),
+  linkedAt: timestamp('linked_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const magicCodes = pgTable('magic_codes', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull(),
+  codeHash: text('code_hash').notNull(),
+  purpose: text('purpose').notNull(), // link|login
+  guestId: text('guest_id'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  requestIp: text('request_ip'),
+});
