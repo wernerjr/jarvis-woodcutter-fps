@@ -124,7 +124,7 @@ document.querySelector('#btnLoginStart')?.addEventListener('click', async () => 
       accountCodeEl.focus()
       accountCodeEl.select?.()
     }
-    setAccountStatus('Código de login enviado.')
+    setAccountStatus('')
   } catch (err) {
     setAccountStatus(`Erro: ${err?.message || err}`, true)
   }
