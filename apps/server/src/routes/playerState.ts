@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { playerState } from '../db/schema.js';
+import { playerState, worlds } from '../db/schema.js';
 
 const GetQuerySchema = z.object({
   guestId: z.string().min(8),
@@ -47,10 +47,16 @@ export async function registerPlayerStateRoutes(app: FastifyInstance) {
     }
 
     try {
+      const { guestId, worldId, state } = parsed.data
+      await db.insert(worlds).values({ id: worldId, name: worldId }).onConflictDoNothing()
+
       await db
-        .update(playerState)
-        .set({ state: parsed.data.state, updatedAt: new Date() })
-        .where(and(eq(playerState.guestId, parsed.data.guestId), eq(playerState.worldId, parsed.data.worldId)));
+        .insert(playerState)
+        .values({ guestId, worldId, state, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: [playerState.guestId, playerState.worldId],
+          set: { state, updatedAt: new Date() },
+        })
 
       return { ok: true };
     } catch (err) {

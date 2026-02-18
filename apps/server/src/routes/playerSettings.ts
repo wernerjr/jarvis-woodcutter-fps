@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { playerSettings } from '../db/schema.js';
+import { playerSettings, worlds } from '../db/schema.js';
 
 const GetQuerySchema = z.object({
   guestId: z.string().min(8),
@@ -51,6 +51,8 @@ export async function registerPlayerSettingsRoutes(app: FastifyInstance) {
     const { guestId, worldId, settings } = parsed.data;
 
     try {
+      await db.insert(worlds).values({ id: worldId, name: worldId }).onConflictDoNothing()
+
       await db
         .insert(playerSettings)
         .values({ guestId, worldId, settings: settings as any, updatedAt: new Date() })
