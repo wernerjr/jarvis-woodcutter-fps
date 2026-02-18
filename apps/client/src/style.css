@@ -77,14 +77,14 @@ body.chest-open #game{cursor:default;}
 #reticle{position:fixed; left:50%; top:50%; width:10px; height:10px; margin-left:-5px; margin-top:-5px; border:1px solid rgba(231,240,231,0.9); border-radius:50%; box-shadow:0 0 0 2px rgba(0,0,0,.25);}
 
 #hotbar{position:fixed; left:50%; bottom:14px; transform: translateX(-50%); display:flex; gap:10px; pointer-events:auto; z-index: 60;}
-.hotSlot{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-height:58px; width:78px; padding:10px; text-align:center; background: rgba(10,18,10,0.55)}
-.hotSlot.fixed{opacity:0.95}
-.hotSlot.drop{border-color: rgba(159,245,168,0.55); background: rgba(159,245,168,0.10)}
-.hotSlot.active{border-color: rgba(159,245,168,0.55); background: rgba(159,245,168,0.12); transform: translateY(-1px);}
-.hotNum{font-size:11px; color:var(--muted); border:1px solid rgba(231,240,231,0.10); border-radius:999px; padding:1px 6px; width:max-content;}
+.hotSlot{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-height:58px; width:78px; padding:10px; text-align:center; background: rgba(51,51,51,0.70); border:2px solid var(--stroke); border-radius:12px; box-shadow:0 10px 24px rgba(0,0,0,.42)}
+.hotSlot.fixed{opacity:0.97; border-color:rgba(255,140,0,.50); background:linear-gradient(180deg, rgba(255,140,0,.18), rgba(180,95,6,.12))}
+.hotSlot.drop{border-color: var(--glow); background: rgba(255,140,0,0.16)}
+.hotSlot.active{border-color: var(--glow); background: rgba(255,140,0,0.18); box-shadow: inset 0 0 12px rgba(255,140,0,.45), 0 0 16px rgba(255,140,0,.24); transform: translateY(-1px);}
+.hotNum{font-size:11px; color:var(--fg); border:1px solid rgba(234,216,177,0.22); border-radius:999px; padding:1px 6px; width:max-content;}
 .hotIco{font-size:20px; line-height:1; color:var(--fg)}
-.hotDur{width:100%; height:5px; border-radius:999px; overflow:hidden; border:1px solid rgba(231,240,231,0.08); background: rgba(0,0,0,0.20)}
-.hotDurFill{height:100%; width:0%; background: rgba(159,245,168,0.75)}
+.hotDur{width:100%; height:5px; border-radius:999px; overflow:hidden; border:1px solid rgba(234,216,177,0.14); background: rgba(0,0,0,0.28)}
+.hotDurFill{height:100%; width:0%; background: linear-gradient(90deg, rgba(255,140,0,.95), rgba(180,95,6,.9))}
 
 /* Drag safety: only allow dragging hotbar when inventory is open */
 body.inventory-open #hotbar{pointer-events:auto;}
@@ -196,11 +196,11 @@ button.primary{border-color:var(--glow); background:linear-gradient(180deg, rgba
 .invTopbar{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:10px}
 .invLegend{display:grid; gap:4px; text-align:right; padding:8px 10px; border:1px solid rgba(255,255,255,.12); border-radius:10px; background:rgba(255,255,255,.03)}
 .invHotbarMirror{display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:6px; margin-top:8px}
-.invHotCell{border:1px solid rgba(255,255,255,.14); border-radius:10px; background:rgba(255,255,255,.04); min-height:36px; display:flex; align-items:center; justify-content:space-between; padding:4px 6px}
-.invHotCell .k{font-size:11px; opacity:.8; font-weight:800}
+.invHotCell{border:1px solid rgba(234,216,177,.16); border-radius:10px; background:rgba(51,51,51,.60); min-height:36px; display:flex; align-items:center; justify-content:space-between; padding:4px 6px}
+.invHotCell .k{font-size:11px; opacity:.85; font-weight:800}
 .invHotCell .i{font-size:15px; line-height:1}
-.invHotCell.fixed{border-color:rgba(255,200,140,.45); background:rgba(255,180,106,.10)}
-.invHotCell.active{outline:2px solid rgba(74,163,255,.75)}
+.invHotCell.fixed{border-color:rgba(255,140,0,.50); background:rgba(180,95,6,.20)}
+.invHotCell.active{outline:2px solid var(--glow); box-shadow: inset 0 0 10px rgba(255,140,0,.35)}
 .invBody{display:grid; grid-template-columns: 1.8fr 1fr; gap:16px; margin-top:10px; min-height:0}
 .invMain,.invEquip{padding:12px; border:1px solid rgba(255,255,255,.10); border-radius:14px; background:rgba(0,0,0,.16); min-height:0}
 .invMain{overflow:auto}
@@ -243,8 +243,8 @@ button.primary{border-color:var(--glow); background:linear-gradient(180deg, rgba
 .invTop{display:flex; align-items:center; gap:8px;}
 .invIcon{font-size:16px; line-height:1}
 .invName{font-weight:700; font-size:11px;}
-.invHotBadge{margin-left:auto; min-width:18px; height:18px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#fff; background:rgba(74,163,255,.85); border:1px solid rgba(255,255,255,.25)}
-.invSlot.selected{outline:2px solid rgba(74,163,255,.75); background:rgba(74,163,255,.10)}
+.invHotBadge{margin-left:auto; min-width:18px; height:18px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#22160a; background:rgba(255,140,0,.92); border:1px solid rgba(255,220,170,.45)}
+.invSlot.selected{outline:2px solid rgba(255,140,0,.85); background:rgba(255,140,0,.12)}
 .invQty{margin-top:4px; font-variant-numeric: tabular-nums; color:var(--muted); font-size:11px}
 .invEmpty{opacity:0.55}
 
