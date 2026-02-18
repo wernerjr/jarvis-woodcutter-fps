@@ -1195,7 +1195,7 @@ export class UI {
     if (!root) return
     const els = root.querySelectorAll('.hotSlot')
 
-    const dragEnabled = document.body.classList.contains('inventory-open')
+    const dragEnabled = false
 
     els.forEach((el) => {
       const idx = Number(el.getAttribute('data-idx'))

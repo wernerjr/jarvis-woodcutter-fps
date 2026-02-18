@@ -370,17 +370,28 @@ export class Game {
   }
 
   _onKeyDownAny(e) {
-    // Hotbar slots (1-0 => idx 0-9)
-    if (e.code === 'Digit1') return void this.selectHotbar(0)
-    if (e.code === 'Digit2') return void this.selectHotbar(1)
-    if (e.code === 'Digit3') return void this.selectHotbar(2)
-    if (e.code === 'Digit4') return void this.selectHotbar(3)
-    if (e.code === 'Digit5') return void this.selectHotbar(4)
-    if (e.code === 'Digit6') return void this.selectHotbar(5)
-    if (e.code === 'Digit7') return void this.selectHotbar(6)
-    if (e.code === 'Digit8') return void this.selectHotbar(7)
-    if (e.code === 'Digit9') return void this.selectHotbar(8)
-    if (e.code === 'Digit0') return void this.selectHotbar(9)
+    // Hotbar slots: 1..9 => indices 1..9, 0 => índice 0 (mão)
+    const digitMap = {
+      Digit1: 1,
+      Digit2: 2,
+      Digit3: 3,
+      Digit4: 4,
+      Digit5: 5,
+      Digit6: 6,
+      Digit7: 7,
+      Digit8: 8,
+      Digit9: 9,
+      Digit0: 0,
+    }
+    const mapped = digitMap[e.code]
+    if (Number.isInteger(mapped)) {
+      // Novo fluxo: com inventário aberto, número atribui atalho para o item sob o mouse.
+      if (this.state === 'inventory') {
+        this.assignHoverItemToHotbar(mapped)
+        return
+      }
+      return void this.selectHotbar(mapped)
+    }
 
     // Jump
     if (e.code === 'Space') {
@@ -2116,8 +2127,46 @@ export class Game {
     const slot = this._getEquipSlotForItem(s.id)
     if (slot) return void this.invEquipFromInventory(idx, slot)
 
-    // default behavior (legacy): quick move to hotbar
-    return void this.invQuickToHotbar(idx)
+    // Sem quick-move para hotbar por clique/duplo clique.
+  }
+
+  setInventoryHoverIndex(invIdx) {
+    const idx = Number(invIdx)
+    this._hoverInvIdx = Number.isInteger(idx) ? idx : -1
+  }
+
+  assignHoverItemToHotbar(hotIdx) {
+    if (this.state !== 'inventory') return
+    const idx = Number(this._hoverInvIdx)
+    if (!Number.isInteger(idx) || idx < 0) {
+      this.ui.toast('Passe o mouse sobre um item do inventário.', 1000)
+      this.sfx.click?.()
+      return
+    }
+    const src = this.inventory?.slots?.[idx]
+    if (!src) {
+      this.ui.toast('Slot vazio.', 900)
+      this.sfx.click?.()
+      return
+    }
+
+    const hi = Number(hotIdx)
+    if (!Number.isInteger(hi) || hi < 0 || hi > 9) return
+    if (hi === 0) {
+      this.ui.toast('Slot 0 é reservado para mão.', 1000)
+      return
+    }
+
+    // Hotbar agora é atalho: NÃO remove do inventário.
+    this.hotbar[hi] = {
+      id: src.id,
+      qty: src.qty,
+      meta: src.meta ? { ...src.meta } : undefined,
+    }
+
+    this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+    this.ui.toast(`Atalho ${hi}: ${ITEMS[src.id]?.name || src.id}`, 900)
+    this._queuePlayerSave()
   }
 
   invEquipFromInventory(invIdx, equipSlot) {

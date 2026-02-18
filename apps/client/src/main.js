@@ -240,13 +240,17 @@ invGrid.addEventListener('drop', (e) => {
   game.moveItem(payload, { to: 'inv', idx: toIdx })
 })
 
-invGrid.addEventListener('dblclick', (e) => {
+invGrid.addEventListener('mouseleave', () => {
+  game.setInventoryHoverIndex(-1)
+})
+
+invGrid.addEventListener('mousemove', (e) => {
   if (!document.body.classList.contains('inventory-open')) return
   const slot = e.target?.closest?.('.invSlot')
   if (!slot) return
   const idx = Number(slot.dataset.index)
   if (Number.isNaN(idx)) return
-  game.invQuickAction(idx)
+  game.setInventoryHoverIndex(idx)
 })
 
 // Double-click on equipment slot: move back to inventory
@@ -437,51 +441,10 @@ forgeRoot?.addEventListener('click', (e) => {
 })
 
 document.querySelectorAll('#hotbar .hotSlot').forEach((el) => {
-  el.addEventListener('dragstart', (e) => {
-    if (!document.body.classList.contains('inventory-open')) return
-    const hotIdx = Number(el.getAttribute('data-idx'))
-    if (Number.isNaN(hotIdx) || hotIdx === 0) return
-    e.dataTransfer?.setData('application/json', JSON.stringify({ from: 'hot', idx: hotIdx }))
-  })
-
-  el.addEventListener('dragover', (e) => {
-    if (!document.body.classList.contains('inventory-open')) return
-    const hotIdx = Number(el.getAttribute('data-idx'))
-    if (Number.isNaN(hotIdx) || hotIdx === 0) return
-    e.preventDefault()
-    el.classList.add('drop')
-  })
-  el.addEventListener('dragleave', () => el.classList.remove('drop'))
-  el.addEventListener('drop', (e) => {
-    if (!document.body.classList.contains('inventory-open')) return
-    e.preventDefault()
-    el.classList.remove('drop')
-    const hotIdx = Number(el.getAttribute('data-idx'))
-    if (Number.isNaN(hotIdx) || hotIdx === 0) return
-
-    const data = e.dataTransfer?.getData('application/json')
-    if (!data) return
-    let payload
-    try {
-      payload = JSON.parse(data)
-    } catch {
-      return
-    }
-
-    game.moveItem(payload, { to: 'hot', idx: hotIdx })
-  })
-
   el.addEventListener('click', () => {
     const hotIdx = Number(el.getAttribute('data-idx'))
     if (Number.isNaN(hotIdx)) return
     game.selectHotbar(hotIdx)
-  })
-
-  el.addEventListener('dblclick', () => {
-    if (!document.body.classList.contains('inventory-open')) return
-    const hotIdx = Number(el.getAttribute('data-idx'))
-    if (Number.isNaN(hotIdx)) return
-    game.hotbarQuickToInventory(hotIdx)
   })
 })
 
