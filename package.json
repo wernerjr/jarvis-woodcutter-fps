@@ -1,6 +1,7 @@
 {
   "name": "jarvis-woodcutter-fps",
   "private": true,
+  "version": "0.0.1",
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "pnpm -r --parallel dev",

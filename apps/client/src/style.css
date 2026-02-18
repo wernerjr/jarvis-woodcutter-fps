@@ -168,11 +168,11 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 .card h2{font-size:24px;}
 .muted{margin:6px 0 12px; color:var(--muted); line-height:1.4}
 .small{font-size:12px;}
-.versionTag{margin-top:8px; margin-bottom:0; text-align:right; opacity:.7}
 
 .row{display:flex; flex-direction:column; gap:6px; margin:10px 0 14px; text-align:left}
-input.text{padding:10px 12px; border-radius:12px; border:1px solid var(--stroke); background: rgba(0,0,0,0.22); color:var(--fg); outline:none; pointer-events:auto}
-input.text:focus{border-color: var(--glow); box-shadow:0 0 0 2px rgba(255,140,0,.18)}
+input.text, select.text{padding:10px 12px; border-radius:12px; border:1px solid var(--stroke); background: rgba(0,0,0,0.22); color:var(--fg); outline:none; pointer-events:auto}
+input.text:focus, select.text:focus{border-color: var(--glow); box-shadow:0 0 0 2px rgba(255,140,0,.18)}
+.appVersion{position:fixed; left:14px; bottom:10px; z-index:120; pointer-events:none; font-size:12px; color:rgba(234,216,177,.78); text-shadow:0 2px 10px rgba(0,0,0,.7)}
 
 .buttons{display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px;}
 button{appearance:none; border:1px solid rgba(234,216,177,0.24); background: linear-gradient(180deg, rgba(180,95,6,.24), rgba(180,95,6,.12)); color:var(--fg); padding:10px 12px; border-radius:12px; font-family:'Titan One','Bebas Neue', ui-sans-serif, system-ui, sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:.6px; cursor:pointer; transition:transform .2s ease-in-out, box-shadow .2s ease-in-out, border-color .2s ease-in-out;}

@@ -52,7 +52,16 @@ const game = new Game({ canvas, ui })
 const worldInput = document.querySelector('#worldId')
 if (worldInput) {
   const saved = getStoredWorldId()
-  if (saved) worldInput.value = saved
+  if (saved) {
+    const hasOpt = [...worldInput.options].some((o) => o.value === saved)
+    if (!hasOpt) {
+      const opt = document.createElement('option')
+      opt.value = saved
+      opt.textContent = `${saved} (custom)`
+      worldInput.appendChild(opt)
+    }
+    worldInput.value = saved
+  }
   worldInput.addEventListener('change', () => {
     const v = String(worldInput.value || '').trim()
     if (v) setStoredWorldId(v)
