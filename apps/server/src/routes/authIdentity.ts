@@ -168,6 +168,7 @@ export async function registerAuthIdentityRoutes(app: FastifyInstance) {
       // Registro direto (sem guest prévio): cria guest base para progresso
       guestId = crypto.randomUUID()
       await db.insert(guests).values({ id: guestId, lastSeenAt: new Date() })
+      await ensureWorld(DEFAULT_WORLD_ID)
       await ensurePlayerState(guestId, DEFAULT_WORLD_ID)
     }
 
