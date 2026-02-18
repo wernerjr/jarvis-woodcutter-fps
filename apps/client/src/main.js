@@ -273,6 +273,24 @@ invGrid.addEventListener('dblclick', (e) => {
 
 // Double-click on equipment slot: move back to inventory
 const invEquipGrid = document.querySelector('#invEquipGrid')
+invEquipGrid?.addEventListener('click', (e) => {
+  if (!document.body.classList.contains('inventory-open')) return
+  const slot = e.target?.closest?.('.equipSlot')
+  if (!slot) return
+  const eq = String(slot.getAttribute('data-eq') || '')
+  if (!eq) return
+
+  // Se já equipado, clique remove para inventário.
+  const hasIcon = !!slot.querySelector('.equipIconOnly')
+  if (hasIcon) {
+    game.equipQuickToInventory(eq)
+    return
+  }
+
+  // Se vazio, tenta equipar item atualmente selecionado no inventário.
+  game.equipSelectedInventoryToSlot(eq)
+})
+
 invEquipGrid?.addEventListener('dblclick', (e) => {
   if (!document.body.classList.contains('inventory-open')) return
   const slot = e.target?.closest?.('.equipSlot')

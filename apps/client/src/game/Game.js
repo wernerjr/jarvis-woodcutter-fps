@@ -2180,6 +2180,13 @@ export class Game {
     if (this.state === 'inventory') this._renderInventoryUI()
   }
 
+  equipSelectedInventoryToSlot(equipSlot) {
+    if (this.state !== 'inventory') return
+    const idx = Number(this._selectedInvIdx)
+    if (!Number.isInteger(idx) || idx < 0) return
+    this.invEquipFromInventory(idx, equipSlot)
+  }
+
   _hotbarKeyLabelFromIdx(i) {
     return i === 9 ? '0' : String(i + 1)
   }

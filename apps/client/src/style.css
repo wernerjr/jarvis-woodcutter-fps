@@ -181,9 +181,10 @@ button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,16
 .equipSlot{border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:8px; background:rgba(255,255,255,0.03); cursor:pointer; min-height:58px}
 .equipSlot:hover{border-color:rgba(74,163,255,.35); background:rgba(74,163,255,.06)}
 .equipLabel{font-size:12px; color:var(--muted); font-weight:700}
-.equipItem{margin-top:6px; min-height:18px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:10px}
+.equipItem{margin-top:6px; min-height:18px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px}
 .equipItem .left{display:flex; align-items:center; gap:8px}
 .equipIconOnly{font-size:22px; line-height:1}
+.equipDurMini{font-variant-numeric:tabular-nums; font-size:10px; color:rgba(255,255,255,.78); border:1px solid rgba(255,255,255,.18); border-radius:8px; padding:1px 5px}
 .equipDur{font-variant-numeric: tabular-nums; font-size:12px; color:rgba(255,255,255,.72)}
 .invBuffLine{margin-top:10px}
 

@@ -1151,11 +1151,11 @@ export class UI {
       const nm = def?.name ?? s.id
 
       const rem = typeof s.meta?.equipRemainingMs === 'number' ? Math.max(0, s.meta.equipRemainingMs) : null
-      const durStr = rem == null ? '' : this._formatRemaining(rem)
+      const durStr = rem == null ? '∞' : this._formatRemaining(rem)
 
-      // Slot compacto: só ícone. Nome/detalhes ficam no hint nativo (title).
+      // Slot compacto: ícone + duração curta.
       el.title = `${el.querySelector('.equipLabel')?.textContent || ''}: ${nm}${durStr ? ` • ${durStr}` : ''}`.trim()
-      itemEl.innerHTML = `<span class="equipIconOnly">${ico}</span>`
+      itemEl.innerHTML = `<span class="equipIconOnly">${ico}</span><span class="equipDurMini">${durStr}</span>`
     }
   }
 
