@@ -3,7 +3,7 @@ import type { WebSocket } from 'ws';
 import type { FastifyInstance } from 'fastify';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { worldChunkState, chestState } from '../db/schema.js';
+import { worldChunkState, chestState, worlds } from '../db/schema.js';
 import { env } from '../env.js';
 import { getRedis } from '../redis/client.js';
 import crypto from 'node:crypto';
@@ -588,6 +588,9 @@ return 1
   }
 
   async function saveChunk(next: { worldId: string; chunkX: number; chunkZ: number; version: number; state: any }) {
+    // After full DB resets, world may not exist yet; keep world chunk writes resilient.
+    await db.insert(worlds).values({ id: next.worldId, name: next.worldId }).onConflictDoNothing()
+
     await db
       .insert(worldChunkState)
       .values({
