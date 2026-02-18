@@ -120,14 +120,19 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 }
 
 /* Loading */
-#loading.overlay{pointer-events:auto; z-index: 40;}
+#loading.overlay{pointer-events:auto; z-index: 40;
+  background:
+    radial-gradient(1200px 700px at 20% 15%, rgba(255,140,0,.16), transparent 60%),
+    radial-gradient(900px 600px at 85% 25%, rgba(180,95,6,.14), transparent 55%),
+    linear-gradient(180deg, rgba(0,0,0,.78), rgba(0,0,0,.85));
+}
 .loading-lock #ui > *:not(#loading){pointer-events:none !important;}
 .loading-lock #loading{pointer-events:auto !important;}
 
 .loadingCard{width:min(520px, 92vw)}
-.loadingTitle{font-size:20px; font-weight:800; margin-bottom:6px}
-.loadingBar{height:10px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.08); margin-top:10px}
-.loadingBarFill{height:100%; width:25%; background:linear-gradient(90deg, rgba(74,163,255,.9), rgba(159,245,168,.9)); border-radius:999px}
+.loadingTitle{font-size:28px; font-weight:800; margin-bottom:6px; font-family:'Bebas Neue', ui-sans-serif, system-ui, sans-serif; text-transform:uppercase; letter-spacing:.6px}
+.loadingBar{height:12px; border-radius:999px; overflow:hidden; background:rgba(0,0,0,.32); border:1px solid rgba(234,216,177,.16); margin-top:10px}
+.loadingBarFill{height:100%; width:25%; background:linear-gradient(90deg, rgba(255,140,0,.95), rgba(180,95,6,.92)); border-radius:999px; box-shadow:0 0 14px rgba(255,140,0,.35)}
 .card{width:min(520px, calc(100vw - 48px)); background:var(--card); border:2px solid var(--stroke); border-radius:16px; padding:18px 18px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); pointer-events:auto;}
 .card h1,.card h2{margin:0 0 10px; letter-spacing:.5px; font-family:'Bebas Neue', ui-sans-serif, system-ui, sans-serif; text-transform:uppercase;}
 .card h1{font-size:30px;}
