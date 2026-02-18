@@ -148,7 +148,7 @@ type WorldEventResultMsg = {
   kind: WorldEventMsg['kind'];
   id: string;
   ok: boolean;
-  reason?: 'already_removed' | 'invalid' | 'duplicate' | 'not_ready';
+  reason?: 'already_removed' | 'invalid' | 'duplicate' | 'not_ready' | 'not_empty';
 };
 
 type WorldChunkMsg = {
@@ -1437,7 +1437,7 @@ return 1
                           const slots = Array.isArray((rows[0].state as any)?.slots) ? (rows[0].state as any).slots : [];
                           const nonEmpty = slots.some((s: any) => s && Number(s.qty || 0) > 0);
                           if (nonEmpty) {
-                            setResult('placeRemove', id, false, 'invalid');
+                            setResult('placeRemove', id, false, 'not_empty');
                           } else {
                             next.placed.splice(idx, 1);
                             try {
@@ -1452,7 +1452,7 @@ return 1
                           const slots = Array.isArray((rows[0].state as any)?.slots) ? (rows[0].state as any).slots : [];
                           const nonEmpty = slots.some((s: any) => s && Number(s.qty || 0) > 0);
                           if (nonEmpty) {
-                            setResult('placeRemove', id, false, 'invalid');
+                            setResult('placeRemove', id, false, 'not_empty');
                           } else {
                             next.placed.splice(idx, 1);
                             try {
