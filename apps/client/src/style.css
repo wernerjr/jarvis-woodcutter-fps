@@ -125,6 +125,7 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
   max-width:min(90vw, 340px);
   max-height:calc(100vh - 48px);
   overflow:auto;
+  transform:translateY(72px);
 }
 #menu .buttons,
 #auth .buttons{justify-items:end}
@@ -135,7 +136,7 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
   #menu.overlay,
   #auth.overlay{justify-content:center; align-items:center; padding:24px;}
   #menu .card,
-  #auth .card{max-width:min(92vw, 520px)}
+  #auth .card{max-width:min(92vw, 520px); transform:none}
   #menu .buttons,
   #auth .buttons{justify-items:stretch}
   #menu .buttons button,
