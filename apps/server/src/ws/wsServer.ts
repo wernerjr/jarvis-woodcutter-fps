@@ -1201,6 +1201,18 @@ return 1
 
         const { cx, cz } = chunkOf(x, z);
 
+        const eventId =
+          (msg.kind === 'treeCut' ? String((msg as any).treeId || '') :
+          msg.kind === 'rockCollect' ? String((msg as any).rockId || '') :
+          msg.kind === 'stickCollect' ? String((msg as any).stickId || '') :
+          msg.kind === 'bushCollect' ? String((msg as any).bushId || '') :
+          msg.kind === 'plotTill' ? String((msg as any).plotId || '') :
+          msg.kind === 'plant' ? String((msg as any).plotId || '') :
+          msg.kind === 'harvest' ? String((msg as any).plotId || '') :
+          msg.kind === 'placeRemove' ? String((msg as any).id || '') :
+          msg.kind === 'oreBreak' ? String((msg as any).oreId || '') :
+          String((msg as any).id || ''));
+
         getChunk(st.worldId, cx, cz)
           .then(async (chunk) => {
             // IMPORTANT: start from full persisted state, not the derived client-facing arrays.
@@ -1518,7 +1530,11 @@ return 1
 
             broadcastWorldChunk(st.worldId, cx, cz, out);
           })
-          .catch(() => null);
+          .catch((err) => {
+            app.log.error({ err, event: 'ws_worldEvent_failed', worldId: st.worldId, playerId: pid, kind: msg.kind, id: eventId }, 'worldEvent failed');
+            const out: WorldEventResultMsg = { t: 'worldEventResult', v: 1, kind: msg.kind, id: eventId, ok: false, reason: 'invalid' };
+            if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(out));
+          });
 
         })();
         return;
