@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import { env } from './env.js';
 import { assertDbConnectionReady } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
-import { registerAuthGuestRoutes } from './routes/authGuest.js';
+// Auth guest legado removido (Auth v2 usa /api/auth/device/guest)
 import { registerPlayerStateRoutes } from './routes/playerState.js';
 import { registerForgeStateRoutes } from './routes/forgeState.js';
 import { registerAuthIdentityRoutes } from './routes/authIdentity.js';
@@ -45,7 +45,6 @@ app.get('/api/health', async () => {
   };
 });
 
-await registerAuthGuestRoutes(app);
 await registerAuthIdentityRoutes(app);
 await registerPlayerStateRoutes(app);
 await registerPlayerSettingsRoutes(app);

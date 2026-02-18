@@ -87,30 +87,14 @@ export function setStoredAccountEmail(email) {
 }
 
 export async function ensureGuest({ worldId } = {}) {
-  const guestId = getStoredGuestId();
-  const desiredWorldId = worldId || getStoredWorldId();
-  const body = {
-    ...(guestId ? { guestId } : {}),
-    ...(desiredWorldId ? { worldId: desiredWorldId } : {}),
-  };
-
-  const res = await apiFetch('/api/auth/guest', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`auth/guest failed: ${res.status} ${text}`);
+  // Compat wrapper: guest agora é garantido por dispositivo (Auth v2)
+  const out = await ensureGuestByDevice({ worldId })
+  return {
+    guestId: out.guestId,
+    worldId: out.worldId,
+    token: out.token,
+    tokenExpMs: out.tokenExpMs ?? null,
   }
-
-  const data = await res.json();
-  if (!data?.guestId || !data?.worldId || !data?.token) throw new Error('auth/guest invalid response');
-
-  setStoredGuestId(data.guestId);
-  setStoredGuestToken(data.token);
-  setStoredWorldId(data.worldId);
-  return { guestId: data.guestId, worldId: data.worldId, token: data.token, tokenExpMs: data.tokenExpMs ?? null };
 }
 
 export async function loadPlayerState({ guestId, worldId }) {
