@@ -60,11 +60,27 @@ if (worldInput) {
 }
 
 // Account link/login (menu)
+const authEl = document.querySelector('#auth')
+const menuEl = document.querySelector('#menu')
 const accountEmailEl = document.querySelector('#accountEmail')
 const accountCodeEl = document.querySelector('#accountCode')
 const accountStatusEl = document.querySelector('#accountStatus')
 const storedEmail = getStoredAccountEmail()
 if (accountEmailEl && storedEmail) accountEmailEl.value = storedEmail
+
+function showAuthGate() {
+  document.body.classList.add('state-menu')
+  authEl?.classList.remove('hidden')
+  menuEl?.classList.add('hidden')
+  document.querySelector('#pause')?.classList.add('hidden')
+  document.querySelector('#controls')?.classList.add('hidden')
+  document.querySelector('#hud')?.classList.add('hidden')
+}
+
+function showMainMenuAfterAuth() {
+  authEl?.classList.add('hidden')
+  ui.showMenu()
+}
 
 function setAccountStatus(msg, isError = false) {
   if (!accountStatusEl) return
@@ -129,6 +145,19 @@ document.querySelector('#btnLoginVerify')?.addEventListener('click', async () =>
         },
       })
     }
+
+    showMainMenuAfterAuth()
+  } catch (err) {
+    setAccountStatus(`Erro: ${err?.message || err}`, true)
+  }
+})
+
+document.querySelector('#btnContinueGuest')?.addEventListener('click', async () => {
+  try {
+    setAccountStatus('Entrando como guest...')
+    await ensureGuest({ worldId: String(worldInput?.value || '').trim() || undefined })
+    setAccountStatus('Entrou como guest ✅')
+    showMainMenuAfterAuth()
   } catch (err) {
     setAccountStatus(`Erro: ${err?.message || err}`, true)
   }
@@ -709,8 +738,8 @@ $('#btnForgeTableClose').addEventListener('click', () => game.closeForgeTable())
 $('#btnChestClose').addEventListener('click', () => game.closeChest())
 $('#btnChestSort')?.addEventListener('click', () => game.sortChest())
 
-// Start at main menu
-ui.showMenu()
+// Start at login/auth screen
+showAuthGate()
 ui.setScore(0)
 
 game.start()

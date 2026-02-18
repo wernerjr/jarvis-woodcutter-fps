@@ -108,7 +108,8 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
 .overlay.hidden{display:none;}
 
 /* Splash background */
-#menu.overlay{
+#menu.overlay,
+#auth.overlay{
   justify-content:flex-end;
   align-items:center;
   padding:24px 10% 24px 24px;
@@ -118,20 +119,27 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
     radial-gradient(900px 600px at 85% 25%, rgba(180,95,6,.20), transparent 55%),
     url('/splash.png') center/cover no-repeat;
 }
-#menu .card{
+#menu .card,
+#auth .card{
   width:340px;
   max-width:min(90vw, 340px);
   max-height:calc(100vh - 48px);
   overflow:auto;
 }
-#menu .buttons{justify-items:end}
-#menu .buttons button{width:100%; text-align:right}
+#menu .buttons,
+#auth .buttons{justify-items:end}
+#menu .buttons button,
+#auth .buttons button{width:100%; text-align:right}
 
 @media (max-width: 900px){
-  #menu.overlay{justify-content:center; align-items:center; padding:24px;}
-  #menu .card{max-width:min(92vw, 520px)}
-  #menu .buttons{justify-items:stretch}
-  #menu .buttons button{text-align:center}
+  #menu.overlay,
+  #auth.overlay{justify-content:center; align-items:center; padding:24px;}
+  #menu .card,
+  #auth .card{max-width:min(92vw, 520px)}
+  #menu .buttons,
+  #auth .buttons{justify-items:stretch}
+  #menu .buttons button,
+  #auth .buttons button{text-align:center}
 }
 #pause.overlay, #options.overlay, #forge.overlay, #chest.overlay, #forgeTable.overlay, #crafting.overlay, #inventory.overlay, #controls.overlay{
   background:
