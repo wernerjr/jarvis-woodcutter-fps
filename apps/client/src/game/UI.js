@@ -584,6 +584,9 @@ export class UI {
     } else if (outId === 'rope') {
       meta.cat = 'Utilidade'
       meta.desc = 'Material básico para futuras receitas.'
+    } else if (outId === 'backpack') {
+      meta.cat = 'Equipamentos'
+      meta.desc = 'Mochila: ao equipar, adiciona +10 slots no inventário.'
     }
 
     return meta
@@ -898,6 +901,10 @@ export class UI {
     if (outId === 'axe_metal') meta.desc = 'Machado de metal: corta árvores mais rápido.'
     else if (outId === 'pickaxe_metal') meta.desc = 'Picareta de metal: quebra rochas/minério mais rápido.'
     else if (outId === 'hoe_metal') meta.desc = 'Enxada de metal: arar e colher plantações.'
+    else if (outId === 'backpack') {
+      meta.cat = 'Equipamentos'
+      meta.desc = 'Mochila: ao equipar, adiciona +10 slots no inventário.'
+    }
 
     return meta
   }

@@ -9,6 +9,7 @@ export const RecipeId = {
   FORGE_TABLE: 'forge_table',
   CHEST: 'chest',
   ROPE: 'rope',
+  BACKPACK: 'backpack',
 }
 
 export const DURABILITY = {
@@ -168,6 +169,15 @@ export const FORGE_TABLE_RECIPES = [
     cost: [
       { id: ItemId.IRON_INGOT, qty: 2 },
       { id: ItemId.STICK, qty: 1 },
+    ],
+  },
+  {
+    id: RecipeId.BACKPACK,
+    name: 'Mochila',
+    output: { id: ItemId.BACKPACK, qty: 1 },
+    cost: [
+      { id: ItemId.FIBER, qty: 200 },
+      { id: ItemId.ROPE, qty: 8 },
     ],
   },
 ]

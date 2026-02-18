@@ -414,17 +414,7 @@ export class Game {
       return
     }
 
-    // Dev helper (temporary): B gives 1 backpack for testing equip/slots.
-    if (e.code === 'KeyB') {
-      if (this.state === 'playing') {
-        const left = this.inventory.add(ItemId.BACKPACK, 1, { equipRemainingMs: 24 * 60 * 60 * 1000 })
-        if (left) this.ui.toast('Inventário cheio (mochila descartada).', 1200)
-        else this.ui.toast('Dev: +1 Mochila (use duplo clique para equipar).', 1400)
-        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], { slotCountHint: this.inventory.slotCount })
-        this._queuePlayerSave?.()
-      }
-      return
-    }
+    // KeyB dev spawn removed: backpack is now crafted in category "Equipamentos".
 
     // Crafting toggle
     if (e.code === 'KeyC') {
@@ -1618,7 +1608,7 @@ export class Game {
 
     const DAY_MS = 24 * 60 * 60 * 1000
 
-    for (const name of ['hat', 'shirt', 'pants', 'boots', 'gloves', 'backpack']) {
+    for (const name of ['hat', 'shirt', 'pants', 'boots', 'gloves']) {
       const s = this.equipment?.[name]
       if (!s || !s.id) continue
       if (!s.meta) s.meta = {}
@@ -2052,9 +2042,11 @@ export class Game {
       return
     }
 
-    // Ensure we have durability meta
-    if (!src.meta) src.meta = {}
-    if (typeof src.meta.equipRemainingMs !== 'number') src.meta.equipRemainingMs = 24 * 60 * 60 * 1000
+    // Ensure durability meta only for clothing pieces (backpack has infinite duration)
+    if (slot !== 'backpack') {
+      if (!src.meta) src.meta = {}
+      if (typeof src.meta.equipRemainingMs !== 'number') src.meta.equipRemainingMs = 24 * 60 * 60 * 1000
+    }
 
     const prev = this.equipment[slot]
     this.equipment[slot] = { id: src.id, qty: 1, meta: src.meta ?? undefined }
@@ -2076,11 +2068,29 @@ export class Game {
     const src = this.equipment?.[slot]
     if (!src) return
 
-    const to = this._firstEmptyInvIdx()
-    if (to < 0) {
-      this.ui.toast('Inventário cheio.', 1000)
-      this.sfx.click()
-      return
+    let to = -1
+    if (slot === 'backpack') {
+      const base = Math.max(1, Math.floor(Number(this.inventoryBaseSlots || 20)))
+      const hasItemsInExtraSlots = (this.inventory?.slots || []).slice(base).some(Boolean)
+      if (hasItemsInExtraSlots) {
+        this.ui.toast('Esvazie os slots extras da mochila antes de desequipar.', 1400)
+        this.sfx.click()
+        return
+      }
+      // Backpack item must move to a base slot; never to a removable extra slot.
+      to = (this.inventory?.slots || []).slice(0, base).findIndex((s) => !s)
+      if (to < 0) {
+        this.ui.toast('Libere 1 slot no inventário base para desequipar a mochila.', 1400)
+        this.sfx.click()
+        return
+      }
+    } else {
+      to = this._firstEmptyInvIdx()
+      if (to < 0) {
+        this.ui.toast('Inventário cheio.', 1000)
+        this.sfx.click()
+        return
+      }
     }
 
     this.inventory.slots[to] = { id: src.id, qty: 1, meta: src.meta ?? undefined }

@@ -46,6 +46,28 @@ export function applyGameSave(game, save) {
   game.score = Number(save.score ?? 0)
   game.ui?.setScore?.(game.score)
 
+  // equipment + buffs (v3)
+  const eq = save.v >= 3 && save.equipment && typeof save.equipment === 'object' ? save.equipment : null;
+  if (!game.equipment) {
+    game.equipment = { hat: null, shirt: null, pants: null, boots: null, gloves: null, backpack: null };
+  }
+  const setEq = (k) => {
+    const s = eq?.[k];
+    if (!s) return (game.equipment[k] = null);
+    if (!ITEMS[s.id]) return (game.equipment[k] = null);
+    game.equipment[k] = { id: s.id, qty: Number(s.qty ?? 1) || 1, meta: s.meta ?? undefined };
+  };
+  setEq('hat');
+  setEq('shirt');
+  setEq('pants');
+  setEq('boots');
+  setEq('gloves');
+  setEq('backpack');
+
+  // Important: restore inventory capacity BEFORE filling slots,
+  // so backpack slots (21-30) from save are not lost on load.
+  game._recomputeInventoryCapacity?.();
+
   // inventory
   const slots = Array.isArray(save.inventory?.slots) ? save.inventory.slots : [];
   game.inventory.clear();
@@ -65,24 +87,6 @@ export function applyGameSave(game, save) {
     if (!ITEMS[s.id] && s.id !== 'hand') continue;
     game.hotbar[i] = { id: s.id, qty: Number(s.qty ?? 0), meta: s.meta ?? undefined };
   }
-
-  // equipment + buffs (v3)
-  const eq = save.v >= 3 && save.equipment && typeof save.equipment === 'object' ? save.equipment : null;
-  if (!game.equipment) {
-    game.equipment = { hat: null, shirt: null, pants: null, boots: null, gloves: null, backpack: null };
-  }
-  const setEq = (k) => {
-    const s = eq?.[k];
-    if (!s) return (game.equipment[k] = null);
-    if (!ITEMS[s.id]) return (game.equipment[k] = null);
-    game.equipment[k] = { id: s.id, qty: Number(s.qty ?? 1) || 1, meta: s.meta ?? undefined };
-  };
-  setEq('hat');
-  setEq('shirt');
-  setEq('pants');
-  setEq('boots');
-  setEq('gloves');
-  setEq('backpack');
 
   if (!game.buffs) game.buffs = { luckUntilMs: 0 };
   const buffs = save.v >= 3 && save.buffs && typeof save.buffs === 'object' ? save.buffs : null;
