@@ -146,10 +146,10 @@ button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,16
 .craftReq{margin-top:6px; color:var(--muted); font-size:12px;}
 .craftRow button{pointer-events:auto;}
 
-.invGrid{display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-top:10px; align-content:start; grid-auto-rows:minmax(62px, auto);} 
+.invGrid{display:grid; grid-template-columns: repeat(6, 1fr); gap:8px; margin-top:10px; align-content:start; grid-auto-rows:minmax(50px, auto);} 
 
 /* Inventory modal: repaginado para leitura/atalhos */
-.invCard{width:min(96vw, 1280px); max-width:none;}
+.invCard{width:min(96vw, 1100px); max-width:none;}
 .invTopbar{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:10px}
 .invLegend{display:grid; gap:4px; text-align:right; padding:8px 10px; border:1px solid rgba(255,255,255,.12); border-radius:10px; background:rgba(255,255,255,.03)}
 .invHotbarMirror{display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:6px; margin-top:8px}
@@ -178,7 +178,7 @@ button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,16
 .equipSlot[data-eq="boots"]{grid-area:boots}
 .equipSlot[data-eq="backpack"]{grid-area:backpack}
 
-.equipSlot{border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:10px; background:rgba(255,255,255,0.03); cursor:pointer; min-height:72px}
+.equipSlot{border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:8px; background:rgba(255,255,255,0.03); cursor:pointer; min-height:58px}
 .equipSlot:hover{border-color:rgba(74,163,255,.35); background:rgba(74,163,255,.06)}
 .equipLabel{font-size:12px; color:var(--muted); font-weight:700}
 .equipItem{margin-top:6px; min-height:18px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:10px}
@@ -192,16 +192,16 @@ button.primary{border-color: rgba(159,245,168,0.35); background: rgba(159,245,16
   .invLegend{text-align:left}
 }
 
-.invSlot{border:1px solid var(--stroke); border-radius:12px; padding:10px; min-height:62px; background: rgba(255,255,255,0.04)}
+.invSlot{border:1px solid var(--stroke); border-radius:10px; padding:6px 7px; min-height:50px; background: rgba(255,255,255,0.04)}
 .invSlot.invEmpty{background: rgba(255,255,255,0.02);}
 .invSlot.draggable{cursor: grab;}
 .invSlot.draggable:active{cursor: grabbing;}
 .invTop{display:flex; align-items:center; gap:8px;}
-.invIcon{font-size:18px; line-height:1}
-.invName{font-weight:700; font-size:12px;}
+.invIcon{font-size:16px; line-height:1}
+.invName{font-weight:700; font-size:11px;}
 .invHotBadge{margin-left:auto; min-width:18px; height:18px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#fff; background:rgba(74,163,255,.85); border:1px solid rgba(255,255,255,.25)}
 .invSlot.selected{outline:2px solid rgba(74,163,255,.75); background:rgba(74,163,255,.10)}
-.invQty{margin-top:6px; font-variant-numeric: tabular-nums; color:var(--muted); font-size:12px}
+.invQty{margin-top:4px; font-variant-numeric: tabular-nums; color:var(--muted); font-size:11px}
 .invEmpty{opacity:0.55}
 
 /* Hide HUD on menu */

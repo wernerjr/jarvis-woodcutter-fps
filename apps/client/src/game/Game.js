@@ -2158,6 +2158,17 @@ export class Game {
     return map
   }
 
+  clearHotbarSlot(hotIdx) {
+    const idx = Number(hotIdx)
+    if (!Number.isInteger(idx) || idx <= 0 || idx >= this.hotbar.length) return
+    if (!this.hotbar[idx]) return
+    this.hotbar[idx] = null
+    if (this.hotbarActive === idx) this.selectHotbar(0)
+    else this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
+    if (this.state === 'inventory') this._renderInventoryUI()
+    this._queuePlayerSave()
+  }
+
   _renderInventoryUI() {
     this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], {
       slotCountHint: this.inventory.slotCount,

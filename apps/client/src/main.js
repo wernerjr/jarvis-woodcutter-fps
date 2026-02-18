@@ -485,6 +485,66 @@ document.querySelectorAll('#hotbar .hotSlot').forEach((el) => {
     if (Number.isNaN(hotIdx)) return
     game.selectHotbar(hotIdx)
   })
+
+  el.addEventListener('contextmenu', (e) => {
+    const hotIdx = Number(el.getAttribute('data-idx'))
+    if (Number.isNaN(hotIdx) || hotIdx === 0) return
+    e.preventDefault()
+    game.clearHotbarSlot(hotIdx)
+  })
+})
+
+const invHotbarMirror = document.querySelector('#invHotbarMirror')
+invHotbarMirror?.addEventListener('dragover', (e) => {
+  if (!document.body.classList.contains('inventory-open')) return
+  const cell = e.target?.closest?.('.invHotCell')
+  if (!cell) return
+  const hotIdx = Number(cell.dataset.idx)
+  if (Number.isNaN(hotIdx) || hotIdx === 0) return
+  e.preventDefault()
+  cell.classList.add('active')
+})
+
+invHotbarMirror?.addEventListener('dragleave', (e) => {
+  const cell = e.target?.closest?.('.invHotCell')
+  cell?.classList.remove('active')
+})
+
+invHotbarMirror?.addEventListener('drop', (e) => {
+  if (!document.body.classList.contains('inventory-open')) return
+  const cell = e.target?.closest?.('.invHotCell')
+  if (!cell) return
+  const hotIdx = Number(cell.dataset.idx)
+  if (Number.isNaN(hotIdx) || hotIdx === 0) return
+  e.preventDefault()
+
+  const data = e.dataTransfer?.getData('application/json')
+  if (!data) return
+  let payload
+  try {
+    payload = JSON.parse(data)
+  } catch {
+    return
+  }
+  if (payload?.from !== 'inv') return
+  game.moveItem(payload, { to: 'hot', idx: hotIdx })
+})
+
+invHotbarMirror?.addEventListener('click', (e) => {
+  const cell = e.target?.closest?.('.invHotCell')
+  if (!cell) return
+  const hotIdx = Number(cell.dataset.idx)
+  if (Number.isNaN(hotIdx)) return
+  game.selectHotbar(hotIdx)
+})
+
+invHotbarMirror?.addEventListener('contextmenu', (e) => {
+  const cell = e.target?.closest?.('.invHotCell')
+  if (!cell) return
+  const hotIdx = Number(cell.dataset.idx)
+  if (Number.isNaN(hotIdx) || hotIdx === 0) return
+  e.preventDefault()
+  game.clearHotbarSlot(hotIdx)
 })
 
 $('#btnPlay').addEventListener('click', async () => {

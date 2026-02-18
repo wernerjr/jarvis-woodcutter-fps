@@ -1252,6 +1252,7 @@ export class UI {
         const s = slots[i]
         const cell = document.createElement('div')
         cell.className = 'invHotCell' + (i === activeIdx ? ' active' : '') + (i === 0 ? ' fixed' : '')
+        cell.dataset.idx = String(i)
         const key = i === 9 ? '0' : String(i + 1)
         const ico = i === 0 ? '✋' : (s ? (getItem(s.id)?.icon ?? '') : '')
         cell.innerHTML = `<div class="k">${key}</div><div class="i">${ico}</div>`
