@@ -5,6 +5,7 @@
 - [2. Estrutura da documentação](#2-estrutura-da-documentação)
 - [3. Para quem é cada seção](#3-para-quem-é-cada-seção)
 - [4. Navegação rápida](#4-navegação-rápida)
+- [5. Atualizações recentes (antes do roadmap atual)](#5-atualizações-recentes-antes-do-roadmap-atual)
 
 ## 1. Visão geral
 Este diretório centraliza a documentação técnica, de funcionalidades e de negócio/game design do projeto **Jarvis Woodcutter FPS**.
@@ -33,3 +34,21 @@ Objetivo: facilitar onboarding, evolução de arquitetura e alinhamento entre en
 - Negócio e design
   - [Visão de negócio](./business/overview.md)
   - [Game Design Document (GDD)](./business/game-design.md)
+
+## 5. Atualizações recentes (antes do roadmap atual)
+- **Conta vinculada (P11)** implementada:
+  - rotas backend para código mágico (`/api/auth/link/*`, `/api/auth/login/*`),
+  - tabelas `accounts`, `account_links`, `magic_codes`,
+  - fluxo client para vincular conta e login por e-mail/código.
+- **Inventário/Hotbar** evoluídos para modelo de atalho:
+  - slot de mão fixo,
+  - atribuição por teclado (hover + número),
+  - drag-and-drop para hotbar,
+  - remoção de atalho e sincronização automática com inventário real.
+- **Consumo de maçã** corrigido:
+  - funciona por inventário (duplo clique) e por hotbar (click),
+  - ativa buff e animação de mão, consumindo do inventário real.
+- **UX/imersão**:
+  - bloqueio de interações durante loading,
+  - bloqueio de seleção de texto e drag acidental na UI/canvas,
+  - splash screen custom no menu principal (`/splash.png`).

@@ -1,97 +1,66 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T16:14:00Z",
+  "updatedAt": "2026-02-18T21:37:00Z",
   "statusLegend": {
     "epic": ["todo", "doing", "done"],
     "story": ["todo", "doing", "done"]
   },
   "epics": [
     {
-      "id": "P11",
-      "title": "Conta Vinculada (upgrade do guest)",
+      "id": "P12",
+      "title": "Main Menu UI (Industrial/Lumberjack) — versão single-file",
       "status": "todo",
-      "objective": "Permitir que jogador guest vincule sua conta a um identificador persistente (e-mail + código mágico), mantendo progresso e habilitando login seguro em múltiplos dispositivos.",
-      "successMetrics": [
-        "Taxa de conversão guest -> conta vinculada",
-        "Queda em relatos de perda de progresso",
-        "Aumento de retenção D7 de jogadores vinculados"
-      ],
+      "objective": "Criar um menu principal de jogo com identidade visual industrial lenhador (Jarvis), em HTML/CSS/JS limpo, com layout centrado, blur, botões estilizados e interações mínimas em JavaScript.",
+      "role": "Senior Frontend Game Developer",
+      "constraints": {
+        "deliveryFormat": "single_file_html_with_internal_css_js",
+        "tech": ["HTML", "CSS", "JavaScript"]
+      },
       "stories": [
         {
-          "id": "P11-S1",
-          "title": "Modelo de dados para account vinculada e vínculo com guest existente",
+          "id": "P12-S1",
+          "title": "Layout base, tipografia e container central",
           "status": "todo",
-          "objective": "Adicionar entidades/tabelas para conta persistente e relação de migração de progresso do guest para accountId.",
+          "objective": "Construir a estrutura semântica do menu e aplicar tipografia pesada (Titan One/Bebas Neue), com container centralizado e estética industrial.",
           "acceptanceCriteria": [
-            "Schema possui entidade de account com identificador único (e-mail normalizado).",
-            "Guest pode ser associado a accountId sem perder progresso já salvo.",
-            "Migração é idempotente (repetir operação não duplica nem corrompe dados).",
-            "Logs mínimos de auditoria para vínculo concluído."
-          ],
-          "probableFiles": [
-            "apps/server/src/db/schema.ts",
-            "apps/server/drizzle/*",
-            "apps/server/src/services/*"
-          ],
-          "testPlan": [
-            "Criar guest com progresso, vincular conta e validar manutenção do estado.",
-            "Executar vínculo duas vezes e confirmar idempotência.",
-            "Validar conflitos com e-mail já existente."
+            "HTML semântico com áreas claras (branding, ações principais).",
+            "Fonte pesada aplicada em uppercase nos botões e títulos.",
+            "Container centralizado com backdrop-filter: blur(12px).",
+            "Container com border 2px solid #444 e sombra 0 10px 30px rgba(0,0,0,0.5)."
           ],
           "mvp": true,
-          "updatedAt": "2026-02-18T16:14:00Z"
+          "updatedAt": "2026-02-18T21:37:00Z"
         },
         {
-          "id": "P11-S2",
-          "title": "Fluxo backend: solicitar código mágico e confirmar vínculo",
+          "id": "P12-S2",
+          "title": "Tema visual e botões conforme especificação",
           "status": "todo",
-          "objective": "Expor endpoints para iniciar vínculo por e-mail (geração/envio de código) e confirmar código para converter guest em conta vinculada.",
+          "objective": "Aplicar paleta e estados visuais dos botões conforme guia do roadmap.",
           "acceptanceCriteria": [
-            "Endpoint para solicitar código mágico com rate limit por IP/e-mail.",
-            "Código tem TTL curto e uso único.",
-            "Endpoint de confirmação valida código e conclui vínculo guest -> accountId.",
-            "Retorno inclui token/sessão válida para uso subsequente no jogo."
-          ],
-          "probableFiles": [
-            "apps/server/src/routes/auth*",
-            "apps/server/src/services/auth*",
-            "apps/server/src/ws/*"
-          ],
-          "testPlan": [
-            "Solicitar e confirmar código válido dentro do TTL.",
-            "Tentar código expirado e reutilização do mesmo código.",
-            "Validar proteção básica contra brute-force."
+            "Paleta aplicada: Primary #B45F06, Background #333333 (0.7), Glow #FF8C00, Text #EAD8B1.",
+            "Botões presentes: START ENGINE, UPGRADES, FOREST LOGS, OPTIONS, SHUT DOWN.",
+            "Hover: inner glow #FF8C00, scale 1.05, transition 0.2s ease-in-out.",
+            "Boa legibilidade em desktop e responsivo básico."
           ],
           "mvp": true,
-          "updatedAt": "2026-02-18T16:14:00Z"
+          "updatedAt": "2026-02-18T21:37:00Z"
         },
         {
-          "id": "P11-S3",
-          "title": "UI do client: 'Salvar meu progresso' e login por código",
+          "id": "P12-S3",
+          "title": "JS minimalista de interação",
           "status": "todo",
-          "objective": "Adicionar fluxo simples no client para solicitar vínculo por e-mail, inserir código e concluir login persistente.",
+          "objective": "Adicionar event listeners nos botões para logging de ação no console, mantendo código limpo.",
           "acceptanceCriteria": [
-            "Ação visível no inventário/menu: 'Salvar meu progresso'.",
-            "Tela/modal com campo de e-mail e campo de código.",
-            "Feedback claro de sucesso/erro/expiração.",
-            "Após concluir, sessão segue autenticada e progresso permanece intacto."
-          ],
-          "probableFiles": [
-            "apps/client/src/game/UI.js",
-            "apps/client/src/net/*",
-            "apps/client/src/game/Game.js"
-          ],
-          "testPlan": [
-            "Fluxo feliz completo no client.",
-            "Erro de código inválido/expirado com retry.",
-            "Reabrir jogo após vínculo e confirmar persistência/login."
+            "Cada botão possui listener próprio ou delegado com console.log semântico.",
+            "JS interno no mesmo arquivo HTML (single-file).",
+            "Código claro, curto e fácil de expandir para integração real posterior."
           ],
           "mvp": true,
-          "updatedAt": "2026-02-18T16:14:00Z"
+          "updatedAt": "2026-02-18T21:37:00Z"
         }
       ],
-      "updatedAt": "2026-02-18T16:14:00Z"
+      "updatedAt": "2026-02-18T21:37:00Z"
     }
   ]
 }
