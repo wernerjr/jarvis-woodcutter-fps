@@ -52,5 +52,6 @@ O Caddy do servidor deve fazer proxy para:
 
 Checklist: ver `docs/deploy-checklist.md`.
 
-## Documentação do jogo
-Veja `apps/client/README.md` e `apps/client/docs/`.
+## Documentação
+- Ponto de entrada: [`docs/README.md`](./docs/README.md)
+- Documentação do client legado: `apps/client/README.md` e `apps/client/docs/`
