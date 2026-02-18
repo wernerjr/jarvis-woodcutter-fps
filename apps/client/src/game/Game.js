@@ -2153,8 +2153,8 @@ export class Game {
     if (!s) return
 
     if (s.id === ItemId.APPLE) {
-      const removed = this.inventory.remove(ItemId.APPLE, 1)
-      if (!removed) return
+      const left = this.inventory.remove(ItemId.APPLE, 1)
+      if (left > 0) return
       this._activateAppleLuck()
       this.player.handAction?.()
       this.sfx.click?.()
