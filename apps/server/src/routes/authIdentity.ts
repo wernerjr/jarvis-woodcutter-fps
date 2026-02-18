@@ -9,8 +9,28 @@ import { env } from '../env.js'
 const DEFAULT_WORLD_ID = 'world-1'
 const DEFAULT_WORLD_NAME = 'World 1'
 
+const RATE_WINDOW_MS = 60 * 1000
+const RATE_LIMITS = {
+  guestDevice: 30,
+  register: 12,
+  login: 20,
+}
+const rateBucket = new Map<string, number[]>()
+
 function normalizeUsername(v: string) {
   return String(v || '').trim().toLowerCase()
+}
+
+function hitRateLimit(key: string, max: number) {
+  const now = Date.now()
+  const arr = (rateBucket.get(key) || []).filter((t) => now - t <= RATE_WINDOW_MS)
+  if (arr.length >= max) {
+    rateBucket.set(key, arr)
+    return true
+  }
+  arr.push(now)
+  rateBucket.set(key, arr)
+  return false
 }
 
 function base64url(buf: Buffer) {
@@ -85,6 +105,9 @@ function makeAuthPayload(guestId: string, worldId: string) {
 export async function registerAuthIdentityRoutes(app: FastifyInstance) {
   app.post('/api/auth/device/guest', async (req, reply) => {
     const parsed = GuestByDeviceSchema.safeParse(req.body ?? {})
+    if (hitRateLimit(`guest:${req.ip}`, RATE_LIMITS.guestDevice)) {
+      return reply.status(429).send({ ok: false, error: 'rate_limited' })
+    }
     if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_body' })
 
     const worldId = parsed.data.worldId || DEFAULT_WORLD_ID
@@ -130,6 +153,9 @@ export async function registerAuthIdentityRoutes(app: FastifyInstance) {
   app.post('/api/auth/register', async (req, reply) => {
     const parsed = RegisterSchema.safeParse(req.body ?? {})
     if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_body' })
+    if (hitRateLimit(`register:${req.ip}`, RATE_LIMITS.register)) {
+      return reply.status(429).send({ ok: false, error: 'rate_limited' })
+    }
 
     const usernameNorm = normalizeUsername(parsed.data.username)
     const passwordHash = hashPassword(parsed.data.password)
@@ -173,6 +199,9 @@ export async function registerAuthIdentityRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.status(400).send({ ok: false, error: 'invalid_body' })
 
     const usernameNorm = normalizeUsername(parsed.data.username)
+    if (hitRateLimit(`login:${req.ip}:${usernameNorm}`, RATE_LIMITS.login)) {
+      return reply.status(429).send({ ok: false, error: 'rate_limited' })
+    }
     const rows = await db
       .select({ id: users.id, passwordHash: users.passwordHash, guestId: users.guestId })
       .from(users)
