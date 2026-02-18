@@ -1,23 +1,11 @@
-# Conta vinculada e login por código mágico
+# Conta vinculada e login por código mágico (LEGADO)
 
-## Objetivo
-Permitir que jogador guest vincule progresso a um e-mail e recupere sessão em outro dispositivo.
+> Status: descontinuado no Auth v2.
 
-## Fluxos principais
-1. `POST /api/auth/link/start` (guest + email) → gera código temporário.
-2. `POST /api/auth/link/verify` (guest + email + código) → vincula conta.
-3. `POST /api/auth/login/start` (email) → gera código de login.
-4. `POST /api/auth/login/verify` (email + código) → retorna `guestId` vinculado + token.
+Este documento descreve o fluxo antigo de autenticação por código mágico.
+Atualmente o projeto usa:
+- guest por dispositivo,
+- login/cadastro por usuário e senha,
+- upgrade irreversível de guest para conta.
 
-## Regras
-- Código mágico com TTL curto e uso único.
-- Proteção básica de tentativas por janela de tempo.
-- Vínculo guest→conta com comportamento idempotente.
-
-## Dados
-- `accounts`
-- `account_links`
-- `magic_codes`
-
-## Observação MVP
-No ambiente atual, retorno pode incluir `devCode` para teste manual sem provedor de e-mail.
+Consulte: `auth-v2-device-userpass.md`.

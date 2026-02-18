@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T22:37:00Z",
+  "updatedAt": "2026-02-18T22:45:00Z",
   "statusLegend": {
     "epic": [
       "todo",
@@ -32,7 +32,7 @@
             "Vínculo device->guest único com marcação de migração.",
             "Sem quebra de compatibilidade do gameplay atual."
           ],
-          "updatedAt": "2026-02-18T22:28:00Z"
+          "updatedAt": "2026-02-18T22:45:00Z"
         },
         {
           "id": "P14-S2",
@@ -44,7 +44,7 @@
             "Device com guest migrado retorna erro orientando login por usuário/senha.",
             "Fluxo preserva worldId e token de sessão."
           ],
-          "updatedAt": "2026-02-18T22:28:00Z"
+          "updatedAt": "2026-02-18T22:45:00Z"
         },
         {
           "id": "P14-S3",
@@ -56,19 +56,19 @@
             "Login com verificação de hash e erro genérico em credenciais inválidas.",
             "Resposta inclui guestId/token para compatibilidade atual."
           ],
-          "updatedAt": "2026-02-18T22:28:00Z"
+          "updatedAt": "2026-02-18T22:45:00Z"
         },
         {
           "id": "P14-S4",
           "title": "Upgrade guest -> conta (irreversível)",
-          "status": "todo",
+          "status": "doing",
           "objective": "Permitir que sessão guest vire conta usuário/senha, desativando acesso guest do device.",
           "acceptanceCriteria": [
             "Upgrade associa guest existente a usuário.",
             "Após upgrade, acesso por guest do mesmo device é bloqueado.",
             "Progresso permanece no guest vinculado (compatibilidade)."
           ],
-          "updatedAt": "2026-02-18T22:28:00Z"
+          "updatedAt": "2026-02-18T22:45:00Z"
         },
         {
           "id": "P14-S5",
@@ -80,7 +80,7 @@
             "Guest logado consegue vincular usuário/senha.",
             "Remover dependência do fluxo de código mágico."
           ],
-          "updatedAt": "2026-02-18T22:28:00Z"
+          "updatedAt": "2026-02-18T22:45:00Z"
         },
         {
           "id": "P14-S6",
@@ -92,10 +92,10 @@
             "Plano de desligamento de rotas antigas documentado.",
             "Testes de regressão dos fluxos críticos."
           ],
-          "updatedAt": "2026-02-18T22:28:00Z"
+          "updatedAt": "2026-02-18T22:45:00Z"
         }
       ],
-      "updatedAt": "2026-02-18T22:37:00Z"
+      "updatedAt": "2026-02-18T22:45:00Z"
     }
   ]
 }

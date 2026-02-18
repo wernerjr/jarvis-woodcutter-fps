@@ -36,10 +36,11 @@ Objetivo: facilitar onboarding, evolução de arquitetura e alinhamento entre en
   - [Game Design Document (GDD)](./business/game-design.md)
 
 ## 5. Atualizações recentes (antes do roadmap atual)
-- **Conta vinculada (P11)** implementada:
-  - rotas backend para código mágico (`/api/auth/link/*`, `/api/auth/login/*`),
-  - tabelas `accounts`, `account_links`, `magic_codes`,
-  - fluxo client para vincular conta e login por e-mail/código.
+- **Auth v2 (P14) em andamento**:
+  - guest único por dispositivo (`/api/auth/device/guest`),
+  - cadastro/login por usuário e senha (`/api/auth/register`, `/api/auth/login`),
+  - upgrade guest->conta com bloqueio de reuso guest no device.
+- **Conta vinculada por código mágico (P11)** permanece apenas como histórico legado (descontinuado no runtime atual).
 - **Inventário/Hotbar** evoluídos para modelo de atalho:
   - slot de mão fixo,
   - atribuição por teclado (hover + número),

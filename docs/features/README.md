@@ -13,7 +13,7 @@
 6. [Sistema de forja (furnace)](./forge-system.md)
 7. [Sistema de baú (chest)](./chest-system.md)
 8. [Loop de progressão e economia de recursos](./progression-economy.md)
-9. [Conta vinculada e login por código mágico](./account-linked-auth.md)
+9. [Auth v2 (guest por dispositivo + usuário/senha)](./auth-v2-device-userpass.md)
 10. [Inventário/Hotbar e UX de interação](./inventory-hotbar-ux.md)
 
 ## 2. Convenção de leitura
