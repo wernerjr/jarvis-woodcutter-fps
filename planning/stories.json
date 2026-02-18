@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T02:18:56Z",
+  "updatedAt": "2026-02-18T02:30:15Z",
   "statusLegend": {
     "epic": [
       "todo",
@@ -243,13 +243,13 @@
     {
       "id": "P10",
       "title": "Item raro: Maçã + Buff de Sorte (5 min dobra drops)",
-      "status": "todo",
+      "status": "doing",
       "objective": "Introduzir item raro Maçã (drop 0,5% em árvore) que ao consumir ativa buff temporário de sorte por 5 minutos, dobrando apenas drops/coletas.",
       "stories": [
         {
           "id": "P10-S1",
           "title": "Adicionar item Maçã + drop raro 0,5% em árvore",
-          "status": "todo",
+          "status": "done",
           "objective": "Criar Maçã como item stackable e inserir chance de drop (0,5%) ao confirmar treeCut.",
           "acceptanceCriteria": [
             "Novo ItemId para maçã e definição em ITEMS.",
@@ -264,7 +264,8 @@
             "Forçar chance 100% via flag temporária (dev) e validar que entra no inventário.",
             "Restaurar chance real (0,5%)."
           ],
-          "mvp": true
+          "mvp": true,
+          "updatedAt": "2026-02-18T02:30:15Z"
         },
         {
           "id": "P10-S2",
@@ -309,7 +310,8 @@
           ],
           "mvp": true
         }
-      ]
+      ],
+      "updatedAt": "2026-02-18T02:30:15Z"
     }
   ]
 }

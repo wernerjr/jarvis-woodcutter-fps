@@ -1222,6 +1222,14 @@ export class Game {
         this.ui.toast(`Bônus Lenhador! ${parts.join(' ')}`, 1400)
       }
 
+      // P10-S1: rare apple drop from confirmed tree cut (0.5%)
+      const appleDrop = Math.random() < 0.005
+      if (appleDrop) {
+        const appleOverflow = this.inventory.add(ItemId.APPLE, 1)
+        if (appleOverflow) this.ui.toast('Item raro! +1 Maçã (excedente descartado)', 1400)
+        else this.ui.toast('Item raro! +1 Maçã', 1400)
+      }
+
       if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     })
 

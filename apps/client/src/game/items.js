@@ -16,6 +16,7 @@ export const ItemId = {
   WOODCUTTER_PANTS: 'woodcutter_pants',
   WOODCUTTER_BOOTS: 'woodcutter_boots',
   WOODCUTTER_GLOVES: 'woodcutter_gloves',
+  APPLE: 'apple',
 
   AXE_STONE: 'axe_stone',
   AXE_METAL: 'axe_metal',
@@ -48,6 +49,7 @@ export const ITEMS = {
   [ItemId.WOODCUTTER_PANTS]: { id: ItemId.WOODCUTTER_PANTS, name: 'Calça do Lenhador', icon: '👖', stackable: false, equipSlot: 'pants' },
   [ItemId.WOODCUTTER_BOOTS]: { id: ItemId.WOODCUTTER_BOOTS, name: 'Bota do Lenhador', icon: '🥾', stackable: false, equipSlot: 'boots' },
   [ItemId.WOODCUTTER_GLOVES]: { id: ItemId.WOODCUTTER_GLOVES, name: 'Luva do Lenhador', icon: '🧤', stackable: false, equipSlot: 'gloves' },
+  [ItemId.APPLE]: { id: ItemId.APPLE, name: 'Maçã', icon: '🍎', stackable: true },
 
   [ItemId.AXE_STONE]: { id: ItemId.AXE_STONE, name: 'Machado de Pedra', icon: '🪓🪨', stackable: false },
   [ItemId.AXE_METAL]: { id: ItemId.AXE_METAL, name: 'Machado de Metal', icon: '🪓⚙️', stackable: false },
