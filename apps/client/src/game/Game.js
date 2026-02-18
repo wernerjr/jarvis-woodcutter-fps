@@ -206,6 +206,8 @@ export class Game {
     // Hotbar items (separate container). Slot 0 is fixed hand.
     this.hotbar = Array.from({ length: 10 }, (_, i) => (i === 0 ? { id: 'hand', qty: 1 } : null))
     this.hotbarActive = 0
+    this._hoverInvIdx = -1
+    this._selectedInvIdx = -1
 
     this.tool = 'hand'
 
@@ -1124,7 +1126,7 @@ export class Game {
       } else {
         this.ui.toast(`Loot: +${oreQty} minério de ferro`, 1100)
         this.sfx.pickup()
-        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+        if (this.state === 'inventory') this._renderInventoryUI()
       }
     })
 
@@ -1245,7 +1247,7 @@ export class Game {
       this.sfx.chop()
       this.ui.toastHtml(lines.join('<br>'), 1700)
 
-      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      if (this.state === 'inventory') this._renderInventoryUI()
     })
 
     const sent = this._sendWorldEvent({ kind: 'treeCut', treeId, x: hit.point.x, z: hit.point.z, at: Date.now() })
@@ -1379,7 +1381,7 @@ export class Game {
         }
 
         this.ui.toast(msg, 1100)
-        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+        if (this.state === 'inventory') this._renderInventoryUI()
       })
 
       const sent = this._sendWorldEvent({ kind: 'harvest', plotId, x: snap.x, z: snap.z, at: Date.now() })
@@ -1417,7 +1419,7 @@ export class Game {
 
         this.ui.toast('Plantou algodão.', 900)
         this.sfx.pickup()
-        if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+        if (this.state === 'inventory') this._renderInventoryUI()
       })
 
       const sent = this._sendWorldEvent({ kind: 'plant', plotId, seedId: ItemId.COTTON_SEED, x: snap.x, z: snap.z, at: Date.now() })
@@ -1504,7 +1506,7 @@ export class Game {
       }
     }
 
-    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this._renderInventoryUI()
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
 
     this.selectHotbar(0)
@@ -1575,7 +1577,7 @@ export class Game {
     }
     this.hotbarActive = 0
 
-    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this._renderInventoryUI()
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
 
     this.trees.resetAll()
@@ -1603,7 +1605,7 @@ export class Game {
     }
     this.hotbarActive = 0
 
-    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    this._renderInventoryUI()
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
 
     this.trees.resetAll()
@@ -1647,7 +1649,7 @@ export class Game {
     this.player.setLocked(false)
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
 
-    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], { slotCountHint: this.inventory.slotCount })
+    this._renderInventoryUI()
     this.ui.renderEquipment?.(this.equipment, (id) => ITEMS[id])
     this.ui.setBuffLine?.(this._getBuffLine())
     this.ui.showInventory()
@@ -1696,7 +1698,7 @@ export class Game {
 
     // If inventory is open, rerender.
     if (this.state === 'inventory') {
-      this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], { slotCountHint: this.inventory.slotCount })
+      this._renderInventoryUI()
     }
   }
 
@@ -1992,7 +1994,7 @@ export class Game {
     if (this.state === 'crafting') {
       this.ui.renderCrafting(RECIPES, (id) => this.inventory.count(id), (id) => ITEMS[id], (rid) => this.craft(rid))
     }
-    if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+    if (this.state === 'inventory') this._renderInventoryUI()
 
     // If crafted a tool, allow equipping.
     this.ui.setHotbarActive(this.tool)
@@ -2006,7 +2008,7 @@ export class Game {
       this._pendingDeleteIdx = null
       this._pendingDeleteUntil = 0
       this.ui.toast('Item removido.', 900)
-      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      if (this.state === 'inventory') this._renderInventoryUI()
       return
     }
 
@@ -2135,6 +2137,61 @@ export class Game {
     this._hoverInvIdx = Number.isInteger(idx) ? idx : -1
   }
 
+  setInventorySelectedIndex(invIdx) {
+    const idx = Number(invIdx)
+    this._selectedInvIdx = Number.isInteger(idx) ? idx : -1
+    if (this.state === 'inventory') this._renderInventoryUI()
+  }
+
+  _buildHotbarShortcutMap() {
+    const map = {}
+    for (let i = 1; i <= 9; i++) {
+      const s = this.hotbar?.[i]
+      if (!s?.id || s.id === 'hand') continue
+      map[s.id] = i
+    }
+    return map
+  }
+
+  _renderInventoryUI() {
+    this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], {
+      slotCountHint: this.inventory.slotCount,
+      selectedIndex: this._selectedInvIdx,
+      hotbarByItemId: this._buildHotbarShortcutMap(),
+    })
+  }
+
+  _assignInventoryItemToHotbar(invIdx, hotIdx) {
+    const idx = Number(invIdx)
+    const hi = Number(hotIdx)
+    if (!Number.isInteger(idx) || idx < 0) return false
+    if (!Number.isInteger(hi) || hi < 0 || hi > 9) return false
+    if (hi === 0) {
+      this.ui.toast('Slot 0 é reservado para mão.', 1000)
+      return false
+    }
+
+    const src = this.inventory?.slots?.[idx]
+    if (!src) {
+      this.ui.toast('Slot vazio.', 900)
+      this.sfx.click?.()
+      return false
+    }
+
+    // Item só pode existir em 1 slot da hotbar: remove de outros atalhos.
+    for (let i = 1; i <= 9; i++) {
+      if (i === hi) continue
+      if (this.hotbar?.[i]?.id === src.id) this.hotbar[i] = null
+    }
+
+    this.hotbar[hi] = {
+      id: src.id,
+      qty: src.qty,
+      meta: src.meta ? { ...src.meta } : undefined,
+    }
+    return true
+  }
+
   assignHoverItemToHotbar(hotIdx) {
     if (this.state !== 'inventory') return
     const idx = Number(this._hoverInvIdx)
@@ -2143,29 +2200,12 @@ export class Game {
       this.sfx.click?.()
       return
     }
-    const src = this.inventory?.slots?.[idx]
-    if (!src) {
-      this.ui.toast('Slot vazio.', 900)
-      this.sfx.click?.()
-      return
-    }
-
-    const hi = Number(hotIdx)
-    if (!Number.isInteger(hi) || hi < 0 || hi > 9) return
-    if (hi === 0) {
-      this.ui.toast('Slot 0 é reservado para mão.', 1000)
-      return
-    }
-
-    // Hotbar agora é atalho: NÃO remove do inventário.
-    this.hotbar[hi] = {
-      id: src.id,
-      qty: src.qty,
-      meta: src.meta ? { ...src.meta } : undefined,
-    }
+    if (!this._assignInventoryItemToHotbar(idx, hotIdx)) return
 
     this.ui.renderHotbar(this.hotbar, (id) => this._getHotbarItemDef(id), this.hotbarActive)
-    this.ui.toast(`Atalho ${hi}: ${ITEMS[src.id]?.name || src.id}`, 900)
+    this._renderInventoryUI()
+    const s = this.inventory?.slots?.[idx]
+    this.ui.toast(`Atalho ${hotIdx}: ${ITEMS[s?.id]?.name || s?.id || ''}`, 900)
     this._queuePlayerSave()
   }
 
@@ -2765,6 +2805,14 @@ export class Game {
     const src = srcArr[sIdx]
     if (!src) return
 
+    // Inventory -> hotbar (atalho): não move item, só referencia por id no atalho.
+    if (from.from === 'inv' && to.to === 'hot') {
+      const ok = this._assignInventoryItemToHotbar(sIdx, dIdx)
+      if (!ok) return
+      this._postMoveUpdate(sIdx, dIdx)
+      return
+    }
+
     // Forge slot rules
     if (to.to === 'forge') {
       if (to.kind === 'out') return
@@ -2877,7 +2925,7 @@ export class Game {
     // Re-render if inventory/forge/chest open.
     if (this.state === 'inventory' || this.state === 'forge' || this.state === 'chest') {
       if (this.state === 'inventory') {
-        this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], { slotCountHint: this.inventory.slotCount })
+        this._renderInventoryUI()
         this.ui.renderEquipment?.(this.equipment, (id) => ITEMS[id])
         this.ui.setBuffLine?.(this._getBuffLine())
       }
@@ -3728,7 +3776,7 @@ export class Game {
         } else {
           this.ui.toast(`Pegou: +${stoneQty} pedra`, 900)
           this.sfx.pickup()
-          if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+          if (this.state === 'inventory') this._renderInventoryUI()
         }
       })
 
@@ -3760,7 +3808,7 @@ export class Game {
         } else {
           this.ui.toast(`Pegou: +${stickQty} galho`, 900)
           this.sfx.pickup()
-          if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+          if (this.state === 'inventory') this._renderInventoryUI()
         }
       })
 
@@ -3807,7 +3855,7 @@ export class Game {
       else this.sfx.pickup()
 
       this.ui.toast(msg, 1100)
-      if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
+      if (this.state === 'inventory') this._renderInventoryUI()
     })
 
     // IMPORTANT: use root position for chunking (hit.point can be across chunk border on large hitbox)

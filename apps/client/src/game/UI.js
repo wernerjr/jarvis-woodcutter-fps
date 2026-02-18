@@ -1097,26 +1097,29 @@ export class UI {
     if (nextId) void setActiveRecipe(nextId)
   }
 
-  renderInventory(slots, getItem, { slotCountHint = null } = {}) {
+  renderInventory(slots, getItem, { slotCountHint = null, selectedIndex = -1, hotbarByItemId = null } = {}) {
     const grid = this.els.invGridEl
     grid.innerHTML = ''
 
     if (this.els.invHintEl) {
       const base = typeof slotCountHint === 'number' ? `${slotCountHint} slots` : `${slots.length} slots`
-      this.els.invHintEl.innerHTML = `${base} • stacks até 100 • <b>I</b> para abrir/fechar`
+      this.els.invHintEl.innerHTML = `${base} • stacks até 100 • passe o mouse + <b>1-9</b> para atalho • <b>I</b> para abrir/fechar`
     }
 
     for (let i = 0; i < slots.length; i++) {
       const s = slots[i]
+      const selected = i === Number(selectedIndex)
       const cell = document.createElement('div')
-      cell.className = 'invSlot' + (s ? ' draggable' : ' invEmpty')
+      cell.className = 'invSlot' + (s ? ' draggable' : ' invEmpty') + (selected ? ' selected' : '')
       cell.dataset.index = String(i)
 
       if (s) {
         const item = getItem(s.id)
         cell.draggable = true
         const extra = item.stackable ? `${s.qty} / 100` : this._toolLine(s)
-        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div></div><div class="invQty">${extra}</div>`
+        const hot = hotbarByItemId?.[s.id]
+        const hotBadge = Number.isInteger(hot) ? `<div class="invHotBadge">${hot}</div>` : ''
+        cell.innerHTML = `<div class="invTop"><div class="invIcon">${item.icon}</div><div class="invName">${item.name}</div>${hotBadge}</div><div class="invQty">${extra}</div>`
       } else {
         cell.innerHTML = ''
       }
