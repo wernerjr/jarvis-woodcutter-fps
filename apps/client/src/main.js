@@ -579,7 +579,12 @@ invHotbarMirror?.addEventListener('contextmenu', (e) => {
   game.clearHotbarSlot(hotIdx)
 })
 
+function setLoadingLock(v) {
+  document.body.classList.toggle('loading-lock', !!v)
+}
+
 $('#btnPlay').addEventListener('click', async () => {
+  setLoadingLock(true)
   try {
     await bootAndLoadAll()
 
@@ -594,6 +599,7 @@ $('#btnPlay').addEventListener('click', async () => {
     ui.toast('Falha ao carregar (servidor indisponível).', 1600)
   } finally {
     ui.hideLoading()
+    setLoadingLock(false)
   }
 })
 $('#btnControls').addEventListener('click', () => game.openControls('menu'))

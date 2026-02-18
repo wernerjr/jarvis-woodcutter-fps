@@ -372,6 +372,8 @@ export class Game {
   }
 
   _onKeyDownAny(e) {
+    if (document.body.classList.contains('loading-lock')) return
+
     // Hotbar slots (teclado): 1..9,0 -> índices 0..9
     // idx 0 (tecla 1) = mão fixa.
     const digitMap = {
@@ -981,6 +983,7 @@ export class Game {
   }
 
   _onCanvasClickAny(e) {
+    if (document.body.classList.contains('loading-lock')) return
     if (this.state !== 'playing') return
 
     // Only relock when no modal/menu is open (state===playing), and we're currently unlocked.
@@ -1023,6 +1026,7 @@ export class Game {
   }
 
   _onMouseDownAny(e) {
+    if (document.body.classList.contains('loading-lock')) return
     if (this.state !== 'playing') return
     if (performance.now() < (this._suppressMouseDownUntil || 0)) return
     if (document.pointerLockElement !== this.canvas) return

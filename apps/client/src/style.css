@@ -82,6 +82,10 @@ body:not(.inventory-open) #hotbar .hotSlot{user-select:none;}
               linear-gradient(180deg, rgba(0,0,0,.72), rgba(0,0,0,.78));}
 
 /* Loading */
+#loading.overlay{pointer-events:auto; z-index: 40;}
+.loading-lock #ui > *:not(#loading){pointer-events:none !important;}
+.loading-lock #loading{pointer-events:auto !important;}
+
 .loadingCard{width:min(520px, 92vw)}
 .loadingTitle{font-size:20px; font-weight:800; margin-bottom:6px}
 .loadingBar{height:10px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.08); margin-top:10px}
