@@ -1105,12 +1105,13 @@ export class Game {
       // Now confirmed: apply local break visual + loot.
       this.ores.confirmBreak(String(hit.oreId))
 
-      const overflow = this.inventory.add(ItemId.IRON_ORE, 2)
+      const oreQty = this._withLuckMultiplier(2)
+      const overflow = this.inventory.add(ItemId.IRON_ORE, oreQty)
       if (overflow) {
         this.ui.toast('Inventário cheio: minério descartado.', 1200)
         this.sfx.click()
       } else {
-        this.ui.toast('Loot: +2 minério de ferro', 1100)
+        this.ui.toast(`Loot: +${oreQty} minério de ferro`, 1100)
         this.sfx.pickup()
         if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
       }
@@ -1193,9 +1194,9 @@ export class Game {
       // P9-S2: full woodcutter set grants independent extra rolls (25%).
       const bonus = this._rollWoodcutterBonusTreeLoot()
 
-      const gainLog = 1 + (bonus.log || 0)
-      const gainStick = sticks + (bonus.stick || 0)
-      const gainLeaf = leaves + (bonus.leaf || 0)
+      const gainLog = this._withLuckMultiplier(1 + (bonus.log || 0))
+      const gainStick = this._withLuckMultiplier(sticks + (bonus.stick || 0))
+      const gainLeaf = this._withLuckMultiplier(leaves + (bonus.leaf || 0))
 
       const dropped = []
       const overflowLog = this.inventory.add(ItemId.LOG, gainLog)
@@ -1286,6 +1287,11 @@ export class Game {
     this._queuePlayerSave?.()
   }
 
+  _withLuckMultiplier(qty) {
+    const n = Math.max(0, Math.floor(Number(qty) || 0))
+    return this._isLuckActive() ? n * 2 : n
+  }
+
   _tryHoe() {
     if (this.state !== 'playing') return
     if (document.pointerLockElement !== this.canvas) return
@@ -1335,20 +1341,24 @@ export class Game {
           this._cleanupHotbarBroken(slot.id, this.hotbarActive)
         }
 
-        // Drops: always return 1 seed + 30% chance of an extra seed
-        const fiberOverflow = this.inventory.add(ItemId.FIBER, 2)
-        const seedOverflow1 = this.inventory.add(ItemId.COTTON_SEED, 1)
+        // Drops: always return 1 seed + 30% chance of an extra seed.
+        // Luck buff doubles harvest quantities.
         const extraSeed = Math.random() < 0.30
-        const seedOverflow2 = extraSeed ? this.inventory.add(ItemId.COTTON_SEED, 1) : 0
+        const fiberQty = this._withLuckMultiplier(2)
+        const seedQty = this._withLuckMultiplier(1 + (extraSeed ? 1 : 0))
+
+        const fiberOverflow = this.inventory.add(ItemId.FIBER, fiberQty)
+        const seedOverflow = this.inventory.add(ItemId.COTTON_SEED, seedQty)
 
         const dropped = []
         if (fiberOverflow) dropped.push('fibra')
-        if (seedOverflow1 || seedOverflow2) dropped.push('semente')
+        if (seedOverflow) dropped.push('semente')
 
-        const baseMsg = extraSeed ? 'Colheu: +2 fibra +2 sementes' : 'Colheu: +2 fibra +1 semente'
+        const seedWord = seedQty === 1 ? 'semente' : 'sementes'
+        const baseMsg = `Colheu: +${fiberQty} fibra +${seedQty} ${seedWord}`
         const msg = dropped.length ? `${baseMsg} (excedente descartado)` : baseMsg
 
-        if (fiberOverflow || seedOverflow1 || seedOverflow2) {
+        if (fiberOverflow || seedOverflow) {
           this.sfx.click()
         } else {
           this.sfx.pickup()
@@ -3648,12 +3658,13 @@ export class Game {
         const ok = this.rocks.collect(rockId, { world: true })
         if (!ok) return
 
-        const overflow = this.inventory.add(ItemId.STONE, 1)
+        const stoneQty = this._withLuckMultiplier(1)
+        const overflow = this.inventory.add(ItemId.STONE, stoneQty)
         if (overflow) {
           this.ui.toast('Inventário cheio: pedra descartada.', 1200)
           this.sfx.click()
         } else {
-          this.ui.toast('Pegou: +1 pedra', 900)
+          this.ui.toast(`Pegou: +${stoneQty} pedra`, 900)
           this.sfx.pickup()
           if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
         }
@@ -3709,23 +3720,25 @@ export class Game {
       const ok = this.bushes.collect(bushId, { world: true })
       if (!ok) return
 
-      // Drops: always leaves + 20% cotton_seed
-      const leaves = 2
+      // Drops: always leaves + 20% cotton_seed. Luck doubles bush quantities.
       const gotSeed = Math.random() < 0.20
+      const leavesQty = this._withLuckMultiplier(2)
+      const seedQty = gotSeed ? this._withLuckMultiplier(1) : 0
 
       const dropped = []
-      const overflowLeaf = this.inventory.add(ItemId.LEAF, leaves)
+      const overflowLeaf = this.inventory.add(ItemId.LEAF, leavesQty)
       if (overflowLeaf) dropped.push(`${overflowLeaf} ${ITEMS[ItemId.LEAF].name}`)
 
       let overflowSeed = 0
-      if (gotSeed) {
-        overflowSeed = this.inventory.add(ItemId.COTTON_SEED, 1)
+      if (seedQty > 0) {
+        overflowSeed = this.inventory.add(ItemId.COTTON_SEED, seedQty)
         if (overflowSeed) dropped.push(`${overflowSeed} ${ITEMS[ItemId.COTTON_SEED].name}`)
       }
 
-      const msg = gotSeed
-        ? (dropped.length ? `Coletou: +${leaves} folhas +1 semente (excedente descartado)` : `Coletou: +${leaves} folhas +1 semente`)
-        : (dropped.length ? `Coletou: +${leaves} folhas (excedente descartado)` : `Coletou: +${leaves} folhas`)
+      const seedWord = seedQty === 1 ? 'semente' : 'sementes'
+      const msg = seedQty > 0
+        ? (dropped.length ? `Coletou: +${leavesQty} folhas +${seedQty} ${seedWord} (excedente descartado)` : `Coletou: +${leavesQty} folhas +${seedQty} ${seedWord}`)
+        : (dropped.length ? `Coletou: +${leavesQty} folhas (excedente descartado)` : `Coletou: +${leavesQty} folhas`)
 
       if (dropped.length) this.sfx.click()
       else this.sfx.pickup()
