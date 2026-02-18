@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T22:32:00Z",
+  "updatedAt": "2026-02-18T22:37:00Z",
   "statusLegend": {
     "epic": [
       "todo",
@@ -85,7 +85,7 @@
         {
           "id": "P14-S6",
           "title": "Hardening e migração",
-          "status": "todo",
+          "status": "doing",
           "objective": "Adicionar rate-limit e plano de migração/descontinuação do auth antigo.",
           "acceptanceCriteria": [
             "Rate limit mínimo em register/login/guest ensure.",
@@ -95,7 +95,7 @@
           "updatedAt": "2026-02-18T22:28:00Z"
         }
       ],
-      "updatedAt": "2026-02-18T22:32:00Z"
+      "updatedAt": "2026-02-18T22:37:00Z"
     }
   ]
 }
