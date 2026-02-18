@@ -17,6 +17,7 @@ const ui = new UI({
   invHintEl: document.querySelector('#invHint'),
   invEquipGridEl: document.querySelector('#invEquipGrid'),
   invBuffLineEl: document.querySelector('#invBuffLine'),
+  luckHudLineEl: document.querySelector('#luckHudLine'),
   forgeEl: document.querySelector('#forge'),
   chestEl: document.querySelector('#chest'),
   chestInvGridEl: document.querySelector('#chestInvGrid'),

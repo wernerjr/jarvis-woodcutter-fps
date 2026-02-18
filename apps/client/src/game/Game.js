@@ -1207,29 +1207,32 @@ export class Game {
       if (overflowStick) dropped.push(`${overflowStick} ${ITEMS[ItemId.STICK].name}`)
       if (overflowLeaf) dropped.push(`${overflowLeaf} ${ITEMS[ItemId.LEAF].name}`)
 
-      const m = dropped.length
+      const baseLootMsg = dropped.length
         ? `Loot: +${gainLog} tronco, +${gainStick} galhos, +${gainLeaf} folhas (excedente descartado)`
         : `Loot: +${gainLog} tronco, +${gainStick} galhos, +${gainLeaf} folhas`
 
-      this.sfx.chop()
-      this.ui.toast(m, 1400)
-
+      let lines = [baseLootMsg]
       const hasAnyBonus = (bonus.log || 0) > 0 || (bonus.stick || 0) > 0 || (bonus.leaf || 0) > 0
       if (hasAnyBonus) {
         const parts = []
         if (bonus.log) parts.push(`+${bonus.log} Tronco`)
         if (bonus.stick) parts.push(`+${bonus.stick} Galhos`)
         if (bonus.leaf) parts.push(`+${bonus.leaf} Folhas`)
-        this.ui.toast(`Bônus Lenhador! ${parts.join(' ')}`, 1400)
+        lines.push(`Bônus Lenhador! ${parts.join(' ')}`)
       }
 
       // P10-S1: rare apple drop from confirmed tree cut (0.5%)
       const appleDrop = Math.random() < 0.005
       if (appleDrop) {
         const appleOverflow = this.inventory.add(ItemId.APPLE, 1)
-        if (appleOverflow) this.ui.toast('Item raro! +1 Maçã (excedente descartado)', 1400)
-        else this.ui.toast('Item raro! +1 Maçã', 1400)
+        const appleMsg = appleOverflow
+          ? '<span class="rareLoot">🍎 ITEM RARO! +1 Maçã (excedente descartado)</span>'
+          : '<span class="rareLoot">🍎 ITEM RARO! +1 Maçã</span>'
+        lines.push(appleMsg)
       }
+
+      this.sfx.chop()
+      this.ui.toastHtml(lines.join('<br>'), 1700)
 
       if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     })
@@ -1647,6 +1650,16 @@ export class Game {
     const mm = Math.floor(s / 60)
     const ss = s % 60
     return `Sorte ativa: ${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+  }
+
+  _getLuckHudLine() {
+    const now = Date.now()
+    const rem = Math.max(0, Number(this.buffs?.luckUntilMs || 0) - now)
+    if (rem <= 0) return ''
+    const s = Math.ceil(rem / 1000)
+    const mm = Math.floor(s / 60)
+    const ss = s % 60
+    return `🍎 Sorte x2: ${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
   }
 
   _isEquipSlotName(name) {
@@ -3690,12 +3703,13 @@ export class Game {
         const ok = this.sticks.collect(stickId, { world: true })
         if (!ok) return
 
-        const overflow = this.inventory.add(ItemId.STICK, 1)
+        const stickQty = this._withLuckMultiplier(1)
+        const overflow = this.inventory.add(ItemId.STICK, stickQty)
         if (overflow) {
           this.ui.toast('Inventário cheio: galho descartado.', 1200)
           this.sfx.click()
         } else {
-          this.ui.toast('Pegou: +1 galho', 900)
+          this.ui.toast(`Pegou: +${stickQty} galho`, 900)
           this.sfx.pickup()
           if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
         }
@@ -3775,8 +3789,13 @@ export class Game {
     const drift = srv
       ? Math.hypot((srv.x || 0) - this.player.position.x, (srv.z || 0) - this.player.position.z)
       : null
-    const netLine = `NET: WS ${wsStatus} • remote: ${remoteCount}${this.wsMeId ? ` • me: ${String(this.wsMeId).slice(0, 8)}` : ''}${drift != null ? ` • drift: ${drift.toFixed(2)}` : ''}${extra ? ` • ${extra}` : ''}`
-    this.ui.setNetDebug?.(this.perfEnabled ? netLine : null)
+    const netLines = [
+      `NET: WS ${wsStatus}`,
+      `remote: ${remoteCount}${this.wsMeId ? ` • me: ${String(this.wsMeId).slice(0, 8)}` : ''}`,
+      drift != null ? `drift: ${drift.toFixed(2)}` : null,
+      extra ? String(extra) : null,
+    ].filter(Boolean)
+    this.ui.setNetDebug?.(this.perfEnabled ? netLines.join('\n') : null)
 
     // Contextual interaction hint (only when playing + locked).
     if (this.state === 'playing' && document.pointerLockElement === this.canvas) {
@@ -3788,6 +3807,9 @@ export class Game {
       this.ui.setInteractHint(null)
       this._updateTargetHighlight(null)
     }
+
+    // HUD buff line (luck timer)
+    this.ui.setLuckHudLine?.(this._getLuckHudLine())
 
     // Hard-guard: never leave wheel visuals around unless the wheel is actually open.
     if (this.state === 'playing' && !this._wheelOpen) this.ui.hideWheel?.()

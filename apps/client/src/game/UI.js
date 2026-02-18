@@ -14,7 +14,8 @@ export class UI {
       el.style.opacity = '0.9'
       el.style.fontSize = '12px'
       el.style.marginTop = '6px'
-      el.style.whiteSpace = 'pre'
+      el.style.whiteSpace = 'pre-wrap'
+      el.style.wordBreak = 'break-word'
       this.els.perfEl.appendChild(el)
     }
     el.textContent = text
@@ -128,7 +129,7 @@ export class UI {
     return `Dur: ${dur ?? '-'}`
   }
 
-  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, invHintEl?: HTMLElement, invEquipGridEl?: HTMLElement, invBuffLineEl?: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, chestEl?: HTMLElement, chestInvGridEl?: HTMLElement, chestSlotsEl?: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement, hitmarkerEl?: HTMLElement, loadingEl?: HTMLElement, loadingHintEl?: HTMLElement, loadingBarFillEl?: HTMLElement}} els */
+  /** @param {{scoreEl: HTMLElement, toastEl: HTMLElement, hudEl: HTMLElement, menuEl: HTMLElement, pauseEl: HTMLElement, controlsEl: HTMLElement, inventoryEl: HTMLElement, invGridEl: HTMLElement, invHintEl?: HTMLElement, invEquipGridEl?: HTMLElement, invBuffLineEl?: HTMLElement, luckHudLineEl?: HTMLElement, forgeEl: HTMLElement, forgeFuelEl: HTMLElement, forgeInEl: HTMLElement, forgeOutEl: HTMLElement, forgeInvGridEl: HTMLElement, chestEl?: HTMLElement, chestInvGridEl?: HTMLElement, chestSlotsEl?: HTMLElement, forgeTableEl: HTMLElement, forgeTableListEl: HTMLElement, actionWheelEl: HTMLElement, craftingEl: HTMLElement, craftListEl: HTMLElement, clockEl: HTMLElement, timeMarkerEl: HTMLElement, icoSunEl: HTMLElement, icoMoonEl: HTMLElement, perfEl: HTMLElement, perfFpsEl: HTMLElement, perfMsEl: HTMLElement, perfMemRowEl: HTMLElement, perfMemEl: HTMLElement, hitmarkerEl?: HTMLElement, loadingEl?: HTMLElement, loadingHintEl?: HTMLElement, loadingBarFillEl?: HTMLElement}} els */
   constructor(els) {
     this.els = els
     this._toastUntil = 0
@@ -162,6 +163,13 @@ export class UI {
   toast(text, ms = 1100) {
     const el = this.els.toastEl
     el.textContent = text
+    el.classList.add('show')
+    this._toastUntil = performance.now() + ms
+  }
+
+  toastHtml(html, ms = 1100) {
+    const el = this.els.toastEl
+    el.innerHTML = String(html || '')
     el.classList.add('show')
     this._toastUntil = performance.now() + ms
   }
@@ -1150,6 +1158,18 @@ export class UI {
 
   setBuffLine(text) {
     const el = this.els.invBuffLineEl
+    if (!el) return
+    if (!text) {
+      el.textContent = ''
+      el.classList.add('hidden')
+      return
+    }
+    el.textContent = text
+    el.classList.remove('hidden')
+  }
+
+  setLuckHudLine(text) {
+    const el = this.els.luckHudLineEl
     if (!el) return
     if (!text) {
       el.textContent = ''
