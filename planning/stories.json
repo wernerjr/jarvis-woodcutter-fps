@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T02:17:54Z",
+  "updatedAt": "2026-02-18T02:18:56Z",
   "statusLegend": {
     "epic": [
       "todo",
@@ -185,7 +185,7 @@
     {
       "id": "P9",
       "title": "Vestimenta inicial: Conjunto do Lenhador (por peça) + bônus no corte de árvores",
-      "status": "doing",
+      "status": "done",
       "objective": "Adicionar peças craftáveis (chapéu/camisa/calça/bota/luva) feitas de linho+corda. Enquanto o conjunto completo estiver equipado, aplicar bônus de chance de drops extras em árvores.",
       "stories": [
         {
@@ -213,12 +213,12 @@
             "Salvar/recarregar no meio do timer: estado permanece consistente."
           ],
           "mvp": true,
-          "updatedAt": "2026-02-18T02:17:54Z"
+          "updatedAt": "2026-02-18T02:18:56Z"
         },
         {
           "id": "P9-S2",
           "title": "Bônus do Lenhador: chance de drops extras ao cortar árvore (modelo A)",
-          "status": "todo",
+          "status": "done",
           "objective": "Quando o conjunto completo (5 peças) estiver equipado, aplicar chance de drop extra ao confirmar treeCut: +1 tronco, +2 galhos, +5 folhas (rolagens independentes) além do loot base.",
           "acceptanceCriteria": [
             "Sem conjunto completo: loot permanece 1 log + (2-5) sticks + (10-20) leaves.",
@@ -234,10 +234,11 @@
             "Cortar ~30 árvores com set completo: observar ocorrências (probabilístico).",
             "2 jogadores simultâneos: cada um recebe seu loot; sem duplicação indevida."
           ],
-          "mvp": true
+          "mvp": true,
+          "updatedAt": "2026-02-18T02:18:56Z"
         }
       ],
-      "updatedAt": "2026-02-18T02:17:54Z"
+      "updatedAt": "2026-02-18T02:18:56Z"
     },
     {
       "id": "P10",

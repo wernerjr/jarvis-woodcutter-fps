@@ -1186,25 +1186,41 @@ export class Game {
       this.score += 1
       this.ui.setScore(this.score)
 
-      // Loot rule (fixed): 1 log, 2–5 sticks, 10–20 leaves.
+      // Loot base: 1 log, 2–5 sticks, 10–20 leaves.
       const sticks = this._randInt(2, 5)
       const leaves = this._randInt(10, 20)
 
+      // P9-S2: full woodcutter set grants independent extra rolls (25%).
+      const bonus = this._rollWoodcutterBonusTreeLoot()
+
+      const gainLog = 1 + (bonus.log || 0)
+      const gainStick = sticks + (bonus.stick || 0)
+      const gainLeaf = leaves + (bonus.leaf || 0)
+
       const dropped = []
-      const overflowLog = this.inventory.add(ItemId.LOG, 1)
-      const overflowStick = this.inventory.add(ItemId.STICK, sticks)
-      const overflowLeaf = this.inventory.add(ItemId.LEAF, leaves)
+      const overflowLog = this.inventory.add(ItemId.LOG, gainLog)
+      const overflowStick = this.inventory.add(ItemId.STICK, gainStick)
+      const overflowLeaf = this.inventory.add(ItemId.LEAF, gainLeaf)
 
       if (overflowLog) dropped.push(`${overflowLog} ${ITEMS[ItemId.LOG].name}`)
       if (overflowStick) dropped.push(`${overflowStick} ${ITEMS[ItemId.STICK].name}`)
       if (overflowLeaf) dropped.push(`${overflowLeaf} ${ITEMS[ItemId.LEAF].name}`)
 
       const m = dropped.length
-        ? `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas (excedente descartado)`
-        : `Loot: +1 tronco, +${sticks} galhos, +${leaves} folhas`
+        ? `Loot: +${gainLog} tronco, +${gainStick} galhos, +${gainLeaf} folhas (excedente descartado)`
+        : `Loot: +${gainLog} tronco, +${gainStick} galhos, +${gainLeaf} folhas`
 
       this.sfx.chop()
       this.ui.toast(m, 1400)
+
+      const hasAnyBonus = (bonus.log || 0) > 0 || (bonus.stick || 0) > 0 || (bonus.leaf || 0) > 0
+      if (hasAnyBonus) {
+        const parts = []
+        if (bonus.log) parts.push(`+${bonus.log} Tronco`)
+        if (bonus.stick) parts.push(`+${bonus.stick} Galhos`)
+        if (bonus.leaf) parts.push(`+${bonus.leaf} Folhas`)
+        this.ui.toast(`Bônus Lenhador! ${parts.join(' ')}`, 1400)
+      }
 
       if (this.state === 'inventory') this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id])
     })
@@ -1220,6 +1236,28 @@ export class Game {
 
   _randInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min
+  }
+
+  _hasFullWoodcutterSet() {
+    const eq = this.equipment || {}
+    return (
+      eq.hat?.id === ItemId.WOODCUTTER_HAT &&
+      eq.shirt?.id === ItemId.WOODCUTTER_SHIRT &&
+      eq.pants?.id === ItemId.WOODCUTTER_PANTS &&
+      eq.boots?.id === ItemId.WOODCUTTER_BOOTS &&
+      eq.gloves?.id === ItemId.WOODCUTTER_GLOVES
+    )
+  }
+
+  _rollWoodcutterBonusTreeLoot() {
+    if (!this._hasFullWoodcutterSet()) return { log: 0, stick: 0, leaf: 0 }
+
+    const chance = 0.25
+    return {
+      log: Math.random() < chance ? 1 : 0,
+      stick: Math.random() < chance ? 2 : 0,
+      leaf: Math.random() < chance ? 5 : 0,
+    }
   }
 
   _tryHoe() {
