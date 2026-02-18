@@ -3,7 +3,6 @@ import { apiFetch } from './api.js';
 const LS_GUEST_ID = 'woodcutter_guest_id';
 const LS_GUEST_TOKEN = 'woodcutter_guest_token';
 const LS_WORLD_ID = 'woodcutter_world_id';
-const LS_ACCOUNT_EMAIL = 'woodcutter_account_email';
 const LS_DEVICE_KEY = 'woodcutter_device_key';
 
 export function getStoredGuestId() {
@@ -56,14 +55,6 @@ export function setStoredWorldId(worldId) {
   }
 }
 
-export function getStoredAccountEmail() {
-  try {
-    return localStorage.getItem(LS_ACCOUNT_EMAIL);
-  } catch {
-    return null;
-  }
-}
-
 export function getOrCreateDeviceKey() {
   try {
     let v = localStorage.getItem(LS_DEVICE_KEY)
@@ -77,14 +68,7 @@ export function getOrCreateDeviceKey() {
   }
 }
 
-export function setStoredAccountEmail(email) {
-  try {
-    if (!email) localStorage.removeItem(LS_ACCOUNT_EMAIL);
-    else localStorage.setItem(LS_ACCOUNT_EMAIL, String(email).trim().toLowerCase());
-  } catch {
-    // ignore
-  }
-}
+// auth email storage (legacy removed)
 
 export async function ensureGuest({ worldId } = {}) {
   // Compat wrapper: guest agora é garantido por dispositivo (Auth v2)
@@ -144,61 +128,7 @@ export async function savePlayerSettings({ guestId, worldId, settings }) {
   return true;
 }
 
-export async function startAccountLink({ guestId, email }) {
-  const res = await apiFetch('/api/auth/link/start', {
-    method: 'POST',
-    body: JSON.stringify({ guestId, email }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `link/start failed: ${res.status}`);
-  return data;
-}
-
-export async function verifyAccountLink({ guestId, email, code }) {
-  const res = await apiFetch('/api/auth/link/verify', {
-    method: 'POST',
-    body: JSON.stringify({ guestId, email, code }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `link/verify failed: ${res.status}`);
-
-  if (data?.guestId && data?.token) {
-    setStoredGuestId(data.guestId);
-    setStoredGuestToken(data.token);
-  }
-  setStoredAccountEmail(email);
-
-  return data;
-}
-
-export async function startAccountLogin({ email }) {
-  const res = await apiFetch('/api/auth/login/start', {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `login/start failed: ${res.status}`);
-  return data;
-}
-
-export async function verifyAccountLogin({ email, code }) {
-  const res = await apiFetch('/api/auth/login/verify', {
-    method: 'POST',
-    body: JSON.stringify({ email, code }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `login/verify failed: ${res.status}`);
-
-  if (data?.guestId && data?.token) {
-    setStoredGuestId(data.guestId);
-    setStoredGuestToken(data.token);
-  }
-  setStoredAccountEmail(email);
-
-  return data;
-}
-
-// Auth v2 (WIP)
+// Auth v2
 export async function ensureGuestByDevice({ worldId } = {}) {
   const desiredWorldId = worldId || getStoredWorldId();
   const deviceKey = getOrCreateDeviceKey();
