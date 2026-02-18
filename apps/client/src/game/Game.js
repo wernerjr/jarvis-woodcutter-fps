@@ -1577,6 +1577,29 @@ export class Game {
     return name === 'hat' || name === 'shirt' || name === 'pants' || name === 'boots' || name === 'gloves' || name === 'backpack'
   }
 
+  _recomputeInventoryCapacity() {
+    // For now: any equipped backpack grants +10 slots (actual item id comes in P8).
+    const hasBackpack = !!this.equipment?.backpack
+    const desired = (this.inventoryBaseSlots || 20) + (hasBackpack ? 10 : 0)
+    this._setInventorySlotCount(desired)
+  }
+
+  _setInventorySlotCount(n) {
+    const desired = Math.max(1, Math.floor(Number(n) || 0))
+    if (!this.inventory || this.inventory.slotCount === desired) return
+
+    const overflow = this.inventory.resize(desired)
+    if (overflow && overflow.length) {
+      // Deterministic: discard overflow (matches previous behavior of overflow drops).
+      this.ui.toast(`Inventário reduziu: ${overflow.length} item(ns) excedente(s) descartado(s).`, 1600)
+    }
+
+    // If inventory is open, rerender.
+    if (this.state === 'inventory') {
+      this.ui.renderInventory(this.inventory.slots, (id) => ITEMS[id], { slotCountHint: this.inventory.slotCount })
+    }
+  }
+
   _updateEquippedDurability(dt) {
     const ms = Math.max(0, Number(dt || 0)) * 1000
     if (!ms) return
@@ -1595,6 +1618,7 @@ export class Game {
         // Break: remove item entirely.
         this.equipment[name] = null
         this.ui.toast('Uma peça equipada se desgastou e quebrou.', 1400)
+        this._recomputeInventoryCapacity?.()
       }
     }
 
@@ -2656,6 +2680,7 @@ export class Game {
   async _applyPersistedState(state) {
     const { applyGameSave } = await import('../net/gameSave.js')
     applyGameSave(this, state)
+    this._recomputeInventoryCapacity?.()
   }
 
   async saveNow() {

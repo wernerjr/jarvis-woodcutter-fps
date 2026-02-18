@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": "jarvis-woodcutter-fps",
-  "updatedAt": "2026-02-18T01:06:22Z",
+  "updatedAt": "2026-02-18T01:07:10Z",
   "statusLegend": {
     "epic": [
       "todo",
@@ -101,7 +101,7 @@
         {
           "id": "P7-S2",
           "title": "Inventário com slotCount dinâmico (resize seguro) para +10 da mochila",
-          "status": "todo",
+          "status": "done",
           "objective": "Permitir aumentar/diminuir a capacidade do inventário sem corromper slots; tratar overflow ao reduzir capacidade.",
           "acceptanceCriteria": [
             "Inventory suporta resize para N slots mantendo itens existentes até N.",
@@ -118,7 +118,8 @@
             "Preencher slots 21-30, resize 30->20: excedentes tratados conforme regra.",
             "Abrir/fechar inventário durante resize não quebra UI."
           ],
-          "mvp": true
+          "mvp": true,
+          "updatedAt": "2026-02-18T01:07:10Z"
         },
         {
           "id": "P7-S3",

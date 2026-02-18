@@ -129,6 +129,26 @@ export class Inventory {
     return false
   }
 
+  /** Resize slot count. Returns overflow items that no longer fit (kept as slot records). */
+  resize(newSlots) {
+    const n = Math.max(1, Math.floor(Number(newSlots) || 0))
+    if (n === this.slotCount) return []
+
+    // Grow
+    if (n > this.slotCount) {
+      const add = n - this.slotCount
+      for (let i = 0; i < add; i++) this.slots.push(null)
+      this.slotCount = n
+      return []
+    }
+
+    // Shrink: collect overflow
+    const overflow = this.slots.slice(n).filter(Boolean)
+    this.slots = this.slots.slice(0, n)
+    this.slotCount = n
+    return overflow
+  }
+
   /** @returns {{used:number, free:number}} */
   getUsage() {
     let used = 0
@@ -136,3 +156,4 @@ export class Inventory {
     return { used, free: this.slotCount - used }
   }
 }
+
