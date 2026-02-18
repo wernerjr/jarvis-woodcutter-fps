@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jarvis — Main Menu (Epic P12)</title>
+
+    <!-- Heavy sans-serif for game menu impact -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Titan+One&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --primary: #b45f06;
+        --bg-glass: rgba(51, 51, 51, 0.7);
+        --glow: #ff8c00;
+        --text: #ead8b1;
+        --stroke: #444;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100svh;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        color: var(--text);
+        background:
+          linear-gradient(180deg, rgba(0,0,0,.42), rgba(0,0,0,.70)),
+          radial-gradient(circle at 20% 20%, rgba(255,140,0,.20), transparent 40%),
+          radial-gradient(circle at 80% 10%, rgba(180,95,6,.22), transparent 45%),
+          url('/splash.png') center / cover no-repeat;
+        font-family: 'Bebas Neue', system-ui, sans-serif;
+        letter-spacing: 0.4px;
+      }
+
+      .menu-shell {
+        width: min(92vw, 520px);
+        padding: 22px 20px 18px;
+        border: 2px solid var(--stroke);
+        border-radius: 16px;
+        background: var(--bg-glass);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .brand {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+
+      .title {
+        margin: 0;
+        line-height: 0.9;
+        font-size: clamp(38px, 8vw, 58px);
+        color: var(--text);
+        text-shadow: 0 0 16px rgba(255, 140, 0, 0.28);
+      }
+
+      .subtitle {
+        margin: 0;
+        font-size: 19px;
+        opacity: 0.95;
+      }
+
+      .hint {
+        margin: 0;
+        font-size: 13px;
+        opacity: 0.8;
+      }
+
+      .menu-actions {
+        margin-top: 14px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .menu-btn {
+        width: 100%;
+        border: 1px solid rgba(234, 216, 177, 0.2);
+        border-radius: 11px;
+        padding: 11px 12px;
+        text-align: center;
+        background: linear-gradient(180deg, rgba(180,95,6,.24), rgba(180,95,6,.12));
+        color: var(--text);
+        font-family: 'Titan One', 'Bebas Neue', system-ui, sans-serif;
+        font-size: clamp(15px, 3.6vw, 19px);
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform .2s ease-in-out, box-shadow .2s ease-in-out, border-color .2s ease-in-out;
+      }
+
+      .menu-btn:hover,
+      .menu-btn:focus-visible {
+        transform: scale(1.05);
+        border-color: var(--glow);
+        box-shadow:
+          inset 0 0 14px rgba(255, 140, 0, .55),
+          0 0 14px rgba(255, 140, 0, .28);
+        outline: none;
+      }
+
+      .menu-btn[data-action="shutdown"] {
+        background: linear-gradient(180deg, rgba(120,40,10,.30), rgba(90,20,10,.22));
+      }
+
+      .footer {
+        margin-top: 12px;
+        font-size: 12px;
+        opacity: 0.72;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="menu-shell" aria-label="Game Main Menu">
+      <header class="brand">
+        <h1 class="title">Jarvis</h1>
+        <p class="subtitle">The Lumberjack Robot</p>
+        <p class="hint">Press any button to start</p>
+      </header>
+
+      <nav class="menu-actions" aria-label="Main navigation">
+        <button class="menu-btn" type="button" data-action="start_engine">Start Engine</button>
+        <button class="menu-btn" type="button" data-action="upgrades">Upgrades</button>
+        <button class="menu-btn" type="button" data-action="forest_logs">Forest Logs</button>
+        <button class="menu-btn" type="button" data-action="options">Options</button>
+        <button class="menu-btn" type="button" data-action="shutdown">Shut Down</button>
+      </nav>
+
+      <footer class="footer">Industrial menu prototype • Epic P12</footer>
+    </main>
+
+    <script>
+      document.querySelectorAll('.menu-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const action = btn.dataset.action;
+          console.log(`[MAIN_MENU] click: ${action}`);
+        });
+      });
+    </script>
+  </body>
+</html>
