@@ -415,6 +415,8 @@ $('#btnPlay').addEventListener('click', async () => {
 $('#btnControls').addEventListener('click', () => game.openControls('menu'))
 $('#btnMenuOptions')?.addEventListener('click', () => {
   // Open options overlay
+  const opt = document.querySelector('#options')
+  if (opt) opt.dataset.returnTo = 'menu'
   document.querySelector('#options')?.classList.remove('hidden')
   document.querySelector('#menu')?.classList.add('hidden')
 
@@ -430,8 +432,11 @@ $('#btnClose').addEventListener('click', () => game.tryClose())
 
 // Options menu
 $('#btnOptBack')?.addEventListener('click', () => {
+  const opt = document.querySelector('#options')
+  const ret = opt?.dataset?.returnTo || 'menu'
   document.querySelector('#options')?.classList.add('hidden')
-  document.querySelector('#menu')?.classList.remove('hidden')
+  if (ret === 'pause') document.querySelector('#pause')?.classList.remove('hidden')
+  else document.querySelector('#menu')?.classList.remove('hidden')
 })
 
 const persistSettingsDebounced = (() => {
@@ -476,9 +481,21 @@ $('#btnOptPreview3D')?.addEventListener('click', () => {
 $('#btnResume').addEventListener('click', () => game.resume())
 $('#btnRestart').addEventListener('click', () => game.restart())
 $('#btnPauseControls').addEventListener('click', () => game.openControls('pause'))
+$('#btnPauseOptions')?.addEventListener('click', () => {
+  // Open options overlay from pause
+  const opt = document.querySelector('#options')
+  if (opt) opt.dataset.returnTo = 'pause'
+  document.querySelector('#options')?.classList.remove('hidden')
+  document.querySelector('#pause')?.classList.add('hidden')
+
+  const b1 = document.querySelector('#btnOptPerf')
+  const b2 = document.querySelector('#btnOptViewBob')
+  const b3 = document.querySelector('#btnOptPreview3D')
+  if (b1) b1.textContent = `Performance: ${game.perfEnabled ? 'ON' : 'OFF'}`
+  if (b2) b2.textContent = `View bob: ${game._viewBobEnabled ? 'ON' : 'OFF'}`
+  if (b3) b3.textContent = `Preview 3D: ${game.preview3dEnabled ? 'ON' : 'OFF'}`
+})
 $('#btnQuit').addEventListener('click', () => game.quitToMenu())
-$('#btnPerfToggle').addEventListener('click', () => game.togglePerf())
-$('#btnViewBob').addEventListener('click', () => game.toggleViewBob())
 
 const btnPreview3D = document.querySelector('#btnPreview3D')
 if (btnPreview3D) {
