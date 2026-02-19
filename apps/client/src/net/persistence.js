@@ -161,10 +161,10 @@ export async function registerUserPassword({ username, password, guestId }) {
   return data;
 }
 
-export async function loginUserPassword({ username, password }) {
+export async function loginUserPassword({ username, password, worldId }) {
   const res = await apiFetch('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, ...(worldId ? { worldId } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || `auth/login failed: ${res.status}`);

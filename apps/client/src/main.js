@@ -127,7 +127,7 @@ document.querySelector('#btnAuthLogin')?.addEventListener('click', async () => {
     const username = String(authUsernameEl?.value || '').trim()
     const password = String(authPasswordEl?.value || '')
     setAuthStatus('Entrando...')
-    const out = await loginUserPassword({ username, password })
+    const out = await loginUserPassword({ username, password, worldId: String(worldInput?.value || '').trim() || undefined })
     game.setPersistenceContext({
       guestId: out.guestId,
       worldId: out.worldId || String(worldInput?.value || '').trim() || 'world-1',
@@ -150,7 +150,7 @@ document.querySelector('#btnAuthRegister')?.addEventListener('click', async () =
     const password = String(authPasswordEl?.value || '')
     setAuthStatus('Cadastrando...')
     await registerUserPassword({ username, password })
-    const out = await loginUserPassword({ username, password })
+    const out = await loginUserPassword({ username, password, worldId: String(worldInput?.value || '').trim() || undefined })
     game.setPersistenceContext({
       guestId: out.guestId,
       worldId: out.worldId || String(worldInput?.value || '').trim() || 'world-1',

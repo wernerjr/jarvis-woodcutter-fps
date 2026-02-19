@@ -3480,6 +3480,18 @@ export class Game {
     const driftCap = 0.2
 
     const yawT = me.yaw || 0
+    // Hard guard: if drift explodes (collision/desync), snap to server and kill velocity.
+    if (dist > 0.55) {
+      const groundY = this._lastGroundY || 0
+      const minY = groundY + this.player.eyeHeight
+      this.player.position.set(tx, Math.max(minY, ty), tz)
+      this.player.velocity.set(0, 0, 0)
+      try { this.player._keys?.clear?.() } catch {}
+      const dy = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+      this.player.yaw.rotation.y += dy * 0.28
+      this._reconCooldownUntil = now + 120
+      return
+    }
     const dyaw = ((yawT - this.player.yaw.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI
 
     // When moving, keep local feel, but if drift exceeds cap, reconcile enough to stay under cap.

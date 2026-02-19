@@ -76,6 +76,7 @@ const RegisterSchema = z.object({
 const LoginSchema = z.object({
   username: z.string().min(3).max(24),
   password: z.string().min(6).max(120),
+  worldId: z.string().min(3).max(40).regex(/^world-[a-z0-9-]+$/i).optional(),
 })
 
 async function ensureWorld(worldId: string) {
@@ -220,9 +221,13 @@ export async function registerAuthIdentityRoutes(app: FastifyInstance) {
       return reply.status(409).send({ ok: false, error: 'user_not_linked_to_progress' })
     }
 
+    const worldId = parsed.data.worldId || DEFAULT_WORLD_ID
+    await ensureWorld(worldId)
+    await ensurePlayerState(user.guestId, worldId)
+
     await db.update(users).set({ lastSeenAt: new Date() }).where(eq(users.id, user.id))
     await db.update(guests).set({ lastSeenAt: new Date() }).where(eq(guests.id, user.guestId))
 
-    return makeAuthPayload(user.guestId, DEFAULT_WORLD_ID)
+    return makeAuthPayload(user.guestId, worldId)
   })
 }
