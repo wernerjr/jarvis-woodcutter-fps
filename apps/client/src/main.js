@@ -51,17 +51,17 @@ const game = new Game({ canvas, ui })
 // World selection (simple lobby)
 const worldInput = document.querySelector('#worldId')
 if (worldInput) {
-  const saved = getStoredWorldId()
-  if (saved) {
-    const hasOpt = [...worldInput.options].some((o) => o.value === saved)
-    if (!hasOpt) {
-      const opt = document.createElement('option')
-      opt.value = saved
-      opt.textContent = `${saved} (custom)`
-      worldInput.appendChild(opt)
-    }
+  const saved = String(getStoredWorldId() || '').trim()
+  const hasOpt = saved ? [...worldInput.options].some((o) => o.value === saved) : false
+
+  // Não criar mundo custom automaticamente (ex.: legado world-1).
+  if (saved && hasOpt) {
     worldInput.value = saved
+  } else {
+    const fallback = String(worldInput.value || worldInput.options?.[0]?.value || '').trim()
+    if (fallback) setStoredWorldId(fallback)
   }
+
   worldInput.addEventListener('change', () => {
     const v = String(worldInput.value || '').trim()
     if (v) setStoredWorldId(v)
